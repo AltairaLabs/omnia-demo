@@ -117,6 +117,11 @@ spec:
     max_tokens: 1024
 
   validators:
+    # NOTE: `message` should be a top-level sibling of `type`/`params`/`fail_on_violation`
+    # per promptconfig.json:643-645, but the current packc binary has a stale embedded
+    # schema that rejects that position. Nested inside `params` is a temporary workaround
+    # until packc is rebuilt against the current on-disk schema. Tracked in the upstream
+    # PromptKit issue filed by Task 19. promptarena validate accepts both positions.
     - type: regex_blocklist
       params:
         patterns:
