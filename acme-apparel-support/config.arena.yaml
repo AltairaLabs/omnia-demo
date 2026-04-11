@@ -35,7 +35,7 @@ spec:
           - 'unresolved' — the conversation ended without the issue being addressed, and without escalation
 
           Respond with ONLY one word: resolved, escalated, abandoned, or unresolved.
-        model: gpt-4o
+        model: gpt-4.1
         output_format: categorical
         categories: [resolved, escalated, abandoned, unresolved]
       metric:
@@ -59,7 +59,7 @@ spec:
           - +1.0 = delighted, effusive thanks
 
           Respond with a single number between -1.0 and +1.0, to one decimal place.
-        model: gpt-4o
+        model: gpt-4.1
         output_format: numeric
       metric:
         name: acme_customer_sentiment
@@ -114,6 +114,7 @@ spec:
 
   providers:
     - file: providers/azure-gpt4o.provider.yaml
+    - file: providers/openai-direct.provider.yaml
     - file: providers/ollama-local.provider.yaml
 
   defaults:
