@@ -1,0 +1,37 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: issue_discount_code
+spec:
+  name: issue_discount_code
+  description: |
+    Issue a discount code to a customer. Use only after confirming the
+    underlying issue with lookup_order. Discount types:
+    - EXPRESS_UPGRADE: free shipping upgrade for delivery delays
+    - PERCENT_OFF_10: 10% off next order, for minor inconvenience
+    - PERCENT_OFF_20: 20% off next order, for significant inconvenience
+  input_schema:
+    type: object
+    properties:
+      customer_email:
+        type: string
+        description: The customer's email address
+      discount_type:
+        type: string
+        enum: [EXPRESS_UPGRADE, PERCENT_OFF_10, PERCENT_OFF_20]
+        description: Which discount tier to issue
+    required:
+      - customer_email
+      - discount_type
+  output_schema:
+    type: object
+    properties:
+      code: { type: string }
+      discount_type: { type: string }
+      expires_at: { type: string }
+  mode: mock
+  timeout_ms: 2000
+  mock_result:
+    code: EXPRESS-X7K92
+    discount_type: EXPRESS_UPGRADE
+    expires_at: "2026-05-11T00:00:00Z"

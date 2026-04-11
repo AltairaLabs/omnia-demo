@@ -1,0 +1,40 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: lookup_customer
+spec:
+  name: lookup_customer
+  description: |
+    Fetch a customer's account details and order history by email or
+    customer ID. Returns customer profile, lifetime orders, last purchase
+    date, and segment tags.
+  input_schema:
+    type: object
+    properties:
+      customer_id_or_email:
+        type: string
+        description: The customer's ID or email address
+    required:
+      - customer_id_or_email
+  output_schema:
+    type: object
+    properties:
+      customer_id: { type: string }
+      email: { type: string }
+      name: { type: string }
+      lifetime_orders: { type: integer }
+      lifetime_value: { type: string }
+      last_order_date: { type: string }
+      segment:
+        type: string
+        enum: [new, returning, loyal, vip]
+  mode: mock
+  timeout_ms: 2000
+  mock_result:
+    customer_id: CUST-8842
+    email: sarah.chen@example.com
+    name: Sarah Chen
+    lifetime_orders: 7
+    lifetime_value: "612.40"
+    last_order_date: "2026-03-28"
+    segment: returning
