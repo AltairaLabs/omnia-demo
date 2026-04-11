@@ -17,6 +17,81 @@ spec:
     - file: tools/issue-discount-code.tool.yaml
     - file: tools/escalate-to-human.tool.yaml
 
+  # Pack-level evals — both variants are measured identically.
+  pack_evals:
+    - id: session_outcome
+      type: llm_judge
+      trigger: session_completion
+      description: Classify session outcome (resolved/escalated/abandoned/unresolved)
+      params:
+        rubric: |
+          You are evaluating a customer support conversation between a customer and an AI agent. Based on the full conversation, classify the final outcome as exactly one of these categories:
+
+          - 'resolved' — the customer's issue was fully addressed, they received what they needed (answer, action, resolution), and the conversation ended on a positive or neutral note
+          - 'escalated' — the agent called escalate_to_human OR the customer was explicitly told their issue would be handled by a human specialist
+          - 'abandoned' — the customer stopped responding mid-conversation without their issue being addressed
+          - 'unresolved' — the conversation ended without the issue being addressed, and without escalation
+
+          Respond with ONLY one word: resolved, escalated, abandoned, or unresolved.
+        model: gpt-4o
+        output_format: categorical
+        categories: [resolved, escalated, abandoned, unresolved]
+      metric:
+        name: acme_session_outcome_total
+        type: counter
+        labels:
+          outcome: ""
+
+    - id: customer_sentiment
+      type: llm_judge
+      trigger: session_completion
+      description: Score customer sentiment at session end, -1 to +1
+      params:
+        rubric: |
+          You are evaluating the customer's sentiment at the end of a support conversation. Rate their final emotional state on a scale from -1 to +1:
+
+          - -1.0 = angry, hostile, threatening to churn
+          - -0.5 = frustrated, dissatisfied
+          -  0.0 = neutral, matter-of-fact
+          - +0.5 = satisfied, polite appreciation
+          - +1.0 = delighted, effusive thanks
+
+          Respond with a single number between -1.0 and +1.0, to one decimal place.
+        model: gpt-4o
+        output_format: numeric
+      metric:
+        name: acme_customer_sentiment
+        type: gauge
+        range:
+          min: -1.0
+          max: 1.0
+
+    - id: no_pii_leak
+      type: regex
+      trigger: turn_completion
+      description: Block credit card and SSN patterns in agent output
+      params:
+        patterns:
+          - '\b(?:\d[ -]*?){13,16}\b'
+          - '\b\d{3}-\d{2}-\d{4}\b'
+        expect: no_match
+      metric:
+        name: acme_no_pii_leak
+        type: counter
+        labels:
+          leaked: ""
+
+    - id: memory_utilization
+      type: rule
+      trigger: session_completion
+      description: Agent called at least one memory__* tool during the session
+      params:
+        tool_names: [memory__recall, memory__remember]
+        match_mode: any
+      metric:
+        name: acme_memory_used
+        type: gauge
+
   providers:
     - file: providers/azure-gpt4o.provider.yaml
     - file: providers/ollama-local.provider.yaml
