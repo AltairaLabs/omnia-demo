@@ -364,6 +364,8 @@ Summary (detailed row-by-row updates are already applied in `specs/demo-build-pl
    - Synthesizes / defaults `name`, `version`, `template_engine`, `metadata`.
    
    **Workaround for the demo**: pass CLI flags in the build script. File an upstream PromptKit issue proposing `Arena.spec.pack: { name, version, template_engine, metadata }` as a new field. Not gating the demo.
+
+   **Upstream tracking**: AltairaLabs/PromptKit#937 (filed 2026-04-11 — covers pack-level metadata gap, stale packc ValidatorConfig schema, and missing `type: azure-openai` support in the promptarena engine)
 2. **Fragment file format**. PromptKit's `FragmentRef { name, path, required }` schema doesn't constrain the MIME of the fragment body. Author as `.txt` plaintext; `packc compile` will surface any expectation mismatch by failing to compile.
 3. **Memory tool naming**. `memory__recall` / `memory__remember` in `allowed_tools` — verify exact tool names with a minimal `promptarena run` that exercises the memory path, or by reading PromptKit's memory SDK code. Could be `memory.recall` / `memory.remember` or similar. Low-risk, two-minute fix if wrong.
 4. **`EvalDef.type` and `EvalDef.trigger` enumerations**. `llm_judge`, `rule`, `regex`, `session_completion`, `turn_completion` are the design intent. Verified at `packc compile` time against the EvalDef schema and at runtime by `promptarena run` executing a scenario that triggers each.
