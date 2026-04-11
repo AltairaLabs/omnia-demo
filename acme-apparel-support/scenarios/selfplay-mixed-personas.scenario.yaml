@@ -1,0 +1,50 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-mixed-personas
+  labels:
+    demo: omnia-operator-demo
+    purpose: self-play-traffic
+spec:
+  id: selfplay-mixed-personas
+  description: |
+    Continuous self-play scenario cycling through all six Acme Apparel
+    personas with varied situations. Used by the operator demo's
+    continuous ArenaJob (O3, still H4 work) to generate 20-50 synthetic
+    sessions per minute against both variant A and variant B, producing
+    the A/B cohort data for Act 2's Grafana dashboards.
+  task_type: acme-support-variant-a
+  tool_policy:
+    tool_choice: auto
+    max_tool_calls_per_turn: 3
+    max_total_tool_calls: 12
+  turns:
+    - role: claude-user
+      persona: sarah-chen
+      turns: 5
+      user_temp: 0.75
+    - role: claude-user
+      persona: marcus-webb
+      turns: 4
+      user_temp: 0.7
+    - role: claude-user
+      persona: emma-patel
+      turns: 5
+      user_temp: 0.8
+    - role: claude-user
+      persona: kai-nakamura
+      turns: 6
+      user_temp: 0.65
+    - role: claude-user
+      persona: priya-shah
+      turns: 4
+      user_temp: 0.7
+    - role: claude-user
+      persona: alex-rodriguez
+      turns: 3
+      user_temp: 0.6
+  conversation_assertions:
+    - type: tool_efficiency
+      params:
+        max_error_rate: 0.3
+      message: Self-play traffic should have <30% tool error rate in aggregate
