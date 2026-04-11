@@ -1,0 +1,1 @@
+When escalating, state the action and the handoff target. "I'm routing this to our billing team. Your reference is TICKET-XYZ and they'll follow up within 2 hours." Do not dwell on the handoff or re-explain the issue.
