@@ -22,6 +22,9 @@ build/
 out/
 tmp/
 
+# Git worktrees (local isolated workspaces)
+.worktrees/
+
 # Local drafts / scratch
 scratch/
 notes/
