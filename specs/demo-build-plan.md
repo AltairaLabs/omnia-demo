@@ -4,7 +4,7 @@
 **Created**: 2026-04-10
 **Last significant update**: 2026-04-11 — arena-native content pivot (see `2026-04-11-arena-native-content-design.md`)
 
-> **Note on the content pivot (2026-04-11)**: Demo content (T7/T8/K1/K2/O1/O2 and the T1–T5 tool schemas) is being re-sourced as native PromptKit arena YAML under a new top-level `acme-apparel-support/` directory. The full design is in `specs/2026-04-11-arena-native-content-design.md`. Rows below have been annotated where tasks shift phases, fold together, or change shape; detailed task breakdown for the pivot itself is the job of the implementation plan that follows the design doc. Phase totals below have not been re-summed — net calendar impact of the pivot is ~zero (work moves forward, not up).
+> **Content pivot (2026-04-11) — COMPLETE**: Demo content (T7/T8/K1/K2/O1/O2 and the T1–T5 tool schemas) has been re-sourced as native PromptKit arena YAML under `acme-apparel-support/`. See `specs/2026-04-11-arena-native-content-design.md` for design rationale and `specs/2026-04-11-arena-native-content-implementation-plan.md` for the executed plan. T7/T8/K1/K2/O1/O2 rows below are marked DONE where the content work completed; H2.b (Helm chart packaging) and H4.a O3 (continuous ArenaJob) remain.
 
 ## 📍 Starting work? Open `demo-kickoff.md` first
 
@@ -150,8 +150,8 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 | T4 | 🛠 | Stub KB service: single Go binary, `GET /search?q=...`, BM25 or keyword match. Tool schema (`search-kb.tool.yaml`) authored alongside T1-T3; backing Go service is unchanged runtime work. | 1-2d | SH4 | Y |
 | T5 | 🛠 | Stub escalation queue service: Go binary, `POST /escalations`, `GET /escalations`, `DELETE /escalations/{id}`. Tool schema (`escalate-to-human.tool.yaml`) authored alongside T1-T3; backing Go service is unchanged runtime work. | 0.5-1d | — | Y |
 | T6 | ~~🛠~~ | **FOLDED INTO T1-T5** per arena-native pivot. The `.tool.yaml` files authored under T1-T5 are the registry entries; no separate "ToolRegistry entries" task needed. H2.b Helm chart packaging wraps them for deployment. | — | — | — |
-| T7 | 🛠 REWORK | Variant A support content. Per arena-native pivot: authored as `acme-apparel-support/prompts/variant-a-agent.yaml` (`kind: PromptConfig`) + 4 fragment files under `prompts/fragments/variant-a/`. Pack-level evals (K1, K2, `no_pii_leak`, `memory_utilization`) live in `config.arena.yaml` `spec.pack_evals[]`, not inside the PromptConfig. The existing markdown at `promptpacks/variant-a-support-promptpack.md` is archival design input — superseded on 2026-04-11. Design content carries forward; authoring form changes. | 1-2d | — | Y |
-| T8 | ✅ DONE CONTENT / MOVE PENDING | 6 Acme Apparel personas drafted at `personas/*.yaml` as `kind: Persona` YAML (sarah-chen, marcus-webb, emma-patel, kai-nakamura, priya-shah, alex-rodriguez). Persona content is complete — Pattern A confirmed. Remaining work = file move + rename into `acme-apparel-support/personas/*.persona.yaml` as part of the arena-native pivot. | 15 min move | — | Y |
+| T7 | ✅ DONE 2026-04-11 | Variant A PromptConfig authored at `acme-apparel-support/prompts/variant-a-agent.yaml` + 4 fragment files. promptarena validate passes. | — | — | — |
+| T8 | ✅ DONE 2026-04-11 | 6 personas at `acme-apparel-support/personas/*.persona.yaml`. Content unchanged from original drafts; file moves + rename complete. | — | — | — |
 
 **H1 total: ~13-19 engineer-days.**
 
@@ -167,8 +167,8 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 
 | ID | Type | Item | Size | Depends on | Parallel? |
 |---|---|---|---|---|---|
-| K1 | ✅ MOVED TO H1 | `session_outcome` eval — pack-level in `config.arena.yaml` spec.pack_evals[]. LLM-as-judge, categorical: resolved/escalated/abandoned/unresolved. `metric: { name: "acme_session_outcome_total", type: "counter", labels: { outcome } }`. Authored as part of T7 rework. | 0 (folded into T7) | T7 rework | — |
-| K2 | ✅ MOVED TO H1 | `customer_sentiment` eval — pack-level. LLM-as-judge, gauge -1..+1. `metric: { name: "acme_customer_sentiment", type: "gauge", range: { min: -1, max: 1 } }`. Authored as part of T7 rework. | 0 (folded into T7) | T7 rework | — |
+| K1 | ✅ DONE 2026-04-11 | `session_outcome` pack-level eval in `acme-apparel-support/config.arena.yaml` spec.pack_evals[]. LLM-as-judge counter metric with outcome label. | — | — | — |
+| K2 | ✅ DONE 2026-04-11 | `customer_sentiment` pack-level eval. LLM-as-judge gauge metric, range -1..+1. | — | — | — |
 | K3 | 🛠 | KPI dashboard strip component. React component querying Prometheus HTTP API for: resolution rate (from K1), cost/conversation (existing metrics), avg handle time (existing metrics), escalation rate (from K1). **Requires §8-Q11 metric name verification** | 1-2d | K1 | Y |
 | K4 | 🛠 | "What did the agent remember" panel on session detail view. Reads memory-api for entities accessed during the session. May need new memory-api query endpoint | 2d | — | Y |
 | K5 | 🛠 | Escalation queue view page — reads from T5 stub, OR derived from `acme_session_outcome_total{outcome="escalated"}` | 1d | T5 or K1 | Y |
@@ -219,8 +219,8 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 
 | ID | Type | Item | Size | Depends on | Parallel? |
 |---|---|---|---|---|---|
-| O1 | ✅ MOVED TO H1 | Self-play scenarios (`acme-apparel-support/scenarios/selfplay-*.scenario.yaml`) cycling through all 6 personas with varied situations. Authored alongside hero-demo scene scenarios during T7 rework. | 0 (folded into H1 content) | T8 move, T7 rework | — |
-| O2 | ✅ MOVED TO H1 | **Variant B PromptConfig** — `acme-apparel-support/prompts/variant-b-agent.yaml` + `fragments/variant-b/*.txt`. Per D6: less-apologetic / confident, persona-dependent winners. Same tools, same pack-level evals, different fragments + slight system template adjustments. | 0 (folded into H1 content) | T7 rework, D6 | — |
+| O1 | ✅ DONE 2026-04-11 | Self-play scenario at `acme-apparel-support/scenarios/selfplay-mixed-personas.scenario.yaml` cycling all 6 personas. | — | — | — |
+| O2 | ✅ DONE 2026-04-11 | Variant B PromptConfig at `acme-apparel-support/prompts/variant-b-agent.yaml` + 4 fragment files. Less-apologetic/confident per D6. | — | — | — |
 | O3 | 🛠 | Continuous ArenaJob config (Omnia cluster CRD) running self-play scenarios at ~20-50 sessions/min indefinitely. Unchanged — still H4 work. | 0.5d | O1 (content) | N |
 
 ### H4.b — On-prem demo environment (O4-O8)

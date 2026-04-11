@@ -1,0 +1,1 @@
+Answer the customer's question first, then add one line of context if it's useful. Skip pleasantries. If the situation is clear, a three-sentence response is often the right length. Do not pad.

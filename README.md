@@ -28,20 +28,25 @@ omnia-demo/
 ├── specs/                                ← planning + design docs
 │   ├── hero-demo-proposal.md             ← hero demo narrative + gaps
 │   ├── operator-demo-proposal.md         ← operator demo narrative + gaps
-│   ├── demo-build-plan.md                ← consolidated flat build list with phase totals
+│   ├── demo-build-plan.md                ← consolidated build list with phase totals
 │   ├── demo-kickoff.md                   ← Day 1 action list
-│   └── demo-h0-plan.md                   ← H0 reliability gate decomposed into TDD tasks
-├── promptpacks/                          ← agent prompt content
-│   └── variant-a-support-promptpack.md   ← ARCHIVAL — superseded by arena-native YAML (see specs/2026-04-11-arena-native-content-design.md); kept as design input until pivot lands
-├── personas/                             ← customer personas for PromptArena self-play
-│   ├── README.md                         ← persona set overview + Pattern A/B design note
-│   ├── sarah-chen.yaml                   ← polite-but-stressed professional (hero Scenes 2-3)
-│   ├── marcus-webb.yaml                  ← assertive escalation-demander (hero Scene 4)
-│   ├── emma-patel.yaml                   ← friendly new visitor (KB path)
-│   ├── kai-nakamura.yaml                 ← patient confused older customer (lookup_customer path)
-│   ├── priya-shah.yaml                   ← loyal disappointed repeat customer (memory recall path)
-│   └── alex-rodriguez.yaml               ← happy returning (positive return archetype)
-└── kb/                                   ← knowledge base articles
+│   ├── demo-h0-plan.md                   ← H0 reliability gate TDD tasks
+│   ├── 2026-04-11-arena-native-content-design.md       ← the arena-native content pivot design
+│   └── 2026-04-11-arena-native-content-implementation-plan.md ← executed by these commits
+├── acme-apparel-support/                 ← ARENA SOURCES (pack ID = folder name)
+│   ├── README.md                         ← layout + run instructions
+│   ├── config.arena.yaml                 ← kind: Arena — pack manifest + run config
+│   ├── prompts/
+│   │   ├── variant-a-agent.yaml          ← kind: PromptConfig — warm/empathetic baseline
+│   │   ├── variant-b-agent.yaml          ← kind: PromptConfig — less-apologetic/confident
+│   │   └── fragments/
+│   │       ├── variant-a/                ← 4 fragment text files referenced by variant A
+│   │       └── variant-b/                ← 4 fragment text files referenced by variant B
+│   ├── personas/                         ← 6 kind: Persona files
+│   ├── tools/                            ← 5 kind: Tool files with mock fixtures
+│   ├── scenarios/                        ← 3 hero scenes + 1 self-play scenario
+│   └── providers/                        ← Azure GPT-4o + Ollama local
+└── kb/                                   ← runtime data served by stub KB service (not arena-native)
     ├── README.md                         ← editorial principles + consistent-facts table
     ├── shipping-policy.md
     ├── returns-and-exchanges.md
@@ -80,14 +85,16 @@ omnia-demo/
 ## Current state (2026-04-11)
 
 - **SH1** ✅ — Shopify dev store live at `acme-apparel-omnia-demo.myshopify.com`
-- **T8** ✅ content complete — 6 Acme Apparel personas drafted (`personas/*.yaml`). Pending file move into `acme-apparel-support/personas/` per the content pivot.
-- **T7** 🛠 superseded, awaiting rework — `promptpacks/variant-a-support-promptpack.md` is archival. Variant A content is being re-authored as native PromptKit arena YAML per `specs/2026-04-11-arena-native-content-design.md`.
+- **T7** ✅ DONE 2026-04-11 — Variant A PromptConfig at `acme-apparel-support/prompts/variant-a-agent.yaml` + fragments. promptarena validate passes.
+- **T8** ✅ DONE 2026-04-11 — 6 personas moved to `acme-apparel-support/personas/*.persona.yaml`. Content unchanged from original drafts.
+- **K1, K2** ✅ DONE 2026-04-11 — pack-level evals in `config.arena.yaml` `spec.pack_evals[]`.
+- **O1, O2** ✅ DONE 2026-04-11 — self-play scenario + variant B PromptConfig authored upfront under `acme-apparel-support/`.
 - **SH4** ✅ DRAFT — 8 KB articles drafted (`kb/*.md`) — unchanged by the pivot (KB content is runtime data, not arena-native).
 - **Azure infrastructure** — being provisioned out of band (V2, V3)
 - **V1** ✅ — verified Claude is not available on Azure AI Foundry; D1 locked to GPT-4o
 - **R2.1** ✅ — verified Omnia's memory populators are orphaned code; PromptKit handles extraction natively
 - **D2, D3, D6, D7** ✅ — all pre-flight decisions now resolved (see `specs/demo-build-plan.md` §Pre-flight decisions)
-- **Arena-native content pivot** 🛠 design approved 2026-04-11 — see `specs/2026-04-11-arena-native-content-design.md`. Implementation (directory scaffolding, content re-authoring, fragment authoring, pack-level evals, scenario authoring) is next. Pulls K1/K2/O1/O2 forward from H2/H4 into H1.
+- **Arena-native content pivot** ✅ DONE 2026-04-11 — implementation per `specs/2026-04-11-arena-native-content-implementation-plan.md` complete; pack validates cleanly. See commit history on branch `impl/arena-native-content`.
 
 Everything else in `specs/demo-build-plan.md` — what's DONE, PARTIAL, NOT STARTED, and VERIFY — is tracked there.
 
@@ -193,7 +200,7 @@ The following items require coordinated work across both repos:
 
 Since this is a content repo, most work is drafting, reviewing, and revising markdown and YAML. The workflow:
 
-1. Edit the relevant file in `specs/`, `promptpacks/`, `personas/`, or `kb/`
+1. Edit the relevant file in `specs/`, `acme-apparel-support/`, or `kb/`
 2. Commit to a branch
 3. Review / iterate
 4. Merge to main when stable

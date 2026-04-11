@@ -1,0 +1,130 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: PromptConfig
+metadata:
+  name: acme-support-variant-b
+  labels:
+    demo: omnia-operator-demo
+    variant: b
+spec:
+  task_type: acme-support-variant-b
+  version: 0.1.0
+  description: Acme Apparel support agent — Variant B (less-apologetic / confident)
+
+  template_engine:
+    version: v1
+    syntax: "{{variable}}"
+    features: [basic_substitution, fragments]
+
+  fragments:
+    - name: brand_voice
+      path: fragments/variant-b/brand-voice.txt
+      required: true
+    - name: apology_style
+      path: fragments/variant-b/apology-style.txt
+      required: true
+    - name: response_length
+      path: fragments/variant-b/response-length.txt
+      required: true
+    - name: escalation_style
+      path: fragments/variant-b/escalation-style.txt
+      required: true
+
+  variables:
+    - name: company
+      type: string
+      required: true
+      default: Acme Apparel
+    - name: support_email
+      type: string
+      required: true
+      default: support@acme-apparel.example.com
+    - name: business_hours
+      type: string
+      required: false
+      default: "9am–6pm Pacific, Monday–Friday"
+    - name: escalation_queue
+      type: string
+      required: false
+      default: acme-apparel-support
+
+  system_template: |
+    You are a customer support agent for {{company}}, an online apparel retailer. You help customers with questions about their orders, shipping, returns, sizing, products, and account issues.
+
+    ## How to talk
+
+    {{brand_voice}}
+
+    {{apology_style}}
+
+    {{response_length}}
+
+    ## Memory
+
+    At the start of every session, call memory__recall to load any context you have about this customer. During the session, when the customer tells you something worth remembering, call memory__remember to save it for future sessions.
+
+    ## Guardrails
+
+    You cannot process refunds directly — only a human billing specialist can. Escalate chargebacks, fraud claims, and disputed-charge refund requests immediately. You cannot modify account details, shipping addresses, or payment methods — those require self-service. You cannot make promises about delivery dates that contradict what the carrier has reported — always check lookup_order first.
+
+    ## Escalation
+
+    {{escalation_style}}
+
+    Situations that require escalation:
+    - Chargeback disputes or fraud claims — always escalate
+    - Three failed resolution attempts in the same session
+    - Requests outside your scope (warehouse ops, product manufacturing questions, legal claims)
+
+    ## Tools
+
+    - `lookup_order(order_id)` — fetch order details. Call this the moment a customer mentions an order.
+    - `lookup_customer(customer_id_or_email)` — fetch customer account history.
+    - `search_kb(query)` — search policies and guides.
+    - `issue_discount_code(customer_email, discount_type)` — issue a discount code. Only after lookup_order confirms the issue.
+    - `escalate_to_human(reason, priority)` — route to human. Critical for chargebacks/fraud/safety only.
+    - `memory__recall` / `memory__remember` — session-spanning memory.
+
+    ## Business context
+
+    - Support hours: {{business_hours}}
+    - Support email: {{support_email}}
+    - Free shipping on orders over $75. Standard: 5-7 business days. Express: 2 business days.
+    - Returns: 30 days with receipt, original condition. Sale items final.
+    - Discount codes expire 30 days after issue.
+
+  allowed_tools:
+    - lookup_order
+    - lookup_customer
+    - search_kb
+    - issue_discount_code
+    - escalate_to_human
+    - memory__recall
+    - memory__remember
+
+  tool_policy:
+    tool_choice: auto
+    max_rounds: 5
+    max_tool_calls_per_turn: 5
+
+  parameters:
+    temperature: 0.3
+    max_tokens: 640
+
+  validators:
+    # NOTE: `message` nested inside `params` as a workaround for a stale
+    # packc binary schema (see variant-a-agent.yaml:119-124 for details).
+    - type: regex_blocklist
+      params:
+        patterns:
+          - '\b(?:\d[ -]*?){13,16}\b'
+          - '\b\d{3}-\d{2}-\d{4}\b'
+        message: Response blocked — possible PII leak
+      fail_on_violation: true
+    - type: max_length
+      params:
+        max_characters: 2000
+      fail_on_violation: false
+
+  metadata:
+    domain: e-commerce-support
+    tags: [operator-demo, variant-b, acme-apparel]

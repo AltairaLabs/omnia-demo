@@ -1,0 +1,39 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: hero-memory-recall
+  labels:
+    demo: omnia-hero-demo
+    scene: "3"
+spec:
+  id: hero-memory-recall
+  description: |
+    Sarah Chen returns 30 minutes after the delayed-shipment scene to
+    thank the agent — the dress arrived in time. The agent should call
+    memory__recall at the start of the session, surface the prior
+    context (the delayed order, the EXPRESS_UPGRADE discount), and
+    reply in a way that clearly references the prior interaction. This
+    is the hero demo's memory moment.
+  task_type: acme-support-variant-a
+  tool_policy:
+    tool_choice: auto
+    max_tool_calls_per_turn: 3
+    max_total_tool_calls: 6
+  turns:
+    - role: user
+      content: |
+        Hi, I'm back — the dress arrived this morning and it's perfect. Thank you for sorting out the express shipping, the party's this afternoon.
+    - role: claude-user
+      persona: sarah-chen
+      turns: 2
+      user_temp: 0.5
+      seed: 1024
+  conversation_assertions:
+    - type: tool_called
+      params:
+        name: memory__recall
+      message: Agent should call memory__recall at session start to load prior context
+    - type: substring_present
+      params:
+        patterns: ["glad to hear", "so pleased", "happy", "great news"]
+      message: Agent should respond warmly to a successful resolution callback

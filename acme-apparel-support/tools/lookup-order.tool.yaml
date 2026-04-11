@@ -1,0 +1,62 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: lookup_order
+spec:
+  name: lookup_order
+  description: |
+    Fetch the full details of an order by its ID. Returns order status, line
+    items, fulfillment state, shipping tracking, and customer info. Use this
+    any time a customer mentions an order, even before asking them to
+    clarify.
+  input_schema:
+    type: object
+    properties:
+      order_id:
+        type: string
+        description: The Shopify order ID (e.g., '1023' or 'A-1234')
+    required:
+      - order_id
+  output_schema:
+    type: object
+    properties:
+      order_id: { type: string }
+      status:
+        type: string
+        enum: [open, closed, cancelled]
+      fulfillment_status:
+        type: string
+        enum: [unfulfilled, partial, fulfilled, delivered, in_transit, delayed]
+      total_price: { type: string }
+      currency: { type: string }
+      customer_email: { type: string }
+      tracking_number: { type: string }
+      shipping_address: { type: object }
+      line_items:
+        type: array
+        items:
+          type: object
+          properties:
+            sku: { type: string }
+            title: { type: string }
+            quantity: { type: integer }
+            price: { type: string }
+  mode: mock
+  timeout_ms: 2000
+  mock_result:
+    order_id: "1023"
+    status: open
+    fulfillment_status: delayed
+    total_price: "89.00"
+    currency: USD
+    customer_email: sarah.chen@example.com
+    tracking_number: 1Z999AA10123456784
+    shipping_address:
+      city: Oakland
+      province: CA
+      country: US
+    line_items:
+      - sku: LINEN-DRESS-M
+        title: Summer Linen Dress (M)
+        quantity: 1
+        price: "89.00"

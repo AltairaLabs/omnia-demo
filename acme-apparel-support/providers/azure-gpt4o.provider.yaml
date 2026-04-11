@@ -1,0 +1,26 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: azure-gpt4o
+  labels:
+    demo: omnia-hero-demo
+spec:
+  id: azure-gpt4o
+  # Azure OpenAI is accessed through PromptKit's vanilla `openai` provider
+  # type pointed at an Azure endpoint — there is NO dedicated `azure-openai`
+  # provider type. The configure-providers.md docs showing `type: azure-openai`
+  # are aspirational; the runtime registers `openai`, `claude`, `gemini` only.
+  type: openai
+  model: gpt-4o
+  # Replace the URL below with your Azure AI Foundry resource endpoint.
+  # Typical Azure OpenAI endpoint form:
+  #   https://<resource>.openai.azure.com/openai/deployments/<deployment-name>
+  # PromptKit does not expand ${VAR} syntax in string fields, so use a literal
+  # value here or override via kustomize/helm for cluster deployments.
+  base_url: https://REPLACE-ME.openai.azure.com/openai/deployments/gpt-4o
+  credential:
+    credential_env: AZURE_OPENAI_API_KEY
+  defaults:
+    temperature: 0.7
+    max_tokens: 2000
+    top_p: 0.9

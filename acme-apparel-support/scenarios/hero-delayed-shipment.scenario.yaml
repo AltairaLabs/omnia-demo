@@ -1,0 +1,42 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: hero-delayed-shipment
+  labels:
+    demo: omnia-hero-demo
+    scene: "2"
+spec:
+  id: hero-delayed-shipment
+  description: |
+    Sarah Chen signs into the Acme store for the first time in the demo.
+    Her order #1023 — a linen dress for a birthday party this weekend —
+    is 5 days late. She's stressed. The agent should lookup_order, see
+    the delayed fulfillment state, acknowledge with warmth (variant A)
+    or competence (variant B), and issue an EXPRESS_UPGRADE discount.
+  task_type: acme-support-variant-a
+  tool_policy:
+    tool_choice: auto
+    max_tool_calls_per_turn: 3
+    max_total_tool_calls: 10
+  turns:
+    - role: user
+      content: |
+        Hi, my order #1023 still hasn't arrived. It was supposed to be here five days ago and I need it for a birthday party this weekend. Can you check what's going on?
+    - role: claude-user
+      persona: sarah-chen
+      turns: 4
+      user_temp: 0.7
+      seed: 1023
+  conversation_assertions:
+    - type: tool_called
+      params:
+        name: lookup_order
+      message: Agent should call lookup_order when the customer mentions an order ID
+    - type: substring_present
+      params:
+        patterns: [tracking, delivery, arriving, shipped, in transit]
+      message: Agent should surface tracking/delivery status from lookup_order
+    - type: tool_called
+      params:
+        name: issue_discount_code
+      message: Agent should issue an EXPRESS_UPGRADE discount for the delay

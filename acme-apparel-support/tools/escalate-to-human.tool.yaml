@@ -1,0 +1,39 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: escalate_to_human
+spec:
+  name: escalate_to_human
+  description: |
+    Route this conversation to a human specialist. Always escalate for
+    chargebacks, fraud claims, or safety issues. Use after three failed
+    resolution attempts for other cases.
+  input_schema:
+    type: object
+    properties:
+      reason:
+        type: string
+        description: Brief explanation of why escalation is needed
+      priority:
+        type: string
+        enum: [low, medium, high, critical]
+        description: |
+          low: routine; medium: standard; high: customer frustrated;
+          critical: chargebacks/fraud/safety
+    required:
+      - reason
+      - priority
+  output_schema:
+    type: object
+    properties:
+      ticket_id: { type: string }
+      queue: { type: string }
+      priority: { type: string }
+      eta_minutes: { type: integer }
+  mode: mock
+  timeout_ms: 2000
+  mock_result:
+    ticket_id: ESC-1287
+    queue: acme-apparel-support
+    priority: high
+    eta_minutes: 120

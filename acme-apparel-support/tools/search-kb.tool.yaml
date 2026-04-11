@@ -1,0 +1,40 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: search_kb
+spec:
+  name: search_kb
+  description: |
+    Search Acme Apparel's knowledge base for policies, guides, and FAQ.
+    Use this when the customer asks about shipping, returns, sizing, care
+    instructions, or any general policy question before answering from
+    memory.
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+        description: Search query describing what you're looking for
+    required:
+      - query
+  output_schema:
+    type: object
+    properties:
+      results:
+        type: array
+        items:
+          type: object
+          properties:
+            title: { type: string }
+            url: { type: string }
+            snippet: { type: string }
+  mode: mock
+  timeout_ms: 2000
+  mock_result:
+    results:
+      - title: Shipping Policy
+        url: /kb/shipping-policy
+        snippet: Standard shipping is 5-7 business days. Express is 2 business days. Free shipping on orders over $75.
+      - title: Returns & Exchanges
+        url: /kb/returns-and-exchanges
+        snippet: Returns accepted within 30 days of delivery, items in original condition with tags attached.
