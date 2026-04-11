@@ -1,0 +1,19 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: azure-gpt4o
+  labels:
+    demo: omnia-hero-demo
+spec:
+  id: azure-gpt4o
+  type: azure-openai
+  model: gpt-4o
+  # Operator must set:
+  # - AZURE_OPENAI_ENDPOINT (e.g., https://<resource-name>.openai.azure.com)
+  # - AZURE_OPENAI_API_KEY
+  # These are resolved by the azure-openai provider at runtime.
+  base_url: "${AZURE_OPENAI_ENDPOINT}"
+  defaults:
+    temperature: 0.7
+    max_tokens: 2000
+    top_p: 0.9
