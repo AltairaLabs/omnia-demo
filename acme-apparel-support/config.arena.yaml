@@ -1,5 +1,3 @@
-# Placeholder — filled in progressively across tasks 2-7, 9, 11, 14, 15.
-# Final form: acme-apparel-support pack manifest + run config.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -8,7 +6,27 @@ metadata:
     demo: omnia-hero-demo
     bundle: acme-apparel
 spec:
-  providers: []
+  prompt_configs:
+    - id: variant-a
+      file: prompts/variant-a-agent.yaml
+
+  tools:
+    - file: tools/lookup-order.tool.yaml
+    - file: tools/lookup-customer.tool.yaml
+    - file: tools/search-kb.tool.yaml
+    - file: tools/issue-discount-code.tool.yaml
+    - file: tools/escalate-to-human.tool.yaml
+
+  providers:
+    - file: providers/azure-gpt4o.provider.yaml
+    - file: providers/ollama-local.provider.yaml
+
   defaults:
     temperature: 0.6
     max_tokens: 800
+    concurrency: 3
+    output:
+      dir: out
+      formats: [json, html]
+      html:
+        file: report.html
