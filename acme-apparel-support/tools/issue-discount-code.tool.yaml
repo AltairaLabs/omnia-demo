@@ -31,6 +31,11 @@ spec:
       expires_at: { type: string }
   mode: mock
   timeout_ms: 2000
+  # Mock returns a fixed EXPRESS_UPGRADE fixture regardless of the input
+  # discount_type — single-value mocks can't dispatch on input. Scenarios
+  # that need to distinguish PERCENT_OFF_10 vs PERCENT_OFF_20 behavior
+  # should use scenario assertions on the tool call args rather than on
+  # this mock's return value.
   mock_result:
     code: EXPRESS-X7K92
     discount_type: EXPRESS_UPGRADE
