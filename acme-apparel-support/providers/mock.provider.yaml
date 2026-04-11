@@ -1,0 +1,25 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+  labels:
+    demo: omnia-hero-demo
+    purpose: local-dev-testing
+spec:
+  id: mock
+  # Deterministic mock provider for local runtime smoke tests. Produces
+  # canned string responses per scenario ID / turn number from the file
+  # at additional_config.mock_config. Does not call any real LLM — use
+  # this for wiring/structure validation without burning tokens or
+  # depending on a live provider.
+  type: mock
+  model: mock-gpt-4.1
+  pricing:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+  defaults:
+    temperature: 0.4
+    max_tokens: 1024
+    top_p: 0.9
+  additional_config:
+    mock_config: providers/mock-responses.yaml

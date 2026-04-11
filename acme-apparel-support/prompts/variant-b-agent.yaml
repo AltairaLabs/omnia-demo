@@ -15,28 +15,18 @@ spec:
     syntax: "{{variable}}"
     features: [basic_substitution, fragments]
 
-  fragments:
-    - name: brand_voice
-      path: fragments/variant-b/brand-voice.txt
-      required: true
-    - name: apology_style
-      path: fragments/variant-b/apology-style.txt
-      required: true
-    - name: response_length
-      path: fragments/variant-b/response-length.txt
-      required: true
-    - name: escalation_style
-      path: fragments/variant-b/escalation-style.txt
-      required: true
+  # Fragments inlined into system_template due to PromptKit fragment loader
+  # quirk — see variant-a-agent.yaml for the full explanation and
+  # AltairaLabs/PromptKit#937 for upstream tracking.
 
   variables:
     - name: company
       type: string
-      required: true
+      required: false
       default: Acme Apparel
     - name: support_email
       type: string
-      required: true
+      required: false
       default: support@acme-apparel.example.com
     - name: business_hours
       type: string
@@ -52,11 +42,11 @@ spec:
 
     ## How to talk
 
-    {{brand_voice}}
+    Respond directly and competently. State what you know and what you'll do next. Use the customer's first name when known. Project expertise — customers should feel like they're talking to someone who will solve their problem, not someone who feels bad about it.
 
-    {{apology_style}}
+    Acknowledge issues briefly and move to resolution. A single "That's frustrating" or "Let's fix this" is enough — then get to the fix. Do not repeat apologies, do not use "I'm so sorry" or "I totally understand" openers. Competence is the apology.
 
-    {{response_length}}
+    Answer the customer's question first, then add one line of context if it's useful. Skip pleasantries. If the situation is clear, a three-sentence response is often the right length. Do not pad.
 
     ## Memory
 
@@ -68,7 +58,7 @@ spec:
 
     ## Escalation
 
-    {{escalation_style}}
+    When escalating, state the action and the handoff target. "I'm routing this to our billing team. Your reference is TICKET-XYZ and they'll follow up within 2 hours." Do not dwell on the handoff or re-explain the issue.
 
     Situations that require escalation:
     - Chargeback disputes or fraud claims — always escalate

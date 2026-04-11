@@ -103,10 +103,11 @@ spec:
       - file: personas/priya-shah.persona.yaml
       - file: personas/alex-rodriguez.persona.yaml
     roles:
-      - id: customer
-        provider: ollama-local
+      - id: claude-user
+        provider: openai-direct
 
   scenarios:
+    - file: scenarios/smoke-test-single-turn.scenario.yaml
     - file: scenarios/hero-delayed-shipment.scenario.yaml
     - file: scenarios/hero-marcus-escalation.scenario.yaml
     - file: scenarios/hero-memory-recall.scenario.yaml
@@ -116,6 +117,7 @@ spec:
     - file: providers/azure-gpt4o.provider.yaml
     - file: providers/openai-direct.provider.yaml
     - file: providers/ollama-local.provider.yaml
+    - file: providers/mock.provider.yaml
 
   defaults:
     temperature: 0.6

@@ -15,29 +15,26 @@ spec:
     syntax: "{{variable}}"
     features: [basic_substitution, fragments]
 
-  fragments:
-    - name: brand_voice
-      path: fragments/variant-a/brand-voice.txt
-      required: true
-    - name: apology_style
-      path: fragments/variant-a/apology-style.txt
-      required: true
-    - name: response_length
-      path: fragments/variant-a/response-length.txt
-      required: true
-    - name: escalation_style
-      path: fragments/variant-a/escalation-style.txt
-      required: true
+  # NOTE: fragments were originally defined as external YAML files under
+  # fragments/variant-a/ for A/B composition, but the current PromptKit
+  # fragment loader (YAMLPromptRepository.LoadFragment at promptkit/runtime/
+  # persistence/yaml/yaml_prompt.go:51) doesn't resolve FragmentRef.path the
+  # way the schema suggests it should — it falls back to a name-based lookup
+  # at <BasePath>/fragments/<name>.yaml and fails for our nested structure.
+  # Tracked as a fourth issue in AltairaLabs/PromptKit#937. For now, the
+  # variant A voice/style content is inlined directly into system_template
+  # below. Restore fragment-based composition once the loader behavior is
+  # fixed upstream.
 
   variables:
     - name: company
       type: string
-      required: true
+      required: false
       default: Acme Apparel
       description: Company name shown to the customer
     - name: support_email
       type: string
-      required: true
+      required: false
       default: support@acme-apparel.example.com
       description: Support contact email
     - name: business_hours
@@ -56,11 +53,11 @@ spec:
 
     ## How to talk
 
-    {{brand_voice}}
+    Respond with warmth and empathy. Acknowledge the customer's frustration or concern before offering solutions. Use the customer's first name when known. Never sound robotic or dismissive.
 
-    {{apology_style}}
+    When something has gone wrong for the customer, apologize sincerely and specifically ("I'm so sorry your order arrived damaged") before explaining the situation or offering a resolution. Don't over-apologize when nothing has gone wrong.
 
-    {{response_length}}
+    Answer fully enough that the customer understands the situation and the next step. Don't be curt, but don't pad with filler. If the customer asked a specific question, answer that question first before adding context.
 
     ## Memory
 
@@ -72,7 +69,7 @@ spec:
 
     ## Escalation
 
-    {{escalation_style}}
+    When escalating to a human agent, explain what you're doing ("I'm going to hand this off to our billing team"), set a clear expectation for follow-up ("they'll reach out within 2 hours"), provide the reference number, and reassure the customer that they're in good hands.
 
     Situations that require escalation:
     - Chargeback disputes or fraud claims — always escalate, never attempt to resolve

@@ -1,0 +1,48 @@
+# Mock LLM responses for the acme-apparel-support pack local smoke tests.
+#
+# Format (per promptkit/examples/mock-config-example.yaml):
+#   defaultResponse: <fallback string>
+#   scenarios:
+#     <scenario-id>:
+#       defaultResponse: <this scenario's default>
+#       turns:
+#         1: <response for turn 1>
+#         2: <response for turn 2>
+#
+# The mock provider substitutes the LLM with deterministic text — it does
+# NOT produce tool-call messages. Scenarios that assert on `tool_called`
+# will not see tool calls fire against this provider; use openai-direct
+# or a real provider for tool-behavior verification.
+
+defaultResponse: "Thanks for reaching out. I'm here to help."
+
+scenarios:
+  smoke-test-single-turn:
+    defaultResponse: "I see your order #1023 is showing a delay in our system. Let me check the tracking details and get back to you with a resolution."
+    turns:
+      1: "Hi Sarah, I'm so sorry your order #1023 hasn't arrived. I just pulled it up and I can see it's been delayed in transit. Given the party this weekend, let me issue you an EXPRESS_UPGRADE voucher so your next order ships overnight at no cost, and I'll flag this delay to our shipping team. Is there anything else I can help with?"
+
+  hero-delayed-shipment:
+    defaultResponse: "Checking your order now."
+    turns:
+      1: "Hi Sarah, I'm so sorry to hear about the delay on #1023 — let me pull up the details right now."
+      2: "I can see the order is in transit but delayed. Given it's for a weekend party I'd like to make this right with an EXPRESS_UPGRADE voucher for your next order."
+      3: "You're welcome! The voucher is EXPRESS-X7K92, good for your next order. Anything else I can help with?"
+      4: "Take care, and again, so sorry for the inconvenience."
+
+  hero-marcus-escalation:
+    defaultResponse: "I'll route this to a human specialist."
+    turns:
+      1: "Thanks for flagging this, Marcus. Chargeback disputes need to be handled by our billing team directly — I'm routing this to them now. Your reference is TICKET-ESC-1287 and they'll reach out within 2 hours."
+      2: "I understand the urgency. The billing team has your ticket and they're reviewing it. They'll have the duplicate charge resolved within 2 hours."
+      3: "Sorry again for the inconvenience, Marcus. Goodbye."
+
+  hero-memory-recall:
+    defaultResponse: "So glad to hear that!"
+    turns:
+      1: "Sarah! So glad to hear the dress arrived in time for the party. I remember we sorted out the express shipping on #1023 — happy it worked out. Have a wonderful time at the party!"
+
+  selfplay-mixed-personas:
+    defaultResponse: "How can I help you today?"
+    turns:
+      1: "Hi, thanks for reaching out to Acme Apparel support. How can I help you today?"
