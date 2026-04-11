@@ -101,6 +101,90 @@ This repo is an **input** to Omnia's `charts/omnia-demo/` Helm chart, which does
 
 The specs in `specs/` describe the demo; they don't ship with the Helm chart. They stay here as the design record.
 
+### Separation of concerns
+
+**This repo (`omnia-demo`)** owns:
+- Demo narratives, phasing, and open questions
+- Demo content (PromptPack, personas, KB articles)
+- Build plans, kickoff docs, and reliability-gate implementation plans
+- Production coordination for recording and publishing the demos
+
+**The Omnia main repo (`AltairaLabs/Omnia`)** owns:
+- All platform code (operator, runtime, facade, session-api, memory-api, doctor, arena-worker)
+- All product-level specs for platform features (memory, arena, privacy, rollouts, etc.)
+- Product PRs, issues, and CI
+- The eventual `charts/omnia-demo/` Helm chart that bundles this repo's content
+- Any reliability fixes the demo needs from the platform (PromptKit#836, Azure SDK private-endpoint handling, etc.)
+
+**Rule of thumb**: if a change affects Omnia's platform behavior, it's a PR against `AltairaLabs/Omnia`. If a change affects how the demo is framed, scripted, or scoped, it's a commit here.
+
+## File reference convention
+
+The specs in `specs/` reference files and line numbers in the Omnia main repo using bare paths like `internal/runtime/conversation.go:176` or `ee/pkg/arena/`. These are **NOT paths within this repo** — they point to files in `AltairaLabs/Omnia`.
+
+To resolve any reference:
+
+- **Base URL**: [`https://github.com/AltairaLabs/Omnia`](https://github.com/AltairaLabs/Omnia)
+- **File URL**: `https://github.com/AltairaLabs/Omnia/blob/main/<path>` — e.g., [`internal/runtime/conversation.go`](https://github.com/AltairaLabs/Omnia/blob/main/internal/runtime/conversation.go)
+- **Line URL**: append `#L<line>` — e.g., [`internal/runtime/conversation.go#L176`](https://github.com/AltairaLabs/Omnia/blob/main/internal/runtime/conversation.go#L176)
+
+Most spec references don't get rewritten as clickable links because there are hundreds of them and the base URL is stable. Readers can copy the path into the URL template above.
+
+### Key Omnia PRs referenced across the specs
+
+These are the merged PRs the specs rely on as "existing infrastructure that the demo uses":
+
+| PRs | What they shipped | Referenced in |
+|---|---|---|
+| [#758](https://github.com/AltairaLabs/Omnia/pull/758)–[#764](https://github.com/AltairaLabs/Omnia/pull/764) | **Rollout support Phase 1-6**: CRD, controller, Istio routing, sticky sessions, cohort tracking, analysis step executor, docs | `operator-demo-proposal.md` Act 3 |
+| [#785](https://github.com/AltairaLabs/Omnia/pull/785) | Provider endpoint health checks, dev Ollama | `operator-demo-proposal.md` Act 4, hero demo §5.1 |
+| [#783](https://github.com/AltairaLabs/Omnia/pull/783) | Workspace settings UI, anonymous device ID, memory-api/session-api DB separation, infra fixes | hero demo §5.2 |
+| [#786](https://github.com/AltairaLabs/Omnia/pull/786), [#787](https://github.com/AltairaLabs/Omnia/pull/787) | Doctor smoke test reliability + ollama-agent tool calling | `demo-h0-plan.md` R3 |
+| [#788](https://github.com/AltairaLabs/Omnia/pull/788) | CI release workflow publishes to `charts.altairalabs.ai` HTTPS helm repo | `demo-build-plan.md` release pipeline context |
+| [#773](https://github.com/AltairaLabs/Omnia/pull/773) | AgentPolicy.OnFailure wiring | hero demo §5.3 |
+| [#728](https://github.com/AltairaLabs/Omnia/pull/728), [#755](https://github.com/AltairaLabs/Omnia/pull/755), [#756](https://github.com/AltairaLabs/Omnia/pull/756) | ToolPolicy enforcement sidecar injection | hero demo §5.3 (guardrail context) |
+| [#771](https://github.com/AltairaLabs/Omnia/pull/771) | MCP tool filter | hero demo §5.3 |
+| #690–#694 | Memory API and privacy wiring | hero demo §5.2 (memory is mostly built) |
+| [#717](https://github.com/AltairaLabs/Omnia/pull/717) | Per-workspace session-api and memory-api | spec archival note |
+
+### Key Omnia source files referenced across the specs
+
+The demo's reliability and capability story depends on these paths working as documented:
+
+| Path | What it proves | Specs that cite it |
+|---|---|---|
+| [`internal/runtime/conversation.go:176`](https://github.com/AltairaLabs/Omnia/blob/main/internal/runtime/conversation.go#L176) | `sdk.WithMemory()` wiring into PromptKit SDK | hero demo §5.2, demo-h0-plan R2 |
+| [`internal/runtime/server.go:100`](https://github.com/AltairaLabs/Omnia/blob/main/internal/runtime/server.go#L100) | `memoryStore` typed as PromptKit's `pkmemory.Store` | demo-h0-plan R2.1 |
+| [`pkg/provider/types.go:50-52`](https://github.com/AltairaLabs/Omnia/blob/main/pkg/provider/types.go#L50-L52) | `TypeAzureAI` first-class provider type | operator demo §5.5, demo-h0-plan V3 |
+| [`api/v1alpha1/provider_types.go:174`](https://github.com/AltairaLabs/Omnia/blob/main/api/v1alpha1/provider_types.go#L174) | `BaseURL` field supports Private Endpoint | operator demo §5.5 |
+| [`internal/schema/promptpack.schema.json:1170-1196`](https://github.com/AltairaLabs/Omnia/blob/main/internal/schema/promptpack.schema.json#L1170-L1196) | Eval `metric` declaration (name, type, bounds) | hero demo §6.5 (KPIs as evals) |
+| [`internal/runtime/metrics_integration_test.go:241`](https://github.com/AltairaLabs/Omnia/blob/main/internal/runtime/metrics_integration_test.go#L241) | `MetricRecorder.Record(evalResult, metricDef)` — eval → Prometheus emission | hero demo §6.5 |
+| [`ee/cmd/arena-worker/SERVICE.md:143`](https://github.com/AltairaLabs/Omnia/blob/main/ee/cmd/arena-worker/SERVICE.md#L143) | Self-play section — PromptArena native feature | operator demo §5.1 |
+| [`internal/doctor/checks/memory.go`](https://github.com/AltairaLabs/Omnia/blob/main/internal/doctor/checks/memory.go) | Doctor `MemoryPersistsAcrossSessions` check | demo-h0-plan R3 |
+| [`ee/pkg/privacy/deletion.go:222-230`](https://github.com/AltairaLabs/Omnia/blob/main/ee/pkg/privacy/deletion.go#L222-L230) | DSAR cascade | hero demo Scene 5, operator demo Act 6 |
+
+### Where to file issues and PRs
+
+**Platform bugs, reliability gaps, feature requests, infrastructure issues**:
+- File against [AltairaLabs/Omnia](https://github.com/AltairaLabs/Omnia/issues)
+- Example: PromptKit#836 (null arg coercion on Ollama), Azure SDK private-endpoint handling gap (if V3 surfaces one)
+
+**Demo narrative changes, content revisions, scope adjustments**:
+- File against [AltairaLabs/omnia-demo](https://github.com/AltairaLabs/omnia-demo/issues) (this repo)
+- Example: "Act 2 A/B comparison table should include X metric", "Sarah persona feels too accommodating"
+
+**Azure infrastructure tickets**:
+- Wherever the Azure provisioning is being tracked (out-of-band for now — see `specs/demo-kickoff.md`)
+
+### Known cross-repo coordination points
+
+The following items require coordinated work across both repos:
+
+1. **PromptKit#836** — null arg coercion upstream fix. Blocks Ollama as a demo LLM (mitigated by using GPT-4o on Azure instead). File upstream in [AltairaLabs/PromptKit](https://github.com/AltairaLabs/PromptKit).
+2. **Omnia `azure-ai` provider + Private Endpoint** — if V3 reveals the Azure SDK client in Omnia doesn't respect a custom `baseURL` pointing at a Private Endpoint, it's an Omnia PR, blocking H4.
+3. **Bundle spec v0.1** — when the demo Helm chart crystallizes its shape, whoever writes the `bundle spec` formalization in the planning repo uses this demo's `charts/omnia-demo/` structure as input. See `specs/hero-demo-proposal.md` §1 for context on why bundle is a deliberate non-goal of the demo.
+4. **LLM populator cleanup** — R2.1 found that `internal/memory/populator_llm.go`, `populator_conversation.go`, `extractor.go` and friends are orphaned code in Omnia. A cleanup PR to delete them is filed as a post-demo backlog item in `docs/local-backlog/agentic-memory-remaining.md` in the Omnia repo.
+
 ---
 
 ## Iterating
