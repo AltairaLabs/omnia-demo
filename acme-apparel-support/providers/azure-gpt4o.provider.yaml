@@ -8,11 +8,12 @@ spec:
   id: azure-gpt4o
   type: azure-openai
   model: gpt-4o
-  # Operator must set:
-  # - AZURE_OPENAI_ENDPOINT (e.g., https://<resource-name>.openai.azure.com)
-  # - AZURE_OPENAI_API_KEY
-  # These are resolved by the azure-openai provider at runtime.
-  base_url: "${AZURE_OPENAI_ENDPOINT}"
+  # API key is auto-resolved from AZURE_OPENAI_API_KEY env var by the
+  # azure-openai provider type at runtime. Replace the URL below with your
+  # Azure AI Foundry resource endpoint for local/dev deployments, or override
+  # via kustomize/helm for cluster deployments. PromptKit does not expand
+  # ${VAR} syntax in string fields, so use a literal value here.
+  base_url: https://REPLACE-ME.openai.azure.com
   defaults:
     temperature: 0.7
     max_tokens: 2000

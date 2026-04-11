@@ -11,6 +11,7 @@ spec:
   model: llama3.1:8b
   base_url: "http://localhost:11434"
   additional_config:
+    # Keep the model loaded in memory for 5 minutes between requests
     keep_alive: "5m"
   defaults:
     temperature: 0.7
