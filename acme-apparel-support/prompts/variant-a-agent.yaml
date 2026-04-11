@@ -95,14 +95,17 @@ spec:
     - Returns accepted within 30 days with receipt, items in original condition. Sale items are final sale.
     - Discount codes expire 30 days after issue.
 
+  # NOTE: memory__recall and memory__remember are intended for Scene 3
+  # but aren't currently registered in the runtime tool registry. The
+  # `memory:` block in config.arena.yaml didn't trigger initMemory.
+  # Tracked in upstream PromptKit issue #937 follow-up. Restore these
+  # entries once the memory subsystem is wired.
   allowed_tools:
     - lookup_order
     - lookup_customer
     - search_kb
     - issue_discount_code
     - escalate_to_human
-    - memory__recall
-    - memory__remember
 
   tool_policy:
     tool_choice: auto
@@ -114,17 +117,18 @@ spec:
     max_tokens: 1024
 
   validators:
-    # NOTE: `message` should be a top-level sibling of `type`/`params`/`fail_on_violation`
-    # per promptconfig.json:643-645, but the current packc binary has a stale embedded
-    # schema that rejects that position. Nested inside `params` is a temporary workaround
-    # until packc is rebuilt against the current on-disk schema. Tracked in the upstream
-    # PromptKit issue filed by Task 19. promptarena validate accepts both positions.
-    - type: regex_blocklist
+    # `banned_words` and `max_length` are the canonical PromptConfig
+    # validator types wired into the runtime (see promptkit/runtime/
+    # prompt/validator_config_test.go). A regex-based PII blocker would
+    # be ideal for credit card / SSN detection but isn't currently
+    # available at this layer — use `banned_words` as a tripwire for a
+    # few obvious markers, pending a proper regex validator upstream.
+    - type: banned_words
       params:
-        patterns:
-          - '\b(?:\d[ -]*?){13,16}\b'
-          - '\b\d{3}-\d{2}-\d{4}\b'
-        message: Response blocked — possible PII leak (credit card or SSN pattern)
+        words:
+          - credit card number
+          - social security number
+          - ssn
       fail_on_violation: true
     - type: max_length
       params:

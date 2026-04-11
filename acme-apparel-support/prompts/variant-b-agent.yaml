@@ -82,14 +82,15 @@ spec:
     - Returns: 30 days with receipt, original condition. Sale items final.
     - Discount codes expire 30 days after issue.
 
+  # See variant-a-agent.yaml for notes on memory__recall / memory__remember —
+  # not currently registered in the runtime, restored once the memory
+  # subsystem is wired.
   allowed_tools:
     - lookup_order
     - lookup_customer
     - search_kb
     - issue_discount_code
     - escalate_to_human
-    - memory__recall
-    - memory__remember
 
   tool_policy:
     tool_choice: auto
@@ -101,14 +102,14 @@ spec:
     max_tokens: 640
 
   validators:
-    # NOTE: `message` nested inside `params` as a workaround for a stale
-    # packc binary schema (see variant-a-agent.yaml:119-124 for details).
-    - type: regex_blocklist
+    # `banned_words` + `max_length` — see variant-a-agent.yaml for notes on
+    # why these are the canonical runtime-wired types.
+    - type: banned_words
       params:
-        patterns:
-          - '\b(?:\d[ -]*?){13,16}\b'
-          - '\b\d{3}-\d{2}-\d{4}\b'
-        message: Response blocked — possible PII leak
+        words:
+          - credit card number
+          - social security number
+          - ssn
       fail_on_violation: true
     - type: max_length
       params:

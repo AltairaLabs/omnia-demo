@@ -27,7 +27,7 @@ spec:
       user_temp: 0.6
       seed: 1087
   conversation_assertions:
-    - type: tool_called
+    - type: tools_called
       params:
         name: escalate_to_human
       message: Agent MUST escalate chargeback disputes — never resolve directly

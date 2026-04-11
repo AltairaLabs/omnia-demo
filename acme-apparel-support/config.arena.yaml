@@ -94,6 +94,12 @@ spec:
         name: acme_memory_used
         type: gauge
 
+  # Memory subsystem is intended for Scene 3 (hero-memory-recall) but is
+  # not currently wired in the runtime — `memory: { enabled: true }` here
+  # didn't trigger initMemory as expected. Tracked in upstream PromptKit
+  # issue #937 follow-up. Restore a proper `memory:` config block once
+  # the canonical shape is confirmed.
+
   self_play:
     personas:
       - file: personas/sarah-chen.persona.yaml
