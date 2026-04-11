@@ -9,6 +9,8 @@ spec:
   prompt_configs:
     - id: variant-a
       file: prompts/variant-a-agent.yaml
+    - id: variant-b
+      file: prompts/variant-b-agent.yaml
 
   tools:
     - file: tools/lookup-order.tool.yaml
