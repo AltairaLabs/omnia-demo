@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+.claude/
+
+# Environment / secrets
+.env
+.env.local
+*.pem
+*.key
+
+# Build artifacts (if any future tooling generates them)
+dist/
+build/
+out/
+tmp/
+
+# Local drafts / scratch
+scratch/
+notes/
+*.draft.*
+
+# Compiled PromptPack JSON from markdown sources (generated during Helm chart build)
+**/*.compiled.json
