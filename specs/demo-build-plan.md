@@ -2,7 +2,9 @@
 
 **Status**: Consolidated build list for the paired hero + operator demos
 **Created**: 2026-04-10
-**Local-only**: Not committed.
+**Last significant update**: 2026-04-11 — arena-native content pivot (see `2026-04-11-arena-native-content-design.md`)
+
+> **Note on the content pivot (2026-04-11)**: Demo content (T7/T8/K1/K2/O1/O2 and the T1–T5 tool schemas) is being re-sourced as native PromptKit arena YAML under a new top-level `acme-apparel-support/` directory. The full design is in `specs/2026-04-11-arena-native-content-design.md`. Rows below have been annotated where tasks shift phases, fold together, or change shape; detailed task breakdown for the pivot itself is the job of the implementation plan that follows the design doc. Phase totals below have not been re-summed — net calendar impact of the pivot is ~zero (work moves forward, not up).
 
 ## 📍 Starting work? Open `demo-kickoff.md` first
 
@@ -66,12 +68,12 @@ These gate the entire build. Several are now **resolved** — marked ✅.
 | ID | Decision | Resolution | Blocks |
 |---|---|---|---|
 | ✅ D1 | **Demo LLM backend** | **GPT-4o (or Azure AI Foundry's current GPT flagship) on Azure AI Foundry with Private Endpoint.** Uses Azure credits. Matches operator demo's cloud-private deployment story. In-cluster Ollama used only for self-play customer role to cap rehearsal costs. **Claude-on-Azure-AI-Foundry is unverified (see V1) and probably not available**; if it turns out to be available, switch to Claude as a free win. If a Claude dogfood is strictly required AND Claude isn't on Azure AI Foundry, the fallback is Anthropic API key directly — but that breaks the operator demo's Act 5 private-deployment story, so NOT recommended | H0 (R3), H1 (T1-T7), operator demo Act 5 |
-| 🔒 D2 | **Shopify customer auth API** — `window.Shopify.customer` vs Customer Account API | Verify current 2026 state before committing widget path | H1 (W4) |
-| 🔒 D3 | **Bundle spec** — is this demo allowed to ship without formalizing "bundle"? | (yes — use existing CRDs + Helm, `DEMO_SHAPE.md` as input to future spec) vs (no — block on bundle spec v0.1) | H2 (D1-D3) |
+| ✅ D2 | **Shopify customer auth API** — `window.Shopify.customer` vs Customer Account API | **Customer Account API (the newer path).** Forward-compatible with Shopify 2026+. W4 design pass still needed before implementation — OAuth wiring is more involved than the legacy global. | H1 (W4) |
+| ✅ D3 | **Bundle spec** — is this demo allowed to ship without formalizing "bundle"? | **Yes — ship with existing CRDs + Helm.** "Bundle" is conceptual, not a product yet; no spec exists to block on. `charts/omnia-demo/DEMO_SHAPE.md` (D3 task in H2.b) ships as a descriptive artifact — input to any future bundle-spec work, not a spec itself. | H2 (D1-D3) |
 | ✅ D4 | **On-prem Ollama for operator demo Act 5** | **Not mandatory as the primary path.** Primary Act 5 target is cloud-private deployment (Azure AI Foundry + Private Endpoint). On-prem Ollama becomes a **~20-second optional sub-beat** showing the full air-gap variant of the same platform. Since in-cluster Ollama is already needed for self-play customer role, the sub-beat is basically free to include. | H4 (O8 reframed) |
 | ✅ D5 | **Demo cluster for operator demo** | **Dedicated Azure AKS cluster** (not shared with hero demo) labeled as the "customer's private K8s cluster". Enables Azure AI Foundry Private Endpoint setup and makes the network isolation story credible. | H4 (O4) |
-| 🔒 D6 | **Variant B PromptPack design** — what style is variant B? | more concise / more directive / less apologetic — specific content decision | H4 (O2) |
-| 🔒 D7 | **Two demos sequentially (one engineer) or in parallel (two engineers)?** | — | H4 start date |
+| ✅ D6 | **Variant B PromptConfig design** — what style is variant B? | **Less-apologetic / confident**, targeting persona-dependent winners. Same length as Variant A, drops "I'm so sorry"/"I totally understand" softeners, projects competence. Persona-dependent outcomes (Marcus prefers terse confidence, Sarah prefers warmth) make Act 2's narrative "this is why cohort analysis matters" rather than a single-metric knockout. O2 authoring pulls forward into H1 per the arena-native content pivot. | H4 (O2), H1 rework |
+| ✅ D7 | **Two demos sequentially (one engineer) or in parallel (two engineers)?** | **Sequential, one engineer.** Hero demo H0→H3 first, then operator demo H4→H6. Calendar: ~7.5–10 weeks total (see Totals table). No compression from parallelism. | H4 start date |
 | ✅ D8 | **Cloud-private LLM backend for Act 5** | **Azure AI Foundry with Private Endpoint on Azure AKS.** Rationale: (a) user has Azure credits, (b) roadmap Phase 1 already allocates Azure sandbox work, (c) Omnia's `azure-ai` provider type is first-class with `baseURL` support for private endpoints (`pkg/provider/types.go:50-52`, `api/v1alpha1/provider_types.go:174`), (d) Azure workload identity support aligns with native cloud-private auth. | H4 (O4, new O8b) |
 
 ---
@@ -88,8 +90,9 @@ These gate the entire build. Several are now **resolved** — marked ✅.
 | SH1 | 🛠 | Create Shopify partner dev store (Dawn theme, note URL) | 30 min | — | Y |
 | V2 | 🧪 | Read Azure AI Foundry Private Endpoint docs; produce procedure cheat sheet | 1-2 hours | — | Y |
 | V3 | 🧪 | **Critical**: provision Azure AI Foundry + Private Endpoint, configure Omnia `azure-ai` Provider CRD, run minimal agent session end-to-end, confirm traffic flows over Private Endpoint | 3-4 hours (0.5-1 day) | V2 | N |
+| VP | 🧪 | **packc smoke test** — once arena-native content lands, run `packc compile -c acme-apparel-support/config.arena.yaml --id acme-apparel-support` and confirm the output pack JSON validates via `packc validate`. Catches schema misunderstandings before H0 starts; gates the "content is real" claim. | 30 min | arena-native content pivot complete | Y |
 
-**Pre-H0 total: ~1-2.5 engineer-days (mostly Day 1).**
+**Pre-H0 total: ~1-2.5 engineer-days (mostly Day 1) — unchanged; VP is trivial once pivot content exists.**
 
 If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 0.5-1 day. Better to catch this now than in week 4.
 
@@ -132,7 +135,7 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 | W1 | 🛠 | Vanilla JS widget core: launcher, panel, message list, input, typing indicator, streaming render. Single `chat.js`, esbuild/vite. | 2-3d | — | Y |
 | W2 | 🛠 | WebSocket client → Omnia facade; reconnect, session persistence, auth token passthrough | 1d | W1 | N |
 | W3 | 🛠 | Styling: Acme Apparel-appropriate, mobile responsive, accessible, WCAG AA | 1d | W1 | Y (with W2) |
-| W4 | 🛠 | Shopify customer context read; fallback to anonymous device ID when signed out. **Depends on D2** | 0.5-1d | W2, D2 | N |
+| W4 | 🛠 | Shopify customer context read via **Customer Account API** (D2 resolved); fallback to anonymous device ID when signed out. Size bumped to reflect OAuth wiring vs legacy global. | 1-1.5d | W2 | N |
 | W5 | 🛠 | "Delete my chat data" affordance in widget settings panel; calls DSAR endpoint | 0.5d | W1 | Y |
 | W6 | 🛠 | Build pipeline: `chat.js` + `chat.css` published to URL Shopify theme can `<script src="...">`. Recommend serving from operator's static asset handler | 0.5d | W1, W2, W3 | N |
 | W7 | 🛠 | Install into Acme Apparel dev store via theme customizer | 0.5d | W6, SH1 | N |
@@ -141,14 +144,14 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 
 | ID | Type | Item | Size | Depends on | Parallel? |
 |---|---|---|---|---|---|
-| T1 | 🛠 | ToolRegistry entry `lookup_order` → Shopify Admin API `GET /orders/{id}.json` | 0.5-1d | SH3 | Y |
-| T2 | 🛠 | ToolRegistry entry `issue_discount_code` → two-step price_rule + discount_code. May need small HTTP wrapper for composition. | 1-2d | SH3 | Y |
-| T3 | 🛠 | ToolRegistry entry `lookup_customer` → Shopify Admin API `GET /customers/{id}.json` | 0.5d | SH3 | Y |
-| T4 | 🛠 | Stub KB service: single Go binary, `GET /search?q=...`, BM25 or keyword match | 1-2d | SH4 | Y |
-| T5 | 🛠 | Stub escalation queue service: Go binary, `POST /escalations`, `GET /escalations`, `DELETE /escalations/{id}` | 0.5-1d | — | Y |
-| T6 | 🛠 | ToolRegistry entries for T4 (`search_kb`) and T5 (`escalate_to_human`) | 0.5d | T4, T5 | Y |
-| T7 | ✅ DRAFT 2026-04-11 | Variant A support PromptPack drafted at `docs/local-backlog/drafts/variant-a-support-promptpack.md`. Includes: system template with 6 replaceable fragments, 5 tools with full schemas, 5 eval declarations (incl. K1 `session_outcome` + K2 `customer_sentiment` with Prometheus metric names), 4 skill fragments, `customer_simulator` second prompt for self-play. **7 open questions flagged** for PromptKit schema verification before H2. | 1-2d | — | Y |
-| T8 | ✅ DRAFT 2026-04-11 | 6 Acme Apparel personas drafted at `docs/local-backlog/drafts/personas/` as PromptArena `kind: Persona` YAML: sarah-chen, marcus-webb, emma-patel, kai-nakamura, priya-shah, alex-rodriguez. Archetypes: polite-stressed, assertive-escalation, new-visitor, patient-confused, loyal-disappointed, happy-returning. README explains hero vs operator demo usage + flags Pattern A/B design tension with T7's `customer_simulator` prompt to verify before H1. | 1d | — | Y |
+| T1 | 🛠 | `lookup_order` tool → Shopify Admin API `GET /orders/{id}.json`. Per arena-native pivot: authored as `acme-apparel-support/tools/lookup-order.tool.yaml` (`kind: Tool`, `mode: mock` with fixture) at content-authoring time; wrapped into Omnia ToolRegistry CRD during H2.b Helm chart packaging. | 0.5-1d | SH3 | Y |
+| T2 | 🛠 | `issue_discount_code` tool → two-step price_rule + discount_code. May need small HTTP wrapper for composition. Same bifurcation as T1 (tool YAML + Helm wrap). | 1-2d | SH3 | Y |
+| T3 | 🛠 | `lookup_customer` tool → Shopify Admin API `GET /customers/{id}.json`. Same bifurcation as T1. | 0.5d | SH3 | Y |
+| T4 | 🛠 | Stub KB service: single Go binary, `GET /search?q=...`, BM25 or keyword match. Tool schema (`search-kb.tool.yaml`) authored alongside T1-T3; backing Go service is unchanged runtime work. | 1-2d | SH4 | Y |
+| T5 | 🛠 | Stub escalation queue service: Go binary, `POST /escalations`, `GET /escalations`, `DELETE /escalations/{id}`. Tool schema (`escalate-to-human.tool.yaml`) authored alongside T1-T3; backing Go service is unchanged runtime work. | 0.5-1d | — | Y |
+| T6 | ~~🛠~~ | **FOLDED INTO T1-T5** per arena-native pivot. The `.tool.yaml` files authored under T1-T5 are the registry entries; no separate "ToolRegistry entries" task needed. H2.b Helm chart packaging wraps them for deployment. | — | — | — |
+| T7 | 🛠 REWORK | Variant A support content. Per arena-native pivot: authored as `acme-apparel-support/prompts/variant-a-agent.yaml` (`kind: PromptConfig`) + 4 fragment files under `prompts/fragments/variant-a/`. Pack-level evals (K1, K2, `no_pii_leak`, `memory_utilization`) live in `config.arena.yaml` `spec.pack_evals[]`, not inside the PromptConfig. The existing markdown at `promptpacks/variant-a-support-promptpack.md` is archival design input — superseded on 2026-04-11. Design content carries forward; authoring form changes. | 1-2d | — | Y |
+| T8 | ✅ DONE CONTENT / MOVE PENDING | 6 Acme Apparel personas drafted at `personas/*.yaml` as `kind: Persona` YAML (sarah-chen, marcus-webb, emma-patel, kai-nakamura, priya-shah, alex-rodriguez). Persona content is complete — Pattern A confirmed. Remaining work = file move + rename into `acme-apparel-support/personas/*.persona.yaml` as part of the arena-native pivot. | 15 min move | — | Y |
 
 **H1 total: ~13-19 engineer-days.**
 
@@ -160,10 +163,12 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 
 ### H2.a — KPIs as evals (K1-K5)
 
+> **Pivot impact**: K1 and K2 move into H1 as part of the T7 rework — they're authored inline in `config.arena.yaml` `spec.pack_evals[]` alongside the PromptConfigs. K3, K4, K5 remain in H2.a as Grafana / UI work downstream of the metrics.
+
 | ID | Type | Item | Size | Depends on | Parallel? |
 |---|---|---|---|---|---|
-| K1 | 🛠 | Define `session_outcome` eval in support PromptPack. LLM-as-judge, categorical: resolved/escalated/abandoned/unresolved. Declares `metric: { name: "acme_session_outcome_total", type: "counter" }` with `outcome` label. Runs on `SessionCompletion` trigger | 0.5d | T7 | Y |
-| K2 | 🛠 | Define `customer_sentiment` eval (optional, nice-to-have for Scene 3). LLM-as-judge, gauge -1..+1. Declares `metric: { name: "acme_customer_sentiment", type: "gauge", bounds: {-1, 1} }` | 0.5d | T7 | Y |
+| K1 | ✅ MOVED TO H1 | `session_outcome` eval — pack-level in `config.arena.yaml` spec.pack_evals[]. LLM-as-judge, categorical: resolved/escalated/abandoned/unresolved. `metric: { name: "acme_session_outcome_total", type: "counter", labels: { outcome } }`. Authored as part of T7 rework. | 0 (folded into T7) | T7 rework | — |
+| K2 | ✅ MOVED TO H1 | `customer_sentiment` eval — pack-level. LLM-as-judge, gauge -1..+1. `metric: { name: "acme_customer_sentiment", type: "gauge", range: { min: -1, max: 1 } }`. Authored as part of T7 rework. | 0 (folded into T7) | T7 rework | — |
 | K3 | 🛠 | KPI dashboard strip component. React component querying Prometheus HTTP API for: resolution rate (from K1), cost/conversation (existing metrics), avg handle time (existing metrics), escalation rate (from K1). **Requires §8-Q11 metric name verification** | 1-2d | K1 | Y |
 | K4 | 🛠 | "What did the agent remember" panel on session detail view. Reads memory-api for entities accessed during the session. May need new memory-api query endpoint | 2d | — | Y |
 | K5 | 🛠 | Escalation queue view page — reads from T5 stub, OR derived from `acme_session_outcome_total{outcome="escalated"}` | 1d | T5 or K1 | Y |
@@ -210,11 +215,13 @@ If V3 surfaces a gap in Omnia's Azure SDK client: fix that before H0. Estimated 
 
 ### H4.a — Self-play + variant B (O1-O3)
 
+> **Pivot impact**: O1 and O2 move into H1 as part of the arena-native pivot — both are authored under `acme-apparel-support/scenarios/` and `acme-apparel-support/prompts/` alongside variant A. O3 remains in H4 because it's cluster-side (ArenaJob CRD), not content.
+
 | ID | Type | Item | Size | Depends on | Parallel? |
 |---|---|---|---|---|---|
-| O1 | 🛠 | Acme Apparel self-play scenario YAML. Uses personas from T8, defines self-play roles, conversation termination, eval attachments | 1-1.5d | T8, T7 | Y (with O2) |
-| O2 | 🛠 | **Variant B PromptPack**, forked from T7. More concise, less apologetic, more directive. Same tools, same evals, different system prompt + style guide. **Depends on D6** | 0.5-1d | T7, D6 | Y |
-| O3 | 🛠 | Continuous ArenaJob config running O1's scenario at ~20-50 sessions/min indefinitely | 0.5d | O1 | N |
+| O1 | ✅ MOVED TO H1 | Self-play scenarios (`acme-apparel-support/scenarios/selfplay-*.scenario.yaml`) cycling through all 6 personas with varied situations. Authored alongside hero-demo scene scenarios during T7 rework. | 0 (folded into H1 content) | T8 move, T7 rework | — |
+| O2 | ✅ MOVED TO H1 | **Variant B PromptConfig** — `acme-apparel-support/prompts/variant-b-agent.yaml` + `fragments/variant-b/*.txt`. Per D6: less-apologetic / confident, persona-dependent winners. Same tools, same pack-level evals, different fragments + slight system template adjustments. | 0 (folded into H1 content) | T7 rework, D6 | — |
+| O3 | 🛠 | Continuous ArenaJob config (Omnia cluster CRD) running self-play scenarios at ~20-50 sessions/min indefinitely. Unchanged — still H4 work. | 0.5d | O1 (content) | N |
 
 ### H4.b — On-prem demo environment (O4-O8)
 

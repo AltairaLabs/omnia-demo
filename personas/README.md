@@ -1,11 +1,11 @@
 # Acme Apparel Personas
 
 **Status**: Draft v0.1
-**Part of**: T8 in `demo-build-plan.md`
-**Depends on**: T7 (variant A support PromptPack)
+**Part of**: T8 in `specs/demo-build-plan.md`
+**Depends on**: T7 (variant A support content)
 **Used by**: Hero demo Scenes 2, 3, 4 + operator demo self-play (O1)
 
-Six reusable customer personas for the Acme Apparel support bundle, authored as PromptArena `kind: Persona` YAML files per `ee/cmd/promptkit-lsp/server/schemas/persona.json`.
+Six reusable customer personas for the Acme Apparel support bundle, authored as PromptKit `kind: Persona` YAML files per `../promptkit/schemas/v1alpha1/persona.json`. These files move into `acme-apparel-support/personas/` when the arena-native content pivot (`specs/2026-04-11-arena-native-content-design.md`) executes.
 
 ---
 
@@ -54,16 +54,9 @@ Coverage the set provides:
 
 ## Relationship to T7 (variant A support PromptPack)
 
-The variant A PromptPack (`docs/local-backlog/drafts/variant-a-support-promptpack.md`) has a `customer_simulator` prompt with variables `persona_name`, `persona_voice`, `persona_situation`. **There's a design tension here** that needs to be resolved before H1:
+**Resolved 2026-04-11**: Pattern A is the PromptKit-native convention. Personas carry their own complete `system_prompt` and are referenced from scenario `claude-user` turns (see `../promptkit/examples/customer-support-integrated/scenarios/social-engineering-selfplay.scenario.yaml`). No `customer_simulator` prompt is needed in the Acme Apparel pack — it's deleted as part of the arena-native content pivot.
 
-- **Pattern A** (simpler): Personas have their own complete `system_prompt` (as I've drafted them). PromptArena self-play uses the persona's `system_prompt` directly. The `customer_simulator` prompt in T7 is redundant and should be removed or simplified.
-- **Pattern B**: Personas only define voice/tone. The `customer_simulator` prompt in T7 is the actual template, and it injects `persona_voice`, `persona_situation` from the persona and scenario.
-
-I've authored these personas following **Pattern A** because it's cleaner and self-contained — each persona is a complete, runnable character. If PromptArena's self-play mechanism expects Pattern B, the personas will need to be reformatted (move `system_prompt` content into voice-only descriptions) OR the T7 `customer_simulator` prompt needs to be removed.
-
-**Action before H1**: verify which pattern PromptArena's self-play actually uses. Check `ee/cmd/arena-worker/` and existing arena scenario tests. If Pattern A is supported, delete the `customer_simulator` prompt from T7.
-
-This goes in the T7 open questions list as a new item, or slot as a general "arena self-play contract verification" task for H4.
+The personas as drafted here are already in Pattern A form and carry forward unchanged into the new layout under `acme-apparel-support/personas/` (file moves + `.persona.yaml` suffix rename). Content doesn't change.
 
 ---
 
@@ -99,7 +92,10 @@ Once Azure is up and the agent is running:
 
 ## What's missing / next
 
-- **Scenario YAML files** (O1 in operator demo spec) — these pair a persona with a specific situation and drive the self-play loop. Not yet drafted. ~1-1.5 days.
-- **Variant B PromptPack** (O2) — forked from T7's variant A, changes the fragments. Drafting happens in H4. ~0.5-1 day.
-- **Pattern A vs B verification** (see "Relationship to T7" above) — check arena-worker code before H1 finishes.
-- **Persona compilation into ConfigMap** (H2 D1) — the YAML files will be loaded from a ConfigMap or mounted volume in the Helm chart. Deployment mechanism TBD.
+Per the arena-native content pivot (`specs/2026-04-11-arena-native-content-design.md`), remaining work on the persona side is:
+
+- **Move + rename** all six files into `acme-apparel-support/personas/` with `.persona.yaml` suffix.
+- **Scenario YAML files** pairing personas with hero-demo scene situations and operator self-play — authored as `kind: Scenario` under `acme-apparel-support/scenarios/`. Pulled forward into H1 alongside the variant A / variant B PromptConfigs.
+- **Variant B PromptConfig** — authored upfront under `acme-apparel-support/prompts/variant-b-agent.yaml` (no longer H4-gated).
+
+Persona content itself is complete and does not change.

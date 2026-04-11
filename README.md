@@ -32,7 +32,7 @@ omnia-demo/
 │   ├── demo-kickoff.md                   ← Day 1 action list
 │   └── demo-h0-plan.md                   ← H0 reliability gate decomposed into TDD tasks
 ├── promptpacks/                          ← agent prompt content
-│   └── variant-a-support-promptpack.md   ← Variant A — warm/empathetic baseline (forked into variant B for operator demo A/B test)
+│   └── variant-a-support-promptpack.md   ← ARCHIVAL — superseded by arena-native YAML (see specs/2026-04-11-arena-native-content-design.md); kept as design input until pivot lands
 ├── personas/                             ← customer personas for PromptArena self-play
 │   ├── README.md                         ← persona set overview + Pattern A/B design note
 │   ├── sarah-chen.yaml                   ← polite-but-stressed professional (hero Scenes 2-3)
@@ -80,12 +80,14 @@ omnia-demo/
 ## Current state (2026-04-11)
 
 - **SH1** ✅ — Shopify dev store live at `acme-apparel-omnia-demo.myshopify.com`
-- **T7** ✅ DRAFT — Variant A support PromptPack drafted (`promptpacks/variant-a-support-promptpack.md`)
-- **T8** ✅ DRAFT — 6 Acme Apparel personas drafted (`personas/*.yaml`)
-- **SH4** ✅ DRAFT — 8 KB articles drafted (`kb/*.md`)
+- **T8** ✅ content complete — 6 Acme Apparel personas drafted (`personas/*.yaml`). Pending file move into `acme-apparel-support/personas/` per the content pivot.
+- **T7** 🛠 superseded, awaiting rework — `promptpacks/variant-a-support-promptpack.md` is archival. Variant A content is being re-authored as native PromptKit arena YAML per `specs/2026-04-11-arena-native-content-design.md`.
+- **SH4** ✅ DRAFT — 8 KB articles drafted (`kb/*.md`) — unchanged by the pivot (KB content is runtime data, not arena-native).
 - **Azure infrastructure** — being provisioned out of band (V2, V3)
 - **V1** ✅ — verified Claude is not available on Azure AI Foundry; D1 locked to GPT-4o
 - **R2.1** ✅ — verified Omnia's memory populators are orphaned code; PromptKit handles extraction natively
+- **D2, D3, D6, D7** ✅ — all pre-flight decisions now resolved (see `specs/demo-build-plan.md` §Pre-flight decisions)
+- **Arena-native content pivot** 🛠 design approved 2026-04-11 — see `specs/2026-04-11-arena-native-content-design.md`. Implementation (directory scaffolding, content re-authoring, fragment authoring, pack-level evals, scenario authoring) is next. Pulls K1/K2/O1/O2 forward from H2/H4 into H1.
 
 Everything else in `specs/demo-build-plan.md` — what's DONE, PARTIAL, NOT STARTED, and VERIFY — is tracked there.
 

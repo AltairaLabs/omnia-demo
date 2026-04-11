@@ -1,9 +1,12 @@
 # Variant A — Acme Apparel Support PromptPack
 
-**Status**: Draft v0.1
-**Part of**: Hero demo build (T7 in `demo-build-plan.md`)
-**Role**: The baseline agent PromptPack for the Acme Apparel support bundle. Used in both demos; fork-source for variant B in the operator demo.
-**Purpose**: Authoring draft for review. Will eventually be compiled into a ConfigMap and referenced from a PromptPack CRD as part of the `omnia-demo` Helm chart (D1 in §6.6).
+> **⚠️ SUPERSEDED 2026-04-11** — This markdown narrative is preserved as archival design input for the arena-native content pivot. The canonical authoring form is now a set of PromptKit YAML files under `acme-apparel-support/` (PromptConfig + fragments + pack-level evals in `config.arena.yaml`). See `specs/2026-04-11-arena-native-content-design.md` for the new structure and how content from this document maps into it.
+>
+> Do not extend this file. New changes to variant A content go into the YAML sources once they land. The "7 open questions" section below is mostly obsolete — the questions are either answered by the real PromptKit schemas or moot under the new form.
+
+**Status**: Archival — superseded by arena-native YAML sources
+**Part of**: Hero demo build (T7 in `specs/demo-build-plan.md`)
+**Role**: Original design narrative for the baseline agent content. Used as input when authoring `acme-apparel-support/prompts/variant-a-agent.yaml`, `fragments/variant-a/*.txt`, and the pack-level evals in `config.arena.yaml`.
 
 ---
 
