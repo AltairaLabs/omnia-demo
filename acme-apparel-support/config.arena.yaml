@@ -94,6 +94,24 @@ spec:
         name: acme_memory_used
         type: gauge
 
+  self_play:
+    personas:
+      - file: personas/sarah-chen.persona.yaml
+      - file: personas/marcus-webb.persona.yaml
+      - file: personas/emma-patel.persona.yaml
+      - file: personas/kai-nakamura.persona.yaml
+      - file: personas/priya-shah.persona.yaml
+      - file: personas/alex-rodriguez.persona.yaml
+    roles:
+      - id: customer
+        provider: ollama-local
+
+  scenarios:
+    - file: scenarios/hero-delayed-shipment.scenario.yaml
+    - file: scenarios/hero-marcus-escalation.scenario.yaml
+    - file: scenarios/hero-memory-recall.scenario.yaml
+    - file: scenarios/selfplay-mixed-personas.scenario.yaml
+
   providers:
     - file: providers/azure-gpt4o.provider.yaml
     - file: providers/ollama-local.provider.yaml
