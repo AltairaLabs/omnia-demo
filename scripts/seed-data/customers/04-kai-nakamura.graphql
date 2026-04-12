@@ -1,0 +1,21 @@
+mutation {
+  customerCreate(input: {
+    firstName: "Kai"
+    lastName: "Nakamura"
+    email: "kai.nakamura@example.com"
+    tags: ["returning", "persona:kai-nakamura"]
+    addresses: [{
+      firstName: "Kai"
+      lastName: "Nakamura"
+      address1: "3200 SE Hawthorne Blvd"
+      city: "Portland"
+      province: "OR"
+      zip: "97214"
+      country: "US"
+    }]
+    emailMarketingConsent: { marketingState: SUBSCRIBED, marketingOptInLevel: SINGLE_OPT_IN }
+  }) {
+    customer { id displayName email }
+    userErrors { field message }
+  }
+}

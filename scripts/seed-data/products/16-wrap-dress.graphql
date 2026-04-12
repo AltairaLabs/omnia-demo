@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Wrap Dress"
+    descriptionHtml: "Jersey wrap dress, machine washable."
+    productType: "Dresses"
+    vendor: "Acme Apparel"
+    tags: ["dress", "wrap", "women"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "WRAP-DRESS-S", price: 96.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "WRAP-DRESS-M", price: 96.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "WRAP-DRESS-L", price: 96.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "WRAP-DRESS-XL", price: 96.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

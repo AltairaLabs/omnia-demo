@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "sarah.chen@example.com"
+    tags: ["delayed", "demo:hero-scene-2"]
+    note: "Sarah's delayed order — hero demo Scene 2."
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Summer Linen Dress (M)", quantity: 1, originalUnitPrice: 89.00, sku: "LINEN-DRESS-M" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

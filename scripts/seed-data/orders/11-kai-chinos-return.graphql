@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "kai.nakamura@example.com"
+    tags: ["return-requested"]
+    note: "Kai ordered wrong size, wants exchange."
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Slim Fit Chinos (32 / Olive)", quantity: 1, originalUnitPrice: 68.00, sku: "CHINOS-34-OLV" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

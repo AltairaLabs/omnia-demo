@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "marcus.webb@example.com"
+    tags: ["duplicate-charge", "demo:hero-scene-4"]
+    note: "Intentional duplicate order to simulate the double charge."
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Tailored Blazer (L)", quantity: 1, originalUnitPrice: 185.00, sku: "BLAZER-L" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

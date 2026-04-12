@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Pleated Midi Skirt"
+    descriptionHtml: "Flowing pleated skirt in satin finish."
+    productType: "Skirts"
+    vendor: "Acme Apparel"
+    tags: ["skirt", "midi", "pleated", "women"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "MIDI-SKIRT-S", price: 72.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "MIDI-SKIRT-M", price: 72.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "MIDI-SKIRT-L", price: 72.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "MIDI-SKIRT-XL", price: 72.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

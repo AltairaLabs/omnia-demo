@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "kai.nakamura@example.com"
+    tags: ["delivered"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Stretch Denim Jacket (M)", quantity: 1, originalUnitPrice: 110.00, sku: "DENIM-JKT-M" }
+      { title: "Oversized Graphic Tee (M)", quantity: 1, originalUnitPrice: 35.00, sku: "GRAPHIC-TEE-M" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

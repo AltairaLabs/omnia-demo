@@ -1,0 +1,13 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "priya.shah@example.com"
+    tags: ["delivered"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Pleated Midi Skirt (S)", quantity: 1, originalUnitPrice: 72.00, sku: "MIDI-SKIRT-S" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

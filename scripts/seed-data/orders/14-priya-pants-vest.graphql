@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "priya.shah@example.com"
+    tags: ["in-transit"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "High-Rise Wide Leg Pants (S)", quantity: 1, originalUnitPrice: 78.00, sku: "WIDE-LEG-S" }
+      { title: "Quilted Vest (S)", quantity: 1, originalUnitPrice: 88.00, sku: "VEST-S" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

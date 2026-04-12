@@ -1,0 +1,21 @@
+mutation {
+  customerCreate(input: {
+    firstName: "Marcus"
+    lastName: "Webb"
+    email: "marcus.webb@example.com"
+    tags: ["returning", "persona:marcus-webb"]
+    addresses: [{
+      firstName: "Marcus"
+      lastName: "Webb"
+      address1: "1501 Broadway"
+      city: "New York"
+      province: "NY"
+      zip: "10036"
+      country: "US"
+    }]
+    emailMarketingConsent: { marketingState: SUBSCRIBED, marketingOptInLevel: SINGLE_OPT_IN }
+  }) {
+    customer { id displayName email }
+    userErrors { field message }
+  }
+}

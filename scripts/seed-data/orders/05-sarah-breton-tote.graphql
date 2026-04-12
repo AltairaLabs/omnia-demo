@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "sarah.chen@example.com"
+    tags: ["delivered"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Striped Breton Tee (S)", quantity: 1, originalUnitPrice: 45.00, sku: "BRETON-TEE-S" }
+      { title: "Canvas Tote Bag (Natural)", quantity: 1, originalUnitPrice: 38.00, sku: "TOTE-NAT" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

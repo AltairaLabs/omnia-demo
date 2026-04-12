@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Relaxed Linen Shirt"
+    descriptionHtml: "Breathable linen button-down shirt."
+    productType: "Shirts"
+    vendor: "Acme Apparel"
+    tags: ["linen", "shirt", "men", "summer"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "LINEN-SHIRT-S", price: 65.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "LINEN-SHIRT-M", price: 65.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "LINEN-SHIRT-L", price: 65.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "LINEN-SHIRT-XL", price: 65.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Oversized Graphic Tee"
+    descriptionHtml: "Relaxed fit tee with seasonal graphic."
+    productType: "Tops"
+    vendor: "Acme Apparel"
+    tags: ["tee", "graphic", "oversized", "unisex"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "GRAPHIC-TEE-S", price: 35.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "GRAPHIC-TEE-M", price: 35.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "GRAPHIC-TEE-L", price: 35.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "GRAPHIC-TEE-XL", price: 35.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

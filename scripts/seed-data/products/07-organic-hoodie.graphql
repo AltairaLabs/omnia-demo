@@ -1,0 +1,22 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Organic Cotton Hoodie"
+    descriptionHtml: "Heavyweight organic cotton hoodie with kangaroo pocket."
+    productType: "Hoodies"
+    vendor: "Acme Apparel"
+    tags: ["hoodie", "organic", "unisex"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "XS" }, { name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }, { name: "XXL" }] }]
+    variants: [
+      { sku: "HOODIE-XS", price: 72.00, optionValues: [{ optionName: "Size", name: "XS" }] }
+      { sku: "HOODIE-S", price: 72.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "HOODIE-M", price: 72.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "HOODIE-L", price: 72.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "HOODIE-XL", price: 72.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+      { sku: "HOODIE-XXL", price: 72.00, optionValues: [{ optionName: "Size", name: "XXL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

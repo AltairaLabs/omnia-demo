@@ -1,0 +1,18 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Canvas Tote Bag"
+    descriptionHtml: "Heavy-duty canvas tote with leather handles."
+    productType: "Accessories"
+    vendor: "Acme Apparel"
+    tags: ["tote", "bag", "canvas"]
+    status: ACTIVE
+    productOptions: [{ name: "Color", values: [{ name: "Natural" }, { name: "Black" }] }]
+    variants: [
+      { sku: "TOTE-NAT", price: 38.00, optionValues: [{ optionName: "Color", name: "Natural" }] }
+      { sku: "TOTE-BLK", price: 38.00, optionValues: [{ optionName: "Color", name: "Black" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "emma.patel@example.com"
+    tags: ["in-transit"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Ribbed Tank Top (M)", quantity: 2, originalUnitPrice: 24.00, sku: "TANK-M" }
+      { title: "Performance Joggers (M)", quantity: 1, originalUnitPrice: 58.00, sku: "JOGGER-M" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

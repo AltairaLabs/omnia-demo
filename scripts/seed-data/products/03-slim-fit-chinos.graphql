@@ -1,0 +1,22 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Slim Fit Chinos"
+    descriptionHtml: "Tailored slim-fit chinos in stretch cotton twill."
+    productType: "Pants"
+    vendor: "Acme Apparel"
+    tags: ["chinos", "pants", "men", "stretch"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "30" }, { name: "32" }, { name: "34" }, { name: "36" }, { name: "38" }] }, { name: "Color", values: [{ name: "Navy" }, { name: "Khaki" }, { name: "Olive" }] }]
+    variants: [
+      { sku: "CHINOS-30-NVY", price: 68.00, optionValues: [{ optionName: "Size", name: "30" }, { optionName: "Color", name: "Navy" }] }
+      { sku: "CHINOS-32-NVY", price: 68.00, optionValues: [{ optionName: "Size", name: "32" }, { optionName: "Color", name: "Navy" }] }
+      { sku: "CHINOS-34-NVY", price: 68.00, optionValues: [{ optionName: "Size", name: "34" }, { optionName: "Color", name: "Navy" }] }
+      { sku: "CHINOS-34-KHK", price: 68.00, optionValues: [{ optionName: "Size", name: "34" }, { optionName: "Color", name: "Khaki" }] }
+      { sku: "CHINOS-36-KHK", price: 68.00, optionValues: [{ optionName: "Size", name: "36" }, { optionName: "Color", name: "Khaki" }] }
+      { sku: "CHINOS-34-OLV", price: 68.00, optionValues: [{ optionName: "Size", name: "34" }, { optionName: "Color", name: "Olive" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

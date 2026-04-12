@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Cotton Boxer Briefs (3-Pack)"
+    descriptionHtml: "Stretch cotton boxer briefs, pack of 3."
+    productType: "Underwear"
+    vendor: "Acme Apparel"
+    tags: ["underwear", "boxers", "men", "basics"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "BOXER-3PK-S", price: 36.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "BOXER-3PK-M", price: 36.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "BOXER-3PK-L", price: 36.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "BOXER-3PK-XL", price: 36.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

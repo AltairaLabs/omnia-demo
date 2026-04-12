@@ -1,0 +1,18 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Leather Belt"
+    descriptionHtml: "Full-grain leather belt with brushed nickel buckle."
+    productType: "Accessories"
+    vendor: "Acme Apparel"
+    tags: ["belt", "leather", "accessories"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S/M" }, { name: "L/XL" }] }]
+    variants: [
+      { sku: "BELT-SM", price: 42.00, optionValues: [{ optionName: "Size", name: "S/M" }] }
+      { sku: "BELT-LXL", price: 42.00, optionValues: [{ optionName: "Size", name: "L/XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Striped Breton Tee"
+    descriptionHtml: "Classic Breton stripe in heavyweight cotton."
+    productType: "Tops"
+    vendor: "Acme Apparel"
+    tags: ["breton", "stripe", "tee", "unisex"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "BRETON-TEE-S", price: 45.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "BRETON-TEE-M", price: 45.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "BRETON-TEE-L", price: 45.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "BRETON-TEE-XL", price: 45.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

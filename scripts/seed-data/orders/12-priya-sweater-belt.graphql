@@ -1,0 +1,14 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "priya.shah@example.com"
+    tags: ["delivered"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Merino Wool Crew Sweater (S)", quantity: 1, originalUnitPrice: 95.00, sku: "MERINO-CREW-S" }
+      { title: "Leather Belt (S/M)", quantity: 1, originalUnitPrice: 42.00, sku: "BELT-SM" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

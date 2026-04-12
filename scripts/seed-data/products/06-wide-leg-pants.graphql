@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "High-Rise Wide Leg Pants"
+    descriptionHtml: "Flowing wide-leg trouser in crepe fabric."
+    productType: "Pants"
+    vendor: "Acme Apparel"
+    tags: ["pants", "women", "wide-leg"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "WIDE-LEG-S", price: 78.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "WIDE-LEG-M", price: 78.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "WIDE-LEG-L", price: 78.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "WIDE-LEG-XL", price: 78.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

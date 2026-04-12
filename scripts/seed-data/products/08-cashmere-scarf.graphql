@@ -1,0 +1,19 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Cashmere Blend Scarf"
+    descriptionHtml: "Soft cashmere-wool blend scarf."
+    productType: "Accessories"
+    vendor: "Acme Apparel"
+    tags: ["scarf", "cashmere", "winter"]
+    status: ACTIVE
+    productOptions: [{ name: "Color", values: [{ name: "Charcoal" }, { name: "Cream" }, { name: "Burgundy" }] }]
+    variants: [
+      { sku: "SCARF-CHAR", price: 55.00, optionValues: [{ optionName: "Color", name: "Charcoal" }] }
+      { sku: "SCARF-CRM", price: 55.00, optionValues: [{ optionName: "Color", name: "Cream" }] }
+      { sku: "SCARF-BURG", price: 55.00, optionValues: [{ optionName: "Color", name: "Burgundy" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

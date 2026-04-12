@@ -1,0 +1,22 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Classic Cotton Tee"
+    descriptionHtml: "Everyday essential cotton t-shirt. Pre-shrunk, ring-spun cotton."
+    productType: "Tops"
+    vendor: "Acme Apparel"
+    tags: ["basics", "cotton", "tee", "unisex"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "XS" }, { name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }, { name: "XXL" }] }]
+    variants: [
+      { sku: "COTTON-TEE-XS", price: 29.00, optionValues: [{ optionName: "Size", name: "XS" }] }
+      { sku: "COTTON-TEE-S", price: 29.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "COTTON-TEE-M", price: 29.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "COTTON-TEE-L", price: 29.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "COTTON-TEE-XL", price: 29.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+      { sku: "COTTON-TEE-XXL", price: 29.00, optionValues: [{ optionName: "Size", name: "XXL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

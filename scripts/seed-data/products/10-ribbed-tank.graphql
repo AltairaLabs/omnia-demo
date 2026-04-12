@@ -1,0 +1,21 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Ribbed Tank Top"
+    descriptionHtml: "Fitted ribbed cotton tank."
+    productType: "Tops"
+    vendor: "Acme Apparel"
+    tags: ["tank", "ribbed", "women", "basics"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "XS" }, { name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "TANK-XS", price: 24.00, optionValues: [{ optionName: "Size", name: "XS" }] }
+      { sku: "TANK-S", price: 24.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "TANK-M", price: 24.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "TANK-L", price: 24.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "TANK-XL", price: 24.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

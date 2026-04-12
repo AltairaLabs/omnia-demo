@@ -1,0 +1,21 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Summer Linen Dress"
+    descriptionHtml: "Lightweight linen dress perfect for warm weather. Relaxed fit with side pockets."
+    productType: "Dresses"
+    vendor: "Acme Apparel"
+    tags: ["summer", "linen", "dress", "women"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "XS" }, { name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "LINEN-DRESS-XS", price: 89.00, optionValues: [{ optionName: "Size", name: "XS" }] }
+      { sku: "LINEN-DRESS-S", price: 89.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "LINEN-DRESS-M", price: 89.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "LINEN-DRESS-L", price: 89.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "LINEN-DRESS-XL", price: 89.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}

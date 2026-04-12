@@ -1,0 +1,21 @@
+mutation {
+  customerCreate(input: {
+    firstName: "Sarah"
+    lastName: "Chen"
+    email: "sarah.chen@example.com"
+    tags: ["loyal", "returning", "persona:sarah-chen"]
+    addresses: [{
+      firstName: "Sarah"
+      lastName: "Chen"
+      address1: "742 Linden Ave"
+      city: "Oakland"
+      province: "CA"
+      zip: "94610"
+      country: "US"
+    }]
+    emailMarketingConsent: { marketingState: SUBSCRIBED, marketingOptInLevel: SINGLE_OPT_IN }
+  }) {
+    customer { id displayName email }
+    userErrors { field message }
+  }
+}

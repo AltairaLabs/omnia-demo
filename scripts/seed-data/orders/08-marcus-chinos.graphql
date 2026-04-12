@@ -1,0 +1,13 @@
+mutation {
+  draftOrderCreate(input: {
+    email: "marcus.webb@example.com"
+    tags: ["delivered"]
+    shippingLine: { title: "Standard Shipping", price: 0 }
+    lineItems: [
+      { title: "Slim Fit Chinos (34 / Navy)", quantity: 1, originalUnitPrice: 68.00, sku: "CHINOS-34-NVY" }
+    ]
+  }) {
+    draftOrder { id }
+    userErrors { field message }
+  }
+}

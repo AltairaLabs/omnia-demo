@@ -1,0 +1,20 @@
+mutation {
+  productSet(synchronous: true, input: {
+    title: "Quilted Vest"
+    descriptionHtml: "Lightweight quilted vest with recycled fill."
+    productType: "Jackets"
+    vendor: "Acme Apparel"
+    tags: ["vest", "quilted", "unisex"]
+    status: ACTIVE
+    productOptions: [{ name: "Size", values: [{ name: "S" }, { name: "M" }, { name: "L" }, { name: "XL" }] }]
+    variants: [
+      { sku: "VEST-S", price: 88.00, optionValues: [{ optionName: "Size", name: "S" }] }
+      { sku: "VEST-M", price: 88.00, optionValues: [{ optionName: "Size", name: "M" }] }
+      { sku: "VEST-L", price: 88.00, optionValues: [{ optionName: "Size", name: "L" }] }
+      { sku: "VEST-XL", price: 88.00, optionValues: [{ optionName: "Size", name: "XL" }] }
+    ]
+  }) {
+    product { id title }
+    userErrors { field message }
+  }
+}
