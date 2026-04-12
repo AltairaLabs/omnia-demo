@@ -21,6 +21,32 @@ PromptKit arena source tree for the Acme Apparel customer-support pack, compiled
 | `scenarios/selfplay-mixed-personas.scenario.yaml` | Self-play template cycling through all six personas; repeated continuously by the operator demo ArenaJob (O3). |
 | `providers/azure-gpt4o.provider.yaml` | Primary agent-role provider (Azure OpenAI GPT-4o). Replace the `REPLACE-ME` URL for your environment. |
 | `providers/ollama-local.provider.yaml` | Cheap customer-simulation provider for self-play. |
+| `skills/memory-protocol/SKILL.md` | Preloaded: memory recall/remember protocol for cross-session context |
+| `skills/guardrails/SKILL.md` | Preloaded: hard agent boundaries (no refunds, no account mods) |
+| `skills/escalation-policy/SKILL.md` | On-demand: when and how to escalate to human specialists |
+| `skills/tool-guide/SKILL.md` | On-demand: how to use lookup_order, lookup_customer, search_kb, issue_discount_code |
+| `skills/business-context/SKILL.md` | On-demand: Acme Apparel policies, hours, shipping/returns rules |
+
+## Skills
+
+The system prompt is intentionally lean — it only defines the agent's identity and voice
+(warm/empathetic for variant A, direct/confident for variant B). All behavioral knowledge
+is provided through skills:
+
+**Preloaded** (active from turn 1):
+- `memory-protocol` — forces `memory__recall` before first response, guides `memory__remember` usage
+- `guardrails` — hard boundaries the agent must never cross (no refunds, no account mods, escalate chargebacks)
+
+**On-demand** (model activates via `skill__activate` when relevant):
+- `escalation-policy` — when and how to hand off to a human specialist
+- `tool-guide` — how to use each Shopify support tool effectively
+- `business-context` — shipping policy, returns policy, support hours
+
+This decomposition means both prompt variants share the same behavioral skills — only
+the voice differs. An operator can swap a skill (e.g., different escalation SLA) without
+touching the prompt.
+
+**Note:** Skills are not yet wired into the pack compilation pipeline (PromptKit#951). The skill files exist and are ready; they'll be activated once the upstream fix lands.
 
 ## Hero demo persona usage
 
