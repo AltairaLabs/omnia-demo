@@ -12,14 +12,13 @@ spec:
   # are aspirational; the runtime registers `openai`, `claude`, `gemini` only.
   type: openai
   model: gpt-4o
-  # Replace the URL below with your Azure AI Foundry resource endpoint.
-  # Typical Azure OpenAI endpoint form:
-  #   https://<resource>.openai.azure.com/openai/deployments/<deployment-name>
-  # PromptKit does not expand ${VAR} syntax in string fields, so use a literal
-  # value here or override via kustomize/helm for cluster deployments.
-  base_url: https://REPLACE-ME.openai.azure.com/openai/deployments/gpt-4o
-  credential:
-    credential_env: AZURE_OPENAI_API_KEY
+  # Azure AI Foundry is accessed as a platform on the openai provider type.
+  # The platform handles auth via the Azure SDK default credential chain
+  # (Managed Identity, Azure CLI, AZURE_CLIENT_ID/TENANT_ID/CLIENT_SECRET).
+  # Replace the endpoint below with your Azure AI Foundry resource URL.
+  platform:
+    type: azure
+    endpoint: https://REPLACE-ME.openai.azure.com
   defaults:
     temperature: 0.7
     max_tokens: 2000

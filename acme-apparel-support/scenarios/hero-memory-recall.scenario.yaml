@@ -15,6 +15,11 @@ spec:
     reply in a way that clearly references the prior interaction. This
     is the hero demo's memory moment.
   task_type: acme-support-variant-a
+  seed_memories:
+    - content: "Sarah Chen contacted support about order #1023 (Summer Linen Dress, $89). The order was delayed 5 days in transit. Agent confirmed the delay via lookup_order, apologized, and issued an EXPRESS_UPGRADE discount code for her next order."
+      type: interaction
+    - content: "Sarah was stressed about the delay because she needed the dress for a birthday party this weekend. She was relieved when offered the express upgrade."
+      type: context
   tool_policy:
     tool_choice: auto
     max_tool_calls_per_turn: 3
@@ -22,7 +27,7 @@ spec:
   turns:
     - role: user
       content: |
-        Hi, I'm back — the dress arrived this morning and it's perfect. Thank you for sorting out the express shipping, the party's this afternoon.
+        Hi, it's Sarah again — just wanted to follow up on our last conversation. Everything worked out perfectly, thank you!
     - role: claude-user
       persona: sarah-chen
       turns: 2
