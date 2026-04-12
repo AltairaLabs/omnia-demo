@@ -2,9 +2,11 @@
 
 **Status**: Consolidated build list for the paired hero + operator demos
 **Created**: 2026-04-10
-**Last significant update**: 2026-04-11 — arena-native content pivot (see `2026-04-11-arena-native-content-design.md`)
+**Last significant update**: 2026-04-12 — skills decomposition + pre-H0 batch complete
 
 > **Content pivot (2026-04-11) — COMPLETE**: Demo content (T7/T8/K1/K2/O1/O2 and the T1–T5 tool schemas) has been re-sourced as native PromptKit arena YAML under `acme-apparel-support/`. See `specs/2026-04-11-arena-native-content-design.md` for design rationale and `specs/2026-04-11-arena-native-content-implementation-plan.md` for the executed plan. T7/T8/K1/K2/O1/O2 rows below are marked DONE where the content work completed; H2.b (Helm chart packaging) and H4.a O3 (continuous ArenaJob) remain.
+
+> **Pre-H0 batch (2026-04-12) — COMPLETE**: VP, Q11, SH2, SH3 all done. Arena content validated against real gpt-4.1 — all 5 scenarios pass 9/9 assertions. Skills decomposition shipped: 5 SKILL.md files (2 preloaded) replace the monolithic system prompt. Shopify dev store seeded with 20 products, 5 customers, 14 orders. Admin API token verified. Remaining pre-H0 work: V2 (Azure AI Foundry Private Endpoint docs), V3 (Azure provisioning + Omnia azure-ai provider end-to-end). See `specs/2026-04-12-skills-decomposition-design.md` and `scripts/seed-data/` for details.
 
 ## 📍 Starting work? Open `demo-kickoff.md` first
 
