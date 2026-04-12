@@ -28,21 +28,92 @@ PromptKit arena source tree for the Acme Apparel customer-support pack, compiled
 - **Marcus Webb**: Scene 4 (chargeback escalation). Tests that the agent always escalates chargebacks via `escalate_to_human`.
 - **Emma, Kai, Priya, Alex**: not on camera in the hero demo. They provide variety in operator-demo self-play traffic so Grafana dashboards show diverse tool-call patterns.
 
-## Running locally
+## Prerequisites
+
+Install the PromptKit tools from source:
 
 ```bash
-# Validate the sources
+go -C ../promptkit install ./tools/arena/cmd/promptarena
+go -C ../promptkit install ./tools/packc
+```
+
+For Shopify store access (SH2/SH3):
+
+```bash
+npm install -g @shopify/cli
+shopify auth login
+shopify store auth --store acme-apparel-omnia-demo.myshopify.com \
+  --scopes read_products,write_products,read_customers,write_customers,\
+read_orders,write_orders,write_discounts,read_discounts,\
+write_price_rules,read_price_rules,write_draft_orders
+```
+
+The `shopify store auth` command creates an OAuth `shpat_` Admin API token stored at `~/Library/Preferences/shopify-cli-store-nodejs/config.json`. Re-run the command to refresh an expired token.
+
+## Running locally
+
+### Environment
+
+Arena scenarios need API keys for the providers they use. Set `OPENAI_API_KEY` for `openai-direct` (gpt-4.1). The `azure-gpt4o` provider requires `AZURE_OPENAI_API_KEY` — set it to `dummy` if you're only running against `openai-direct` or `mock` (see PromptKit#938 for why this is needed).
+
+```bash
+export OPENAI_API_KEY=sk-...
+export AZURE_OPENAI_API_KEY=dummy   # not needed unless running against Azure
+```
+
+### Validate and compile
+
+```bash
+# Validate the arena config + all referenced files
 promptarena validate acme-apparel-support/config.arena.yaml
 
-# Compile the pack (note: no --compiler-version flag — current packc
-# does not accept it)
+# Compile the pack into deployable JSON
 packc compile \
   -c acme-apparel-support/config.arena.yaml \
   --id acme-apparel-support \
   -o build/acme-apparel-support.pack.json
 
-# Run a scenario end-to-end
-promptarena run -c acme-apparel-support/config.arena.yaml --scenario hero-delayed-shipment
+# Validate the compiled pack
+packc validate build/acme-apparel-support.pack.json
+```
+
+### Run scenarios
+
+```bash
+# Single scenario against mock provider (no API key needed, fast)
+promptarena run \
+  -c acme-apparel-support/config.arena.yaml \
+  --scenario smoke-test-single-turn \
+  --provider mock
+
+# Single scenario against real LLM (needs OPENAI_API_KEY)
+promptarena run \
+  -c acme-apparel-support/config.arena.yaml \
+  --scenario smoke-test-single-turn \
+  --provider openai-direct
+
+# All scenarios against real LLM
+promptarena run \
+  -c acme-apparel-support/config.arena.yaml \
+  --provider openai-direct
+
+# Add -v for verbose debug logging
 ```
 
 Results land in `out/report.html` by default.
+
+### Seed the Shopify store
+
+The dev store at `acme-apparel-omnia-demo.myshopify.com` needs demo data (products, customers, orders). The seed script creates everything via GraphQL:
+
+```bash
+./scripts/seed-data/create-all.sh
+```
+
+Requires `shopify store auth` (see Prerequisites). Idempotent for products and customers; orders will duplicate on re-run. See `scripts/seed-data/` for individual mutation files.
+
+### Known issues
+
+- **PromptKit#938**: `--provider` filter doesn't skip credential resolution for unselected providers — workaround is `AZURE_OPENAI_API_KEY=dummy`
+- **PromptKit#946**: `seed_memories` not yet implemented — `hero-memory-recall` scenario's `memory__recall` assertion fails when run in isolation (no prior session to recall from)
+- **hero-memory-recall**: passes `contains_any` (warm response) but fails `tools_called_session` for `memory__recall` — the model skips the tool call when memory store is empty
