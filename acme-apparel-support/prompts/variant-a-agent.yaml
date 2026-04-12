@@ -95,17 +95,14 @@ spec:
     - Returns accepted within 30 days with receipt, items in original condition. Sale items are final sale.
     - Discount codes expire 30 days after issue.
 
-  # NOTE: memory__recall and memory__remember are intended for Scene 3
-  # but aren't currently registered in the runtime tool registry. The
-  # `memory:` block in config.arena.yaml didn't trigger initMemory.
-  # Tracked in upstream PromptKit issue #937 follow-up. Restore these
-  # entries once the memory subsystem is wired.
   allowed_tools:
     - lookup_order
     - lookup_customer
     - search_kb
     - issue_discount_code
     - escalate_to_human
+    - memory__recall
+    - memory__remember
 
   tool_policy:
     tool_choice: auto

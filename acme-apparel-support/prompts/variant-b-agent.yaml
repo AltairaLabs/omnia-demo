@@ -82,15 +82,14 @@ spec:
     - Returns: 30 days with receipt, original condition. Sale items final.
     - Discount codes expire 30 days after issue.
 
-  # See variant-a-agent.yaml for notes on memory__recall / memory__remember —
-  # not currently registered in the runtime, restored once the memory
-  # subsystem is wired.
   allowed_tools:
     - lookup_order
     - lookup_customer
     - search_kb
     - issue_discount_code
     - escalate_to_human
+    - memory__recall
+    - memory__remember
 
   tool_policy:
     tool_choice: auto
