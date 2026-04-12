@@ -19,6 +19,15 @@ spec:
     - file: tools/issue-discount-code.tool.yaml
     - file: tools/escalate-to-human.tool.yaml
 
+  skills:
+    - path: skills/memory-protocol
+      preload: true
+    - path: skills/guardrails
+      preload: true
+    - path: skills/escalation-policy
+    - path: skills/tool-guide
+    - path: skills/business-context
+
   # Pack-level evals — both variants are measured identically.
   pack_evals:
     - id: session_outcome
