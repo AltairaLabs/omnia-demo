@@ -54,11 +54,10 @@ The `shopify store auth` command creates an OAuth `shpat_` Admin API token store
 
 ### Environment
 
-Arena scenarios need API keys for the providers they use. Set `OPENAI_API_KEY` for `openai-direct` (gpt-4.1). The `azure-gpt4o` provider requires `AZURE_OPENAI_API_KEY` — set it to `dummy` if you're only running against `openai-direct` or `mock` (see PromptKit#938 for why this is needed).
+Arena scenarios need API keys for the providers they use. Set `OPENAI_API_KEY` for `openai-direct` (gpt-4.1). The `azure-gpt4o` provider uses Azure platform auth (Managed Identity, Azure CLI, or `AZURE_CLIENT_ID`/`AZURE_TENANT_ID`/`AZURE_CLIENT_SECRET`) — no separate API key needed.
 
 ```bash
 export OPENAI_API_KEY=sk-...
-export AZURE_OPENAI_API_KEY=dummy   # not needed unless running against Azure
 ```
 
 ### Validate and compile
@@ -114,6 +113,4 @@ Requires `shopify store auth` (see Prerequisites). Idempotent for products and c
 
 ### Known issues
 
-- **PromptKit#938**: `--provider` filter doesn't skip credential resolution for unselected providers — workaround is `AZURE_OPENAI_API_KEY=dummy`
-- **PromptKit#946**: `seed_memories` not yet implemented — `hero-memory-recall` scenario's `memory__recall` assertion fails when run in isolation (no prior session to recall from)
-- **hero-memory-recall**: passes `contains_any` (warm response) but fails `tools_called_session` for `memory__recall` — the model skips the tool call when memory store is empty
+- **hero-memory-recall**: `seed_memories` populates the store correctly, but gpt-4.1 skips the `memory__recall` tool call — it responds directly without checking memory. The `contains_any` assertion passes (warm response) but `tools_called_session` for `memory__recall` fails. Needs prompt tuning to make the recall instruction stronger.
