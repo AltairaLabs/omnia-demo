@@ -46,7 +46,17 @@ This decomposition means both prompt variants share the same behavioral skills â
 the voice differs. An operator can swap a skill (e.g., different escalation SLA) without
 touching the prompt.
 
-**Note:** Skills are not yet wired into the pack compilation pipeline (PromptKit#951). The skill files exist and are ready; they'll be activated once the upstream fix lands.
+### Current test status
+
+All 5 scenarios pass 9/9 assertions against gpt-4.1 with skills active:
+
+| Scenario | Assertions | Notes |
+|---|---|---|
+| `smoke-test-single-turn` | 1/1 | `lookup_order` called after user mentions order |
+| `hero-delayed-shipment` | 3/3 | `lookup_order` + tracking info surfaced + `issue_discount_code` |
+| `hero-marcus-escalation` | 3/3 | `escalate_to_human` + specialist mention + no false refund claims |
+| `hero-memory-recall` | 2/2 | `memory__recall` called (preloaded memory-protocol skill) + warm response |
+| `selfplay-mixed-personas` | 1/1 | Tool efficiency within limits across 6 personas |
 
 ## Hero demo persona usage
 
@@ -92,7 +102,7 @@ export OPENAI_API_KEY=sk-...
 # Validate the arena config + all referenced files
 promptarena validate acme-apparel-support/config.arena.yaml
 
-# Compile the pack into deployable JSON
+# Compile the pack into deployable JSON (includes skills)
 packc compile \
   -c acme-apparel-support/config.arena.yaml \
   --id acme-apparel-support \
@@ -100,6 +110,15 @@ packc compile \
 
 # Validate the compiled pack
 packc validate build/acme-apparel-support.pack.json
+
+# Inspect pack contents (prompts, tools, evals, skills)
+packc inspect build/acme-apparel-support.pack.json
+```
+
+If schema validation fails with "Additional property not allowed" on a field that exists in your local PromptKit schema, run the above commands with `PROMPTKIT_SCHEMA_SOURCE=local` from the PromptKit repo root:
+
+```bash
+cd ../promptkit && PROMPTKIT_SCHEMA_SOURCE=local packc compile -c ../omnia-demo/acme-apparel-support/config.arena.yaml --id acme-apparel-support -o ../omnia-demo/build/acme-apparel-support.pack.json
 ```
 
 ### Run scenarios
@@ -139,4 +158,4 @@ Requires `shopify store auth` (see Prerequisites). Idempotent for products and c
 
 ### Known issues
 
-- **hero-memory-recall**: `seed_memories` populates the store correctly, but gpt-4.1 skips the `memory__recall` tool call â€” it responds directly without checking memory. The `contains_any` assertion passes (warm response) but `tools_called_session` for `memory__recall` fails. Needs prompt tuning to make the recall instruction stronger.
+- **Schema validation**: the published schema at `https://promptkit.altairalabs.ai/schemas/v1alpha1/` lags the PromptKit `main` branch. If `promptarena validate` or `packc compile` fails with "Additional property X is not allowed" on a field that exists in the local schema, run with `PROMPTKIT_SCHEMA_SOURCE=local` from the PromptKit repo directory until the published schema is updated.
