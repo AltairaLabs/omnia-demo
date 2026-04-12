@@ -35,7 +35,7 @@ spec:
     - Expects the agent to remember — if the agent asks "how can I help you today?" as if Alex is a stranger, something is visibly wrong
 
   style:
-    verbosity: low
+    verbosity: short
     challenge_level: low
     friction_tags:
       - positive_return

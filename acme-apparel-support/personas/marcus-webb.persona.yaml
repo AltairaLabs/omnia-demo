@@ -36,7 +36,7 @@ spec:
     - Does not repeat himself more than needed — if he's said "this is a chargeback dispute" once, he expects the agent to have heard
 
   style:
-    verbosity: low
+    verbosity: short
     challenge_level: high
     friction_tags:
       - dispute
