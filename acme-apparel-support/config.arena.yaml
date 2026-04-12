@@ -23,7 +23,7 @@ spec:
   pack_evals:
     - id: session_outcome
       type: llm_judge
-      trigger: session_completion
+      trigger: on_session_complete
       description: Classify session outcome (resolved/escalated/abandoned/unresolved)
       params:
         rubric: |
@@ -46,7 +46,7 @@ spec:
 
     - id: customer_sentiment
       type: llm_judge
-      trigger: session_completion
+      trigger: on_session_complete
       description: Score customer sentiment at session end, -1 to +1
       params:
         rubric: |
@@ -70,7 +70,7 @@ spec:
 
     - id: no_pii_leak
       type: regex
-      trigger: turn_completion
+      trigger: every_turn
       description: Block credit card and SSN patterns in agent output
       params:
         patterns:
@@ -85,7 +85,7 @@ spec:
 
     - id: memory_utilization
       type: rule
-      trigger: session_completion
+      trigger: on_session_complete
       description: Agent called at least one memory__* tool during the session
       params:
         tool_names: [memory__recall, memory__remember]
