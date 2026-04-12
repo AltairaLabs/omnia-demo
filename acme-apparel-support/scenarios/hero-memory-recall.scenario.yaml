@@ -29,11 +29,11 @@ spec:
       user_temp: 0.5
       seed: 1024
   conversation_assertions:
-    - type: tools_called
+    - type: tools_called_session
       params:
-        name: memory__recall
+        tools: [memory__recall]
       message: Agent should call memory__recall at session start to load prior context
-    - type: substring_present
+    - type: contains_any
       params:
         patterns: ["glad to hear", "so pleased", "happy", "great news"]
       message: Agent should respond warmly to a successful resolution callback

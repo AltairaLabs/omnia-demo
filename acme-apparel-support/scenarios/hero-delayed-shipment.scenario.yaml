@@ -28,15 +28,15 @@ spec:
       user_temp: 0.7
       seed: 1023
   conversation_assertions:
-    - type: tools_called
+    - type: tools_called_session
       params:
-        name: lookup_order
+        tools: [lookup_order]
       message: Agent should call lookup_order when the customer mentions an order ID
-    - type: substring_present
+    - type: contains_any
       params:
         patterns: [tracking, delivery, arriving, shipped, in transit]
       message: Agent should surface tracking/delivery status from lookup_order
-    - type: tools_called
+    - type: tools_called_session
       params:
-        name: issue_discount_code
+        tools: [issue_discount_code]
       message: Agent should issue an EXPRESS_UPGRADE discount for the delay

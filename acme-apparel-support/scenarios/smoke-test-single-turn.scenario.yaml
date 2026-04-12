@@ -25,7 +25,7 @@ spec:
       content: |
         Hi, my order #1023 still hasn't arrived. It was supposed to be here five days ago and I need it for a birthday party this weekend. Can you check what's going on?
   conversation_assertions:
-    - type: tool_called
+    - type: tools_called_session
       params:
-        name: lookup_order
+        tools: [lookup_order]
       message: Agent should call lookup_order when the customer mentions an order ID
