@@ -21,6 +21,7 @@ spec:
       monthly_disposable_income_gbp: { type: number }
       passes: { type: boolean }
       basis: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [financial] }
   mode: mock
   timeout_ms: 30000
   mock_result:

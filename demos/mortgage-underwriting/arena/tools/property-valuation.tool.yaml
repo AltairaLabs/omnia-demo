@@ -20,6 +20,7 @@ spec:
       method: { type: string }
       confidence_band: { type: string }
       ltv_percent: { type: number }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [property] }
   mode: mock
   timeout_ms: 30000
   mock_result:

@@ -1,7 +1,3 @@
-# Required by the Arena config schema, and used only when running this pack
-# through PromptArena locally. It has no bearing on the deployed demo: in
-# Omnia the model comes from the Provider CR named by the AgentRuntime
-# (mortgage-underwriting-llm), not from anything in the pack.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Provider
 metadata:

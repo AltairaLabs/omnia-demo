@@ -10,8 +10,6 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # Order is the order the underwriting chain runs in, so the pack reads the
-  # way the case is worked.
   tools:
     - file: tools/case-fetch.tool.yaml
     - file: tools/credit-report.tool.yaml

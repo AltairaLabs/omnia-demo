@@ -32,6 +32,7 @@ spec:
           them. Held legitimately inside the firm. This data may be READ here
           and may not be sent to any external supplier.
         items: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, financial] }
   mode: mock
   timeout_ms: 30000
   mock_result:

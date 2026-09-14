@@ -22,6 +22,7 @@ spec:
         type: array
         items: { type: string }
       screened_against: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, sanctions] }
   mode: mock
   timeout_ms: 30000
   mock_result:
