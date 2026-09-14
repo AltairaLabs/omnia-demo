@@ -1,0 +1,22 @@
+namespace: omnia-demo
+
+memory:
+  enabled: true
+  workspaceID: demo
+  apiURL: http://memory-api.omnia-system.svc.cluster.local:8080
+  source: public-s3-demo
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-memory-ingestion
+    tag: latest
+    pullPolicy: IfNotPresent
+  s3:
+    bucket: omnia-memory
+    prefix: fixtures/
+    region: us-east-1
+    endpoint: http://memory-s3:9000
+    forcePathStyle: "true"
+  minio:
+    enabled: true
+    image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
+    accessKey: minioadmin
+    secretKey: minioadmin

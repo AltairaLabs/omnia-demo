@@ -1,0 +1,33 @@
+name: Public demo validation
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: memory-ingestion
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: memory-ingestion/go.mod
+          cache-dependency-path: memory-ingestion/go.sum
+      - run: go mod tidy
+      - run: go test ./...
+      - run: go vet ./...
+
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/omnia-demo
+      - run: helm template omnia-demo charts/omnia-demo >/dev/null

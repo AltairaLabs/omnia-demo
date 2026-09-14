@@ -58,6 +58,14 @@ omnia-demo/
     └── faq.md
 ```
 
+### Public memory ingestion demo
+
+[`memory-ingestion/`](memory-ingestion/) and [`charts/omnia-demo/`](charts/omnia-demo/)
+are a standalone S3-to-Omnia institutional-memory example. They are designed
+to run against a released Omnia installation and contain only synthetic
+fixtures and source-connector code. The chart is an add-on: it does not copy
+Omnia templates or install private platform components.
+
 ---
 
 ## What's NOT in this repo (and where to find it)

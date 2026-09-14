@@ -1,0 +1,46 @@
+{{- if .Values.memory.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: omnia-demo-memory-ingest
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "20"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: upload-fixtures
+          image: quay.io/minio/mc:RELEASE.2024-06-13T17-11-24Z
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              until mc alias set local http://memory-s3:9000 {{ .Values.memory.minio.accessKey }} {{ .Values.memory.minio.secretKey }}; do sleep 2; done
+              mc mb --ignore-existing local/{{ .Values.memory.s3.bucket }}
+              mc cp /fixtures/*.md local/{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }}
+          volumeMounts:
+            - { name: fixtures, mountPath: /fixtures }
+      containers:
+        - name: ingest
+          image: {{ .Values.memory.image.repository }}:{{ .Values.memory.image.tag }}
+          imagePullPolicy: {{ .Values.memory.image.pullPolicy }}
+          env:
+            - { name: MEMORY_API_URL, value: {{ .Values.memory.apiURL | quote }} }
+            - { name: WORKSPACE_ID, value: {{ .Values.memory.workspaceID | quote }} }
+            - { name: MEMORY_SOURCE, value: {{ .Values.memory.source | quote }} }
+            - { name: S3_BUCKET, value: {{ .Values.memory.s3.bucket | quote }} }
+            - { name: S3_PREFIX, value: {{ .Values.memory.s3.prefix | quote }} }
+            - { name: S3_REGION, value: {{ .Values.memory.s3.region | quote }} }
+            - { name: S3_ENDPOINT, value: {{ .Values.memory.s3.endpoint | quote }} }
+            - { name: S3_FORCE_PATH_STYLE, value: {{ .Values.memory.s3.forcePathStyle | quote }} }
+            - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.memory.minio.accessKey | quote }} }
+            - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
+      volumes:
+        - name: fixtures
+          configMap: { name: omnia-demo-memory-fixtures }
+{{- end }}
