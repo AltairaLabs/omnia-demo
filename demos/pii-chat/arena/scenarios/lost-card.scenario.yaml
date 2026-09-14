@@ -15,7 +15,7 @@ kind: Scenario
 metadata:
   name: lost-card
 spec:
-  task_type: general
+  task_type: card_support
   description: >-
     A cardholder reports a lost card and supplies identifiers in one message.
     The agent should verify, then confirm the card and its status.

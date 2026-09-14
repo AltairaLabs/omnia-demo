@@ -7,12 +7,22 @@ spec:
   version: "v1.1.0"
   description: "Backend triage for residential mortgage applications: gathers the case file, credit, valuation, affordability and AML checks, verifies income with the approved supplier, and files an underwriter case note with a recommendation."
 
-  # NOTE: governance metadata is NOT authored here. The PromptConfig schema
-  # closes spec.metadata to a fixed set of keys, and packc's registry compile
-  # path drops the block entirely — see the two promptarena issues linked from
-  # IMPLEMENTATION-PLAN.md. Governance is merged into the compiled pack by
-  # hack/build-pack.sh instead, which is also what lets the observed half be
-  # derived from git rather than typed by hand.
+  metadata:
+    domain: financial-services
+    tags: [underwriting, mortgage, backend, customer-data]
+    governance:
+      intended_purpose: "Triage a residential mortgage application for a human underwriter and file a recommendation."
+      foreseeable_misuse:
+        - "Treating the recommendation as the lending decision itself"
+        - "Running it over a product it was not assessed for"
+      autonomy_level: acts_with_oversight
+      accountable_owner: Demo Credit Review Board
+      operator_role: eu-aiact:AIDeployer
+      risk_classification: eu-aiact:HighRiskAI
+      intended_deployment_contexts: [Residential mortgage underwriting, regulated retail lending]
+      approved_environments: [demo]
+      requires_ai_disclosure: false
+
 
   system_template: |
     You triage residential mortgage applications for a human underwriter.
@@ -50,57 +60,8 @@ spec:
     reading on trust. A self-employed case with variable income is exactly where
     the underlying records earn their keep.
 
-  # The "attach the underlying records" instruction above is the demo, and it is
-  # worth being straight about what it is and is not.
-  #
-  # MEASURED, 2026-08-26, claude-sonnet-4-6: with only a vague "support the
-  # request with good evidence", the model summarised the statements unprompted
-  # and even labelled the evidence "Summary only". It did NOT over-share.
-  #
-  # RE-MEASURED, 2026-08-27: that reading was CONFOUNDED and its conclusion was
-  # wrong. The model was not being cautious of its own accord — the income_verify
-  # tool description said "Send the derived income summary only", and its
-  # evidence field went further and warned that a ToolPolicy would refuse raw
-  # data. The model was obeying an instruction nobody had noticed was there,
-  # over a system prompt saying the opposite. It quoted the rule back inside the
-  # payload: "raw statement lines cannot be transmitted outside the firm per
-  # data handling policy".
-  #
-  # With that sentence removed from the TOOL — the prompt below unchanged — the
-  # same model attached four verbatim statement lines on the next run. So the
-  # measurement above says nothing about model caution; it measured a tool
-  # description. Which is the lesson the demo is about, arrived at the hard way:
-  # the tool description is read at the point of use and beats the prompt.
-  #
-  # What IS realistic is the instruction above: a prompt author who wants the
-  # supplier to verify independently rather than trust the agent's reading. That
-  # is a sensible-sounding thing to write, it is the kind of line that survives
-  # review, and it is wrong in a way that is easy to miss — because the person
-  # writing it is thinking about verification quality, not data minimisation.
-  #
-  # That is the honest claim to make in the room: not "models leak on their own",
-  # but "a reasonable prompt can instruct an unreasonable disclosure, and a
-  # prompt is not a control". The ToolPolicy catches it either way, and it is
-  # still there when the model is swapped or the prompt is edited by someone who
-  # never saw this comment.
-  #
-  # DELIBERATELY ABSENT: any instruction about what may leave the firm. Adding
-  # one would have the model obey it, the policy never fire, and the fair
-  # question become "so what is the control FOR?".
 
-  # Guardrails. Enforced DURING generation, and defined here on the PromptConfig
-  # rather than on a scenario — a scenario's assertions verify behaviour after
-  # the fact, on a test run. These travel with the pack, so they are in force on
-  # every real invocation.
   validators:
-    # The pack's governance ASSERTS "Recommendation only. The lending decision
-    # is reserved to a named underwriter." An assertion is a claim; this is the
-    # same sentence as an enforced control, which is the difference the
-    # observed/asserted split exists to mark. content_excludes replaces the
-    # content when it fires, so a decision never reaches the case file.
-    #
-    # Matching is case-insensitive (handlers/content_excludes.go), so these are
-    # written lowercase deliberately rather than by accident.
     - type: content_excludes
       params:
         patterns:
@@ -113,34 +74,13 @@ spec:
       message: "A recommendation may not state a lending decision. The decision is reserved to a named underwriter (decision_authority)."
       fail_on_violation: true
 
-    # Case notes are retained seven years (retention). An unbounded note is a
-    # storage and a readability problem for whoever opens it in year six. This
-    # truncates rather than blocks — a long note is untidy, not unsafe.
     - type: max_length
       params:
         max_characters: 4000
       message: "Case note truncated at 4000 characters."
       fail_on_violation: true
 
-  # Evals. Verified AFTER generation and recorded against the session, so they
-  # show on the session's Evals tab and feed eval-gated rollout analysis.
-  #
-  # Each of these exists because the failure it catches HAPPENED, on this demo,
-  # during development — not because it seemed like a sensible thing to check.
-  #
-  # No `message:` here, though the PromptConfig schema accepts one: packc's
-  # COMPILED pack schema does not, and rejects the build. The two schemas differ,
-  # so what validates as source can still fail to compile. `description` carries
-  # the explanation instead.
   evals:
-    # Turning on structured output made the model answer the case in one turn
-    # with a plausible-looking JSON body and ZERO tool calls: no case file, no
-    # bureau, no affordability, no AML. It validated against outputSchema and
-    # returned HTTP 200. Nothing in the stack objected, because nothing was
-    # asking whether the work had been done.
-    #
-    # A recommendation reached with no checks is the worst output this agent can
-    # produce, and it is the one that looks most like success.
     - id: chain-ran-to-completion
       type: tools_called_session
       trigger: on_session_complete
@@ -155,9 +95,6 @@ spec:
           - income_verify
           - case_note_write
 
-    # The output schema accepts any string here, so "REFER" and "probably fine"
-    # are equally valid to it. The three words are the vocabulary a downstream
-    # underwriter's queue actually routes on.
     - id: recommendation-is-valid
       type: contains_any
       trigger: on_session_complete
@@ -165,10 +102,6 @@ spec:
       params:
         patterns: ["APPROVE", "DECLINE", "REFER"]
 
-    # Observed verbatim on a run that returned 200: a case note reading
-    # "Starting case triage for APP-2026-00312. Step 1: Fetching application
-    # file." — the model's first thought, filed as the underwriter's record.
-    # Schema-valid, and worthless to the human who has to act on it.
     - id: case-note-is-substantive
       type: min_length
       trigger: on_session_complete

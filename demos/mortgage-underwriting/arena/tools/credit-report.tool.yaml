@@ -23,6 +23,7 @@ spec:
         items: { type: string }
       monthly_commitments: { type: number }
       bureau: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, credit] }
   mode: mock
   timeout_ms: 30000
   mock_result:
