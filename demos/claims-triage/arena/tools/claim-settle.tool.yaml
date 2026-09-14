@@ -1,0 +1,44 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: claim_settle
+spec:
+  name: claim_settle
+  # The description deliberately does NOT state the delegated authority limit.
+  #
+  # If it did, a well-behaved model would decline on its own and the ToolPolicy
+  # would never be reached — the same trap the mortgage demo documents, where a
+  # live model sends the derived summary and the control is never exercised.
+  # The limit belongs to the POLICY; the agent learns it by calling
+  # claim_policy_fetch, and the broker enforces it whether the agent looked or
+  # not.
+  description: "Authorise payment of a claim to the member's account. Irreversible: once authorised the payment leaves the same day."
+  input_schema:
+    type: object
+    properties:
+      claim_ref:
+        type: string
+        description: Claim reference to settle
+      amount_pence:
+        type: integer
+        description: >-
+          Amount to pay, in pence. Must not exceed what is payable on the claim.
+    required:
+      - claim_ref
+      - amount_pence
+  output_schema:
+    type: object
+    properties:
+      claim_ref: { type: string }
+      settled_pence: { type: integer }
+      payment_ref: { type: string }
+      paid_to: { type: string }
+      status: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    claim_ref: "LM-40733"
+    settled_pence: 18000
+    payment_ref: "PAY-LM-40733"
+    paid_to: "Everyday checking ending 4471"
+    status: "settled"

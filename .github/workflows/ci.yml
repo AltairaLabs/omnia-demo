@@ -11,18 +11,22 @@ permissions:
 jobs:
   go:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: memory-ingestion
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version-file: memory-ingestion/go.mod
-          cache-dependency-path: memory-ingestion/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            memory-ingestion/go.sum
+      - run: go test ./demos/...
+      - run: go vet ./demos/...
       - run: go mod tidy
+        working-directory: memory-ingestion
       - run: go test ./...
+        working-directory: memory-ingestion
       - run: go vet ./...
+        working-directory: memory-ingestion
 
   chart:
     runs-on: ubuntu-latest

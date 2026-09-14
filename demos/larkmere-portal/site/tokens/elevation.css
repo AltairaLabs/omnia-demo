@@ -1,0 +1,10 @@
+:root {
+  --shadow-none: none;
+  --shadow-hairline: 0 1px 0 rgba(10, 33, 25, 0.05);
+  --shadow-1: 0 1px 2px rgba(10, 33, 25, 0.04), 0 4px 12px -2px rgba(10, 33, 25, 0.06);
+  --shadow-2: 0 2px 4px rgba(10, 33, 25, 0.05), 0 12px 28px -6px rgba(10, 33, 25, 0.12);
+  --shadow-3: 0 24px 60px -12px rgba(5, 19, 14, 0.28), 0 4px 12px rgba(5, 19, 14, 0.1);
+  --shadow-mint: 0 8px 24px -6px rgba(41, 198, 143, 0.45);
+  --shadow-inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  --shadow-focus: var(--focus-ring);
+}

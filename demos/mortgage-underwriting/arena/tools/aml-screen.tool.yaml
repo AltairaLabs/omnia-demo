@@ -1,0 +1,31 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: aml_screen
+spec:
+  name: aml_screen
+  description: "Screen the applicant against sanctions and politically-exposed-person watchlists. Internal screening service."
+  input_schema:
+    type: object
+    properties:
+      applicant_ref:
+        type: string
+        description: Case reference for the applicant
+    required:
+      - applicant_ref
+  output_schema:
+    type: object
+    properties:
+      sanctions_hit: { type: boolean }
+      pep_match: { type: boolean }
+      watchlist_ids:
+        type: array
+        items: { type: string }
+      screened_against: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    sanctions_hit: false
+    pep_match: false
+    watchlist_ids: []
+    screened_against: "UK HMT, EU, OFAC (synthetic)"

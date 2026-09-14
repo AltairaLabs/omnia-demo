@@ -1,0 +1,6 @@
+/* Larkmere Mutual webfonts.
+   SUBSTITUTION NOTE: no brand font binaries were supplied. Nearest Google Fonts
+   matches for the intended voice — Manrope (UI + headlines), Instrument Serif
+   (editorial statements), JetBrains Mono (figures). Swap for local @font-face
+   rules when licensed files arrive. */
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500&display=swap");

@@ -1,0 +1,52 @@
+:root {
+  --font-sans: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "Manrope", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-editorial: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --text-2xs: 12px;
+  --text-xs: 13px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-md: 18px;
+  --text-lg: 21px;
+  --text-xl: 26px;
+  --text-2xl: 33px;
+  --text-3xl: 42px;
+  --text-4xl: 56px;
+  --text-5xl: 76px;
+
+  --leading-tight: 1.02;
+  --leading-snug: 1.16;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.6;
+
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-black: 800;
+
+  --tracking-tight: -0.03em;
+  --tracking-snug: -0.018em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.02em;
+  --tracking-caps: 0.06em;
+
+  /* Composite roles */
+  --type-display-xl: var(--weight-bold) var(--text-5xl)/var(--leading-tight) var(--font-display);
+  --type-display-l: var(--weight-bold) var(--text-4xl)/var(--leading-tight) var(--font-display);
+  --type-display-m: var(--weight-bold) var(--text-3xl)/var(--leading-snug) var(--font-display);
+  --type-editorial: 400 var(--text-3xl)/1.12 var(--font-editorial);
+  --type-heading-l: var(--weight-bold) var(--text-xl)/var(--leading-snug) var(--font-display);
+  --type-heading-m: var(--weight-semibold) var(--text-lg)/var(--leading-snug) var(--font-display);
+  --type-heading-s: var(--weight-semibold) var(--text-base)/1.35 var(--font-sans);
+  --type-body-l: var(--weight-regular) var(--text-md)/var(--leading-relaxed) var(--font-sans);
+  --type-body: var(--weight-regular) var(--text-base)/var(--leading-normal) var(--font-sans);
+  --type-body-s: var(--weight-regular) var(--text-sm)/var(--leading-normal) var(--font-sans);
+  --type-label: var(--weight-semibold) var(--text-sm)/1.3 var(--font-sans);
+  --type-eyebrow: var(--weight-semibold) var(--text-2xs)/1.2 var(--font-sans);
+  --type-figure-l: 700 var(--text-3xl)/1.05 var(--font-sans);
+  --type-figure: 600 var(--text-lg)/1.2 var(--font-sans);
+  --type-figure-s: var(--weight-regular) var(--text-xs)/1.35 var(--font-mono);
+}

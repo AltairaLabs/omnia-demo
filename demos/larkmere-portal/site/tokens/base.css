@@ -1,0 +1,36 @@
+/* Minimal resets consumers can rely on. No component classes live here. */
+:root { color-scheme: light; }
+
+body {
+  margin: 0;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font: var(--type-body);
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+a { color: var(--text-link); text-decoration: none; }
+a:hover { color: var(--text-link-hover); }
+
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-display); font-weight: var(--weight-bold); letter-spacing: var(--tracking-tight); }
+
+::selection { background: var(--mint-200); color: var(--green-950); }
+
+*:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-sm); }
+
+/* DIVERGES FROM THE UPSTREAM EXPORT — push this back to the Claude Design
+   project rather than letting the next sync silently drop it.
+
+   The rule above is the fallback ring for anything with no focus treatment of
+   its own. A form control does have one: Input draws the ring and the focus
+   border on its WRAPPER, so a focused field got two concentric rings — the
+   wrapper's, and this rule's on the inner <input>, complete with its own
+   --radius-sm corner. It reads as a double border, which is exactly what it is.
+
+   The kit has one raw <input> and it lives inside that wrapper, so suppressing
+   the fallback here costs no affordance: the wrapper still changes its border
+   to --border-focus and still draws --focus-ring around the whole control. */
+:where(input, textarea, select):focus-visible { box-shadow: none; border-radius: inherit; }
+
+.lk-tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; }

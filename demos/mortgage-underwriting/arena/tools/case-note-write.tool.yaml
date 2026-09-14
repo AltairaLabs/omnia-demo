@@ -1,0 +1,35 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: case_note_write
+spec:
+  name: case_note_write
+  description: "File the underwriter case note and recommendation against the case. This records a recommendation for a named human underwriter; it does not make the lending decision."
+  input_schema:
+    type: object
+    properties:
+      case_ref:
+        type: string
+        description: Underwriting case reference
+      recommendation:
+        type: string
+        description: APPROVE, DECLINE or REFER
+      note:
+        type: string
+        description: The underwriter case note, citing what was checked and what was not
+    required:
+      - case_ref
+      - recommendation
+      - note
+  output_schema:
+    type: object
+    properties:
+      case_ref: { type: string }
+      note_id: { type: string }
+      filed_for_review_by: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    case_ref: "APP-2026-00312"
+    note_id: "NOTE-APP-2026-00312"
+    filed_for_review_by: "R. Nkemdirim, Head of Credit Risk"

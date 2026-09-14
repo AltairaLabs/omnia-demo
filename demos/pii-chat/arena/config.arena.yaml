@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for the card-support agent's behaviour.
+#
+# This directory is the editable source for the example pack.
+#
+# Regenerate with: demos/pii-chat/hack/build-pack.sh
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: pii-chat
+spec:
+  prompt_configs:
+    - id: card-support
+      file: prompts/card-support.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # One tool. memory__remember and memory__recall are NOT declared here: they
+  # are PromptKit platform capabilities registered by the SDK when
+  # spec.memory.enabled is set on the AgentRuntime, not pack tools. Declaring
+  # them would be describing something the pack does not own.
+  tools:
+    - file: tools/verify-identity.tool.yaml
+
+  scenarios:
+    - file: scenarios/lost-card.scenario.yaml
+    - file: scenarios/social-engineering.scenario.yaml
+
+  # Self-play, because one scripted conversation only tests the happy path. The
+  # agent's job is to refuse to act until it has verified the caller, and the
+  # only way to know that guardrail works is to have something attack it.
+  #
+  # The litmus test: social-engineer SHOULD trip the assertions on
+  # scenarios/social-engineering. If it sails through, the assertions are too
+  # weak — not the agent too good.
+  #
+  # Needs a real provider for the simulated user (a mock cannot improvise), so
+  # `promptarena run --roles claude-user` requires a key. The rest of the kit
+  # runs against the mock without one.
+  self_play:
+    personas:
+      - file: personas/social-engineer.persona.yaml
+    roles:
+      - id: claude-user
+        provider: mock
+
+  defaults:
+    # Low, but not zero. A support agent that phrases the same reassurance
+    # identically every time reads as a script, and the deterministic capture
+    # path already exists for takes that must match.
+    temperature: 0.3
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

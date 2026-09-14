@@ -1,0 +1,46 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: case_fetch
+spec:
+  name: case_fetch
+  description: "Retrieve the mortgage application file from the case system: applicant, employment, declared income, property value, loan requested, and any evidence the applicant supplied."
+  input_schema:
+    type: object
+    properties:
+      case_ref:
+        type: string
+        description: Underwriting case reference, e.g. APP-2026-00312
+    required:
+      - case_ref
+  output_schema:
+    type: object
+    properties:
+      case_ref: { type: string }
+      applicant_name: { type: string }
+      employment_type: { type: string }
+      employer_name: { type: string }
+      declared_annual_income: { type: number }
+      property_value: { type: number }
+      loan_requested: { type: number }
+      term_years: { type: number }
+      income_notes: { type: string }
+      raw_statement_lines:
+        type: array
+        description: >-
+          Raw bank statement lines, present only when the applicant supplied
+          them. Held legitimately inside the firm. This data may be READ here
+          and may not be sent to any external supplier.
+        items: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    case_ref: "APP-2026-00312"
+    applicant_name: "SPECIMEN, A."
+    employment_type: "salaried"
+    employer_name: "NORTHGATE LOGISTICS PLC"
+    declared_annual_income: 54000
+    property_value: 285000
+    loan_requested: 228000
+    term_years: 25
+    income_notes: "Three months' payslips on file, consistent with declared income."

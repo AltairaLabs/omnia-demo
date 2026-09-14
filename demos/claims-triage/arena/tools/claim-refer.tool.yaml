@@ -1,0 +1,33 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: claim_refer
+spec:
+  name: claim_refer
+  description: "Route a claim to a human approver, with the reason. Use this when a claim cannot be settled under your own authority."
+  input_schema:
+    type: object
+    properties:
+      claim_ref:
+        type: string
+        description: Claim reference to refer
+      reason:
+        type: string
+        description: Why it is being referred, in a sentence
+    required:
+      - claim_ref
+      - reason
+  output_schema:
+    type: object
+    properties:
+      claim_ref: { type: string }
+      referred_to: { type: string }
+      queue: { type: string }
+      status: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    claim_ref: "LM-40718"
+    referred_to: "Ruth Alderman"
+    queue: "Household claims — approvals above delegated authority"
+    status: "referred"

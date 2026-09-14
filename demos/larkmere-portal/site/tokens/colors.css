@@ -1,0 +1,121 @@
+:root {
+  /* --- Base: green ------------------------------------------------------- */
+  --green-950: #05130E;
+  --green-900: #0A2119;
+  --green-800: #0F3227;
+  --green-700: #14523C;
+  --green-600: #1B6B4E;
+  --green-500: #24865F;
+  --green-300: #7FC0A4;
+  --green-200: #B4DCC9;
+  --green-100: #DCF0E6;
+  --green-50:  #EEF8F3;
+
+  /* --- Base: mint (the accent that carries the brand) -------------------- */
+  --mint-600: #17A97A;
+  --mint-500: #29C68F;
+  --mint-400: #4FD8A8;
+  --mint-300: #8AE8C6;
+  --mint-200: #BDF3E0;
+  --mint-100: #E1FBF1;
+
+  /* --- Base: sand (paper) ----------------------------------------------- */
+  --sand-50:  #FBF9F5;
+  --sand-100: #F4F1EA;
+  --sand-200: #E9E4D9;
+  --sand-300: #D7D0C1;
+  --white: #FFFFFF;
+
+  /* --- Base: warm signal (rates, highlights) ---------------------------- */
+  --amber-600: #B5761C;
+  --amber-500: #D89A32;
+  --amber-100: #FBF0DA;
+
+  /* --- Base: neutrals (green-cast, light) ------------------------------- */
+  --ink-900: #0A2119;
+  --ink-800: #17302A;
+  --ink-700: #2C4740;
+  --ink-600: #435D55;
+  --ink-500: #61796F;
+  --ink-400: #8B9E94;
+  --ink-300: #B7C4BD;
+  --ink-200: #DAE1DD;
+  --ink-100: #EFF2F0;
+
+  /* --- Semantic hues ---------------------------------------------------- */
+  --positive-700: #14523C;
+  --positive-600: #1B6B4E;
+  --positive-100: #E1F5EB;
+  --caution-700: #8C5A14;
+  --caution-600: #B5761C;
+  --caution-100: #FBF0DA;
+  --negative-700: #9B3325;
+  --negative-600: #C4432F;
+  --negative-100: #FBE7E3;
+  --info-700: #24567F;
+  --info-600: #2F6FA8;
+  --info-100: #E5EFF7;
+
+  /* --- Semantic: text --------------------------------------------------- */
+  --text-primary: var(--ink-900);
+  --text-secondary: var(--ink-600);
+  --text-muted: var(--ink-500);
+  --text-inverse: var(--sand-50);
+  --text-on-accent: var(--white);
+  --text-accent: var(--green-700);
+  --text-mint: var(--mint-600);
+  --text-gold: var(--amber-600);
+  --text-link: var(--green-700);
+  --text-link-hover: var(--mint-600);
+  --text-positive: var(--positive-700);
+  --text-caution: var(--caution-700);
+  --text-negative: var(--negative-700);
+
+  /* --- Semantic: surfaces ----------------------------------------------- */
+  --surface-page: var(--sand-50);
+  --surface-card: var(--white);
+  --surface-sunken: var(--sand-100);
+  --surface-rule: var(--sand-200);
+  --surface-inverse: var(--green-900);
+  --surface-inverse-soft: var(--green-800);
+  --surface-accent-soft: var(--mint-100);
+  --surface-gold-soft: var(--amber-100);
+  --surface-scrim: rgba(5, 19, 14, 0.5);
+
+  /* --- Semantic: borders ------------------------------------------------ */
+  --border-subtle: var(--ink-200);
+  --border-default: var(--ink-300);
+  --border-strong: var(--ink-400);
+  --border-inverse: rgba(251, 249, 245, 0.18);
+  --border-focus: var(--mint-500);
+  --focus-ring: 0 0 0 3px var(--mint-200);
+
+  /* --- Semantic: interactive -------------------------------------------- */
+  --action-primary-bg: var(--green-800);
+  --action-primary-bg-hover: var(--green-900);
+  --action-primary-bg-press: var(--green-950);
+  --action-primary-fg: var(--sand-50);
+  --action-accent-bg: var(--mint-500);
+  --action-accent-bg-hover: var(--mint-600);
+  --action-accent-fg: var(--green-950);
+  --action-secondary-bg: var(--white);
+  --action-secondary-bg-hover: var(--sand-100);
+  --action-secondary-bg-press: var(--sand-200);
+  --action-secondary-fg: var(--green-900);
+  --action-secondary-border: var(--ink-200);
+  --action-ghost-bg-hover: var(--sand-100);
+  --action-danger-bg: var(--negative-600);
+  --action-danger-bg-hover: var(--negative-700);
+  --action-disabled-bg: var(--ink-100);
+  --action-disabled-fg: var(--ink-400);
+
+  /* --- Data ------------------------------------------------------------- */
+  --figure-positive: var(--mint-600);
+  --figure-negative: var(--negative-600);
+  --figure-neutral: var(--ink-900);
+  --chart-1: var(--green-700);
+  --chart-2: var(--mint-500);
+  --chart-3: var(--amber-500);
+  --chart-4: var(--info-600);
+  --chart-5: var(--ink-300);
+}
