@@ -1,0 +1,31 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: affordability_assess
+spec:
+  name: affordability_assess
+  description: "Run the MCOB 11.6 stressed affordability assessment for the case and return the stressed monthly payment, remaining disposable income, and whether it passes."
+  input_schema:
+    type: object
+    properties:
+      case_ref:
+        type: string
+        description: Underwriting case reference
+    required:
+      - case_ref
+  output_schema:
+    type: object
+    properties:
+      stress_rate_percent: { type: number }
+      stressed_monthly_payment_gbp: { type: number }
+      monthly_disposable_income_gbp: { type: number }
+      passes: { type: boolean }
+      basis: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    stress_rate_percent: 8.0
+    stressed_monthly_payment_gbp: 1762
+    monthly_disposable_income_gbp: 1094
+    passes: true
+    basis: "MCOB 11.6 stressed at reversion rate + 3%"

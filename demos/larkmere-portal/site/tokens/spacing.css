@@ -1,0 +1,42 @@
+:root {
+  --space-0: 0px;
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 20px;
+  --space-7: 24px;
+  --space-8: 32px;
+  --space-9: 40px;
+  --space-10: 48px;
+  --space-11: 64px;
+  --space-12: 88px;
+  --space-13: 112px;
+  --space-14: 160px;
+
+  /* Soft, contemporary geometry. Pills for actions, 14–20px for surfaces. */
+  --radius-none: 0px;
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+  --radius-pill: 999px;
+
+  --border-width-hairline: 1px;
+  --border-width-thick: 2px;
+  --rule-accent-width: 3px;
+
+  --container-narrow: 720px;
+  --container-text: 760px;
+  --container-wide: 1200px;
+  --container-max: 1400px;
+  --gutter-page: var(--space-9);
+
+  --control-height-sm: 36px;
+  --control-height-md: 44px;
+  --control-height-lg: 54px;
+  --touch-target-min: 44px;
+}

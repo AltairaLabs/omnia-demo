@@ -1,0 +1,39 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The demo's own conversation, as a runnable check.
+#
+# What it is FOR: catching a prompt edit that breaks the demo before someone
+# discovers it mid-recording. The two things the video depends on are that the
+# agent verifies identity before acting, and that it reads back only the last
+# four digits — both asserted here.
+#
+# What it is NOT: a test of redaction. Redaction happens in session-api and
+# memory-api, which a local arena run never touches. The e2e suite covers that
+# (the deployed privacy example).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: lost-card
+spec:
+  task_type: general
+  description: >-
+    A cardholder reports a lost card and supplies identifiers in one message.
+    The agent should verify, then confirm the card and its status.
+  turns:
+    - role: user
+      content: >-
+        Hi, I've lost my card. It's Ellen Whitcomb, ellen.whitcomb@example.com —
+        my SSN is 123-45-6789 and I was born 1988-03-14.
+      assertions:
+        # The whole point of the agent: it confirms who it is talking to before
+        # touching the account.
+        - type: tool_called
+          params:
+            name: verify_identity
+          message: "The agent must verify identity before acting on the account"
+        # Last four only. A model that reads back a full PAN has failed the
+        # brief regardless of what any policy would have redacted afterwards.
+        - type: contains_any
+          params:
+            patterns: ["4471"]
+          message: "Response should confirm the card by its last four digits"

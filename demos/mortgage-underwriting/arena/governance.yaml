@@ -1,0 +1,56 @@
+# Governance metadata merged into the compiled pack by hack/build-pack.sh.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# ASSERTED. Every key in this file is typed by a human and is worth exactly as
+# much as the person who typed it. Nothing here is verified by anything.
+#
+# It is merged under metadata.asserted, and the session page labels it as such,
+# because an assertion dressed as evidence is worse than no assertion at all.
+#
+# The OBSERVED half — commit, tag, author, pipeline, build time — is not in this
+# file. It is derived from git at build time, precisely so it cannot be typed.
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# What would make this evidence rather than assertion is a signed attestation
+# over the pack, verifiable without the platform. That is FRIL WP1 (M1.1–M1.4),
+# funded Oct 2026 – Jan 2027, and deliberately NOT built here. Sealing the
+# records that reference it is WP2 M2.2. Until then the honest claim is
+# tamper-EVIDENT: the content digest covers this block, so it cannot change
+# without the change being detectable — but nothing proves who wrote it.
+
+# The keys below are deliberately NOT a schema Omnia defines. They are what
+# this firm's governance happens to care about. A different firm would carry
+# model risk tiers, a different control library, its own committee names — and
+# would put those here instead. The platform's job is to carry whatever the
+# organisation's governance schema is, and tie it to the conversations that
+# actually ran under it.
+
+domain: financial-services
+tags:
+  - underwriting
+  - mortgage
+  - backend
+  - customer-data
+
+# Who signed it off, and under what change control.
+approved_by: "R. Nkemdirim, Head of Credit Risk"
+approval_date: "2026-07-14"
+change_ticket: "CRR-4471"
+reviewed_by: "T. Okonkwo, Model Risk (2nd line)"
+committee: "Credit Risk Committee, minute CRC-2026-07-14/3"
+
+# What it is allowed to do, and what it is not.
+decision_authority: "Recommendation only. The lending decision is reserved to a named underwriter."
+control_reference: "MCOB 11.6 — affordability assessment"
+model_risk_tier: "Tier 2 — material, human-in-the-loop"
+permitted_egress: "Derived income summary only. Raw statement and transaction data may not leave the firm."
+
+# Data protection.
+data_classification: "Customer personal data — special category not permitted"
+dpia_reference: "DPIA-2026-031"
+retention: "Case notes 7 years; session transcripts 90 days"
+lawful_basis: "Contract performance (UK GDPR Art. 6(1)(b))"
+
+# When it must be looked at again.
+review_due: "2027-07-14"
+review_trigger: "Any change to the affordability stress rate, or a model change"

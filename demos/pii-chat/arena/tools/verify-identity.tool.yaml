@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/tool.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: verify_identity
+spec:
+  name: verify_identity
+  # The description asks for the SSN plainly, because the demo needs the model
+  # to put it in the call. A description that hedged — "confirm identity using
+  # available details" — would let the model satisfy the tool with a customer
+  # reference and the tool-call redaction beat would have nothing to redact.
+  description: >-
+    Confirm a cardholder's identity from their Social Security number and date
+    of birth before discussing or acting on their account. Returns the customer
+    reference, the cardholder's name, the last four digits of the card on file,
+    and the card's current status.
+  input_schema:
+    type: object
+    properties:
+      ssn:
+        type: string
+        description: "The cardholder's Social Security number, as they gave it, e.g. 123-45-6789."
+      dob:
+        type: string
+        description: "The cardholder's date of birth in YYYY-MM-DD form."
+    # BOTH required. If the SSN alone sufficed the model could leave the date of
+    # birth in conversation, and the redacted tool-call arguments are half of
+    # what the demo shows. The backend enforces it too — see verifyIdentity in
+    # demos/mortgage-underwriting/server.go.
+    required:
+      - ssn
+      - dob
+  output_schema:
+    type: object
+    properties:
+      verified:
+        type: boolean
+      customer_ref:
+        type: string
+      full_name:
+        type: string
+      card_last4:
+        type: string
+        description: >-
+          The last four digits only. The full card number is never returned by
+          this service.
+      card_status:
+        type: string
+  # THIS FILE IS AUTHORITATIVE for what the model reads. The name, description
+  # and input schema above are the tool as the LLM sees it, in the cluster as
+  # well as in a local arena run — the SDK builds its descriptor registry from
+  # the compiled pack, and the provider
+  # stage reads name/description/InputSchema straight off those descriptors.
+  #
+  # The ToolRegistry CRD supplies the BINDING, not the description: it maps this
+  # name onto an executor (an http handler pointed at the identity stub) and
+  # governs the call through ToolPolicy. PromptKit registers pack tools with
+  # `Mode: "local"` as a placeholder and, in its own words, "the host binds the
+  # real execution mode".
+  #
+  # So deployment configuration restating the
+  # description and schemas is the REDUNDANT copy — the model never reads it.
+  # The two can still drift apart in silence, and a drifted registry schema will
+  # break dispatch while the model carries on believing this one, so change both.
+  #
+  # `mode: mock` governs only how PromptArena executes the tool in a local arena
+  # run. In the cluster the executor is the registry's.
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    verified: true
+    customer_ref: "MEM-4471-889"
+    full_name: "Ellen Whitcomb"
+    card_last4: "4471"
+    card_status: "active"

@@ -1,0 +1,33 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: credit_report
+spec:
+  name: credit_report
+  description: "Retrieve the applicant's credit bureau report: score, band, adverse events and existing monthly commitments. Internal bureau feed — no customer data leaves the firm."
+  input_schema:
+    type: object
+    properties:
+      applicant_ref:
+        type: string
+        description: Case reference for the applicant
+    required:
+      - applicant_ref
+  output_schema:
+    type: object
+    properties:
+      score: { type: number }
+      band: { type: string }
+      adverse_events:
+        type: array
+        items: { type: string }
+      monthly_commitments: { type: number }
+      bureau: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    score: 812
+    band: "excellent"
+    adverse_events: []
+    monthly_commitments: 145
+    bureau: "Synthetic Bureau Ltd"

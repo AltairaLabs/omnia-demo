@@ -1,0 +1,75 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/promptconfig.json
+#
+# The prompt ASKS for the SSN, and asks for a case note. Both are deliberate.
+#
+# A prompt that told the agent to avoid collecting sensitive data would be
+# obeyed, nothing sensitive would ever be written, and the SessionPrivacyPolicy
+# would have nothing to redact — a green demo proving only that the model
+# followed instructions. Same reasoning as the mortgage pack's refusal to forbid
+# raw statement egress: prompt is guidance, policy is control, and you only see
+# the control work when the guidance does not prevent the thing.
+#
+# The case-note instruction is load-bearing rather than decorative. NOTHING in
+# Omnia extracts memories from a conversation on its own — memory__remember is
+# model-driven, document ingestion is for documents, and the consolidation
+# worker only reorganises rows already in the store. Without this sentence a
+# live model has no reason to write a memory at all, and the demo's memory beat
+# would exist only because the deterministic script forces the call.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: PromptConfig
+metadata:
+  name: card-support
+spec:
+  # packc uses task_type as the key under `prompts` in the compiled pack, so
+  # this pack's prompt is keyed `card_support` rather than `default`. That is
+  # fine and was verified in-cluster: the agent loads, resolves the prompt and
+  # answers normally. mortgage-underwriting keys its prompt `underwriting` for
+  # the same reason.
+  task_type: card_support
+  version: "1.0.0"
+  description: >-
+    Retail-bank card support agent. Verifies a caller's identity before
+    discussing an account, then records a case note for the next agent.
+  system_template: |
+    You are a card support assistant for a retail bank. A cardholder is
+    contacting you about their card.
+
+    Tone: warm, brief, phone-style. This is a conversation, not a form.
+
+    Guidelines:
+    - Before you discuss or act on any account, confirm the caller's identity:
+      ask for their Social Security number and their date of birth, then call
+      verify_identity with both.
+    - Do not proceed on an unverified account, and never guess or invent either
+      value — ask for whatever you are missing.
+    - Once verified, greet them by name, confirm the last four digits of the
+      card on file and its status, and help with what they asked.
+    - Never read back more than the last four digits of a card number.
+    - When the caller's issue is resolved, record a short case note using
+      memory__remember so whoever picks this account up next has the context:
+      what the caller reported, what you did about it, and how to reach them.
+  parameters:
+    temperature: 0.3
+
+  # The prompt's allow-list. Compiles to `tools` on the prompt in the pack, and
+  # a non-implicit tool absent from here is not offered to the model — omitting
+  # this block is not "no opinion", it is an unscoped prompt.
+  #
+  # The pack's top-level `tools` are the DEFINITIONS — name, description,
+  # schemas — and those are what the model reads. The ToolRegistry maps a name
+  # onto an executor; it does not replace the declaration.
+  #
+  # memory__remember and memory__recall are listed for documentation, not
+  # because they are required: PromptKit surfaces implicit capabilities
+  # (memory__, skill__, a2a__, workflow__, media) regardless of the allow-list,
+  # which is why they reach the model in an agent whose prompt names no tools at
+  # all. Listing them states what this agent actually uses.
+  #
+  # Omitting verify_identity would currently be patched over rather than
+  # failing: the runtime rewrites the pack to union the ToolRegistry's names
+  # into every prompt's list. Declare it properly rather than
+  # relying on that.
+  allowed_tools:
+    - verify_identity
+    - memory__remember
+    - memory__recall

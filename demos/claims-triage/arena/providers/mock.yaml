@@ -1,0 +1,16 @@
+# Required by the Arena config schema, and used only when running this pack
+# through PromptArena locally. It has no bearing on the deployed demo: in
+# Omnia the model comes from the Provider CR named by the AgentRuntime
+# (claims-triage-llm), not from anything in the pack.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+spec:
+  id: mock
+  type: mock
+  model: mock-assessor
+  defaults:
+    temperature: 0.0
+    top_p: 1.0
+    max_tokens: 1200

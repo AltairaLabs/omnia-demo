@@ -1,0 +1,26 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: claims-triage
+spec:
+  prompt_configs:
+    - id: triage
+      file: prompts/claims-triage.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # Order is the order a claim is worked: read it, read the schedule that
+  # governs it, then either pay it or hand it on.
+  tools:
+    - file: tools/claim-fetch.tool.yaml
+    - file: tools/claim-policy-fetch.tool.yaml
+    - file: tools/claim-settle.tool.yaml
+    - file: tools/claim-refer.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1200
+    output:
+      dir: out
+      formats: ["json"]

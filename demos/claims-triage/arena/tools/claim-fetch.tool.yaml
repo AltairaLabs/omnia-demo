@@ -1,0 +1,51 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: claim_fetch
+spec:
+  name: claim_fetch
+  description: "Retrieve a claim from the claims system: peril, cover, the assessed amount, the policy excess, what is payable after the excess, and the claim history on that policy."
+  input_schema:
+    type: object
+    properties:
+      claim_ref:
+        type: string
+        description: Claim reference, e.g. LM-40718
+    required:
+      - claim_ref
+  output_schema:
+    type: object
+    properties:
+      claim_ref: { type: string }
+      policy_ref: { type: string }
+      member_name: { type: string }
+      peril: { type: string }
+      cover: { type: string }
+      reported_on: { type: string }
+      assessed_pence:
+        type: integer
+        description: What the loss was assessed at, in pence
+      excess_pence:
+        type: integer
+        description: The policy excess, in pence
+      payable_pence:
+        type: integer
+        description: >-
+          Assessed less excess, in pence. Computed by the claims system — do not
+          derive it yourself.
+      prior_claims: { type: string }
+      status: { type: string }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    claim_ref: "LM-40718"
+    policy_ref: "LM-HOME-4471"
+    member_name: "Ellen Whitcomb"
+    peril: "Escape of water"
+    cover: "Buildings"
+    reported_on: "2026-09-02"
+    assessed_pence: 124000
+    excess_pence: 25000
+    payable_pence: 99000
+    prior_claims: "One prior claim on this policy, November 2023. Nothing flagged."
+    status: "assessed"

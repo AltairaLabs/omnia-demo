@@ -1,0 +1,29 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: mortgage-underwriting
+spec:
+  prompt_configs:
+    - id: triage
+      file: prompts/case-triage.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # Order is the order the underwriting chain runs in, so the pack reads the
+  # way the case is worked.
+  tools:
+    - file: tools/case-fetch.tool.yaml
+    - file: tools/credit-report.tool.yaml
+    - file: tools/property-valuation.tool.yaml
+    - file: tools/affordability-assess.tool.yaml
+    - file: tools/aml-screen.tool.yaml
+    - file: tools/income-verify.tool.yaml
+    - file: tools/case-note-write.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1200
+    output:
+      dir: out
+      formats: ["json"]

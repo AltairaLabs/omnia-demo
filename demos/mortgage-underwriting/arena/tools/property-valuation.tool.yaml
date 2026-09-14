@@ -1,0 +1,29 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: property_valuation
+spec:
+  name: property_valuation
+  description: "Obtain an automated valuation for the security property, with the resulting loan-to-value. Internal AVM."
+  input_schema:
+    type: object
+    properties:
+      case_ref:
+        type: string
+        description: Underwriting case reference
+    required:
+      - case_ref
+  output_schema:
+    type: object
+    properties:
+      valuation_gbp: { type: number }
+      method: { type: string }
+      confidence_band: { type: string }
+      ltv_percent: { type: number }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    valuation_gbp: 285000
+    method: "AVM, desktop"
+    confidence_band: "high"
+    ltv_percent: 80.0

@@ -1,0 +1,51 @@
+# Governance declarations for the synthetic privacy example.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. Nothing here
+# is signed.
+#
+
+# What the agent is built to do, stated by its author.
+intended_purpose: >-
+  Handle inbound retail card-support conversations: verify the caller's
+  identity, answer questions about the card on file, and record a case note for
+  the next agent.
+
+# Uses the author considers out of bounds and reasonably foreseeable. Written as
+# things someone might plausibly TRY, not as a disclaimer — the first is what
+# the kit's social-engineer persona actually attacks.
+foreseeable_misuse:
+  - >-
+    Obtaining another person's account details by talking past identity
+    verification.
+  - >-
+    Treating the agent's identity check as sufficient authorisation for a
+    payment or transfer. It confirms who is calling; it authorises nothing.
+
+# The agent verifies and advises; a human or a downstream system acts.
+autonomy_level: acts_with_oversight
+
+accountable_owner: Card Operations
+
+operator_role: eu-aiact:AIDeployer
+
+# Not high-risk under Annex III: this is customer service on an existing card,
+# not creditworthiness assessment. Declared rather than omitted so the reader
+# knows it was considered.
+risk_classification: eu-aiact:LimitedRiskAI
+
+intended_deployment_contexts:
+  - Inbound retail card support, authenticated caller.
+
+approved_environments:
+  - demo
+
+# ─────────────────────────────────────────────────────────────────────────────
+# This customer-facing example declares that an AI disclosure is required.
+#
+# Art. 50(1) requires that a person be informed they are interacting with an AI
+# system unless it is obvious to a reasonably observant person. This agent talks
+# directly to a member of the public, in a support conversation that is
+# indistinguishable in form from a human one, about their own bank account.
+# There is no reading of "obvious" that covers it.
+#
+requires_ai_disclosure: true
