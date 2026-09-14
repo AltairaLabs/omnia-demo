@@ -1,0 +1,9 @@
+{{- if .Values.memory.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omnia-demo-memory-fixtures
+  namespace: {{ .Values.namespace }}
+data:
+{{ (.Files.Glob "fixtures/memory-s3/*.md").AsConfig | indent 2 }}
+{{- end }}
