@@ -9,12 +9,9 @@ spec:
   id: smoke-test-single-turn
   description: |
     Single-turn smoke test for the variant-a agent against real tools
-    (mock mode) and real LLM provider. Bypasses the claude-user self-play
-    role because that role is currently unsupported in the promptarena
-    runtime (tracked as a fourth bug in AltairaLabs/PromptKit#937). This
-    scenario verifies: prompt loading, tool schema resolution, tool call
-    execution against mock fixtures, and pack-level eval triggering on
-    session completion.
+    (mock mode) and a configured LLM provider. This scenario verifies: prompt
+    loading, tool schema resolution, tool call execution against mock fixtures,
+    and pack-level eval triggering on session completion.
   task_type: acme-support-variant-a
   tool_policy:
     tool_choice: auto
