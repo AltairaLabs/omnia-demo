@@ -44,3 +44,8 @@ memory database: use the versioned batch-ingest contract.
 Institutional ingestion requires an Omnia Enterprise deployment with the
 institutional ingest endpoint enabled. The repository contains no Enterprise
 implementation or private package dependency.
+
+The public repository publishes the container image as
+`ghcr.io/altairalabs/omnia-demo-memory-ingestion:latest` from `main`. For local
+development, build it with `docker build -t omnia-demo-memory-ingestion:dev .`
+and set `memory.image.repository` and `memory.image.tag` accordingly.
