@@ -6,16 +6,11 @@ metadata:
     demo: omnia-hero-demo
 spec:
   id: azure-gpt4o
-  # Azure OpenAI is accessed through PromptKit's vanilla `openai` provider
-  # type pointed at an Azure endpoint — there is NO dedicated `azure-openai`
-  # provider type. The configure-providers.md docs showing `type: azure-openai`
-  # are aspirational; the runtime registers `openai`, `claude`, `gemini` only.
+  # Use the generic OpenAI-compatible provider type with a deployment endpoint.
   type: openai
   model: gpt-4o
-  # Azure AI Foundry is accessed as a platform on the openai provider type.
-  # The platform handles auth via the Azure SDK default credential chain
-  # (Managed Identity, Azure CLI, AZURE_CLIENT_ID/TENANT_ID/CLIENT_SECRET).
-  # Replace the endpoint below with your Azure AI Foundry resource URL.
+  # Replace this placeholder with an endpoint available in your environment
+  # and provide credentials through the platform's supported secret mechanism.
   platform:
     type: azure
     endpoint: https://REPLACE-ME.openai.azure.com

@@ -15,16 +15,8 @@ spec:
     syntax: "{{variable}}"
     features: [basic_substitution, fragments]
 
-  # NOTE: fragments were originally defined as external YAML files under
-  # fragments/variant-a/ for A/B composition, but the current PromptKit
-  # fragment loader (YAMLPromptRepository.LoadFragment at promptkit/runtime/
-  # persistence/yaml/yaml_prompt.go:51) doesn't resolve FragmentRef.path the
-  # way the schema suggests it should — it falls back to a name-based lookup
-  # at <BasePath>/fragments/<name>.yaml and fails for our nested structure.
-  # Tracked as a fourth issue in AltairaLabs/PromptKit#937. For now, the
-  # variant A voice/style content is inlined directly into system_template
-  # below. Restore fragment-based composition once the loader behavior is
-  # fixed upstream.
+  # The variant voice/style content is kept inline so this example remains
+  # portable across PromptKit versions.
 
   variables:
     - name: company

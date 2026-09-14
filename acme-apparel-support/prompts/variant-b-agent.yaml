@@ -15,9 +15,8 @@ spec:
     syntax: "{{variable}}"
     features: [basic_substitution, fragments]
 
-  # Fragments inlined into system_template due to PromptKit fragment loader
-  # quirk — see variant-a-agent.yaml for the full explanation and
-  # AltairaLabs/PromptKit#937 for upstream tracking.
+  # Fragments are kept inline so this example remains portable across
+  # PromptKit versions.
 
   variables:
     - name: company
