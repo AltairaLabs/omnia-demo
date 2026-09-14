@@ -1,0 +1,28 @@
+{{- if .Values.galaxy.enabled }}
+{{- if or (eq .Values.galaxy.workspaceUID "") (eq .Values.galaxy.agentUID "") }}
+{{- fail "galaxy.workspaceUID and galaxy.agentUID are required when galaxy.enabled is true" }}
+{{- end }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: omnia-demo-memory-galaxy
+  namespace: {{ .Values.namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "30"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seeder
+          image: {{ .Values.galaxy.image.repository }}:{{ .Values.galaxy.image.tag }}
+          imagePullPolicy: {{ .Values.galaxy.image.pullPolicy }}
+          args:
+            - --memory-api={{ default .Values.memory.apiURL .Values.galaxy.memoryAPIURL }}
+            - --workspace-uid={{ .Values.galaxy.workspaceUID }}
+            - --agent-uid={{ .Values.galaxy.agentUID }}
+            - --seed={{ .Values.galaxy.seed }}
+{{- end }}

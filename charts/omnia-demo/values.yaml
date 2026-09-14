@@ -20,3 +20,15 @@ memory:
     image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
     accessKey: minioadmin
     secretKey: minioadmin
+
+galaxy:
+  # Seed the dashboard with synthetic multi-tier memories and relations.
+  enabled: false
+  workspaceUID: ""
+  agentUID: ""
+  memoryAPIURL: ""
+  seed: "1"
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-memory-seeder
+    tag: latest
+    pullPolicy: IfNotPresent
