@@ -17,3 +17,17 @@ The chart is intentionally an add-on rather than an umbrella chart. This keeps
 the public repository independent of private Omnia implementation details and
 makes the dependency on a released Omnia version explicit in the operator's
 installation procedure.
+
+To populate the richer Memory Galaxy as well as the institutional documents,
+enable `galaxy` and provide the metadata UIDs from the target Workspace and
+AgentRuntime:
+
+```bash
+helm upgrade --install omnia-demo ./charts/omnia-demo \
+  --set galaxy.enabled=true \
+  --set galaxy.workspaceUID=<workspace-uid> \
+  --set galaxy.agentUID=<agent-uid>
+```
+
+The Galaxy job writes synthetic data through the public memory API only. It
+does not connect to or modify the memory database directly.
