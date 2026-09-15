@@ -18,6 +18,16 @@ the public repository independent of private Omnia implementation details and
 makes the dependency on a released Omnia version explicit in the operator's
 installation procedure.
 
+For a protected memory API, create a Secret containing the bearer token and
+reference it without putting the token in Helm values:
+
+```bash
+kubectl -n omnia-demo create secret generic memory-api-token \
+  --from-literal=token="$MEMORY_API_TOKEN"
+helm upgrade --install omnia-demo ./charts/omnia-demo \
+  --set memory.auth.secretName=memory-api-token
+```
+
 To populate the richer Memory Galaxy as well as the institutional documents,
 enable `galaxy` and provide the metadata UIDs from the target Workspace and
 AgentRuntime:
