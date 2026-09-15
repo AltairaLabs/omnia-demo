@@ -68,6 +68,12 @@ piiChat:
     redact: true
     strategy: replace
     patterns: [ssn, credit_card, email]
+  portal:
+    enabled: false
+    image:
+      repository: ghcr.io/altairalabs/omnia-demo-larkmere-portal
+      tag: latest
+      pullPolicy: IfNotPresent
 
 claimsTriage:
   # Requires Omnia Enterprise CRDs for the runtime and policy.

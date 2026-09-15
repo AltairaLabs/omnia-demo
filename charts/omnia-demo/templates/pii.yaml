@@ -1,5 +1,37 @@
 {{- if .Values.piiChat.enabled }}
 {{- $ns := .Values.namespace }}
+{{- if .Values.piiChat.portal.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: larkmere-portal
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: larkmere-portal }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: larkmere-portal }
+    spec:
+      containers:
+        - name: portal
+          image: {{ .Values.piiChat.portal.image.repository }}:{{ .Values.piiChat.portal.image.tag }}
+          imagePullPolicy: {{ .Values.piiChat.portal.image.pullPolicy }}
+          args: ["--agent-url", "http://pii-chat.{{ $ns }}:8080"]
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: larkmere-portal
+  namespace: {{ $ns }}
+spec:
+  selector: { app.kubernetes.io/name: larkmere-portal }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+{{- end }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -123,6 +155,10 @@ spec:
   promptPackRef: { name: pii-chat-pack }
   toolRegistryRef: { name: pii-chat-tools }
   privacyPolicyRef: { name: pii-chat-privacy }
+  {{- if .Values.piiChat.portal.enabled }}
+  externalAuth:
+    edgeTrust: {}
+  {{- end }}
   providers:
     - name: default
       providerRef: { name: pii-chat-llm }
