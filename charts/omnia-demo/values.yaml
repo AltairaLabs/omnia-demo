@@ -68,3 +68,15 @@ piiChat:
     redact: true
     strategy: replace
     patterns: [ssn, credit_card, email]
+
+claimsTriage:
+  # Requires Omnia Enterprise CRDs for the runtime and policy.
+  enabled: false
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
+    tag: latest
+    pullPolicy: IfNotPresent
+  provider:
+    type: claude
+    model: claude-sonnet-4-6
+    secretRef: anthropic-api-key
