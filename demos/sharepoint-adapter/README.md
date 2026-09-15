@@ -16,5 +16,5 @@ repository. The included sample corpus is synthetic.
 
 The adapter is intentionally source-specific example code. It does not access
 Omnia databases and does not replace the memory service's ingestion or
-chunking logic.
-
+chunking logic. The public image is published as
+`ghcr.io/altairalabs/omnia-demo-sharepoint-adapter:latest`.
