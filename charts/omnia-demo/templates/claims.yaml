@@ -1,0 +1,128 @@
+{{- if .Values.claimsTriage.enabled }}
+{{- $ns := .Values.namespace }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claims-systems
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: claims-systems }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: claims-systems }
+    spec:
+      containers:
+        - name: claims
+          image: {{ .Values.claimsTriage.image.repository }}:{{ .Values.claimsTriage.image.tag }}
+          imagePullPolicy: {{ .Values.claimsTriage.image.pullPolicy }}
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: claims-systems
+  namespace: {{ $ns }}
+spec:
+  selector: { app.kubernetes.io/name: claims-systems }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: claims-triage-llm
+  namespace: {{ $ns }}
+spec:
+  type: {{ .Values.claimsTriage.provider.type }}
+  role: llm
+  model: {{ .Values.claimsTriage.provider.model }}
+  credential:
+    secretRef:
+      name: {{ .Values.claimsTriage.provider.secretRef }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: claims-triage-tools
+  namespace: {{ $ns }}
+spec:
+  handlers:
+{{- range $tool := list (dict "name" "claim_fetch" "path" "/claim") (dict "name" "claim_policy_fetch" "path" "/claim-policy") (dict "name" "claim_settle" "path" "/claim-settle") (dict "name" "claim_refer" "path" "/claim-refer") }}
+    - name: {{ $tool.name }}-handler
+      type: http
+      tool:
+        name: {{ $tool.name }}
+        description: Synthetic claims triage {{ $tool.name }} handler.
+        inputSchema:
+          type: object
+          additionalProperties: true
+      httpConfig:
+        endpoint: http://claims-systems.{{ $ns }}:8080{{ $tool.path }}
+        method: POST
+        contentType: application/json
+{{- end }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: claims-triage-policy
+  namespace: {{ $ns }}
+spec:
+  selector: { registry: claims-triage-tools }
+  mode: enforce
+  onFailure: deny
+  policy: |
+    @id("permit-synthetic-claims-tools")
+    permit (principal, action == Action::"invoke", resource);
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claims-triage-pack-v1
+  namespace: {{ $ns }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/claims-triage-pack.json" | indent 4 }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: claims-triage-pack
+  namespace: {{ $ns }}
+spec:
+  packName: claims-triage-pack
+  version: "1.0.0"
+  source:
+    type: configmap
+    configMapRef: { name: claims-triage-pack-v1 }
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: claims-triage
+  namespace: {{ $ns }}
+spec:
+  mode: function
+  promptPackRef: { name: claims-triage-pack }
+  toolRegistryRef: { name: claims-triage-tools }
+  providers:
+    - name: default
+      providerRef: { name: claims-triage-llm }
+  facades:
+    - type: rest
+      port: 8080
+  inputSchema:
+    type: object
+    required: [claim_ref]
+    properties:
+      claim_ref: { type: string }
+  outputFormat: json_schema
+  outputSchema:
+    type: object
+    required: [outcome, note]
+    properties:
+      outcome: { type: string }
+      note: { type: string }
+{{- end }}
