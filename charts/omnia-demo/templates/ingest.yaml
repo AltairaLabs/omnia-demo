@@ -40,7 +40,24 @@ spec:
             - { name: S3_FORCE_PATH_STYLE, value: {{ .Values.memory.s3.forcePathStyle | quote }} }
             - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.memory.minio.accessKey | quote }} }
             - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
+{{- if .Values.memory.auth.secretName }}
+            - { name: MEMORY_TOKEN_PATH, value: /var/run/omnia/memory-token/token }
+{{- end }}
+{{- if .Values.memory.auth.secretName }}
+          volumeMounts:
+            - name: memory-token
+              mountPath: /var/run/omnia/memory-token
+              readOnly: true
+{{- end }}
       volumes:
         - name: fixtures
           configMap: { name: omnia-demo-memory-fixtures }
+{{- if .Values.memory.auth.secretName }}
+        - name: memory-token
+          secret:
+            secretName: {{ .Values.memory.auth.secretName }}
+            items:
+              - key: {{ .Values.memory.auth.secretKey }}
+                path: token
+{{- end }}
 {{- end }}
