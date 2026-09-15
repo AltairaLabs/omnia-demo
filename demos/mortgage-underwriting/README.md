@@ -12,4 +12,5 @@ go run ./demos/mortgage-underwriting
 
 The service contains fictional data only. The Arena source is compiled and
 deployed by an Omnia Enterprise installation; this repository does not include
-private platform manifests or credentials.
+private platform manifests or credentials. The public image is published as
+`ghcr.io/altairalabs/omnia-demo-mortgage-underwriting:latest`.
