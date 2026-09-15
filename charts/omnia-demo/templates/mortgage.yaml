@@ -1,0 +1,209 @@
+{{- if .Values.mortgageUnderwriting.enabled }}
+{{- $ns := .Values.namespace }}
+{{- if .Values.mortgageUnderwriting.deterministic }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mortgage-underwriting-mock-credential
+  namespace: {{ $ns }}
+type: Opaque
+stringData:
+  ANTHROPIC_API_KEY: not-used-by-mock
+---
+{{- end }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mortgage-case-systems
+  namespace: {{ $ns }}
+spec:
+  selector:
+    app.kubernetes.io/name: mortgage-case-systems
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mortgage-income-verify
+  namespace: {{ $ns }}
+spec:
+  selector:
+    app.kubernetes.io/name: mortgage-income-verify
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mortgage-case-systems
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mortgage-case-systems
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mortgage-case-systems
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.mortgageUnderwriting.image.repository }}:{{ .Values.mortgageUnderwriting.image.tag }}
+          imagePullPolicy: {{ .Values.mortgageUnderwriting.image.pullPolicy }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mortgage-income-verify
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mortgage-income-verify
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mortgage-income-verify
+    spec:
+      containers:
+        - name: backend
+          image: {{ .Values.mortgageUnderwriting.image.repository }}:{{ .Values.mortgageUnderwriting.image.tag }}
+          imagePullPolicy: {{ .Values.mortgageUnderwriting.image.pullPolicy }}
+          args: ["serve"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: { path: /healthz, port: http }
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mortgage-underwriting-llm
+  namespace: {{ $ns }}
+spec:
+{{- if .Values.mortgageUnderwriting.deterministic }}
+  type: mock
+  role: llm
+  credential:
+    secretRef:
+      name: mortgage-underwriting-mock-credential
+{{- else }}
+  type: {{ .Values.mortgageUnderwriting.provider.type }}
+  role: llm
+  model: {{ .Values.mortgageUnderwriting.provider.model }}
+  credential:
+    secretRef:
+      name: {{ .Values.mortgageUnderwriting.provider.secretRef }}
+{{- end }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: mortgage-underwriting-tools
+  namespace: {{ $ns }}
+spec:
+  handlers:
+{{- range $tool := list (dict "name" "case_fetch" "path" "/case") (dict "name" "credit_report" "path" "/credit-report") (dict "name" "property_valuation" "path" "/valuation") (dict "name" "affordability_assess" "path" "/affordability") (dict "name" "aml_screen" "path" "/aml-screen") (dict "name" "income_verify" "path" "/verify") (dict "name" "case_note_write" "path" "/case-note") }}
+    - name: {{ $tool.name }}-handler
+      type: http
+      tool:
+        name: {{ $tool.name }}
+        description: Synthetic mortgage underwriting {{ $tool.name }} handler.
+        inputSchema:
+          type: object
+          additionalProperties: true
+      httpConfig:
+{{- if eq $tool.name "income_verify" }}
+        endpoint: http://mortgage-income-verify.{{ $ns }}:8080{{ $tool.path }}
+{{- else }}
+        endpoint: http://mortgage-case-systems.{{ $ns }}:8080{{ $tool.path }}
+{{- end }}
+        method: POST
+        contentType: application/json
+{{- end }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: mortgage-underwriting-policy
+  namespace: {{ $ns }}
+spec:
+  selector:
+    registry: mortgage-underwriting-tools
+  mode: enforce
+  onFailure: deny
+  policy: |
+    @id("permit-synthetic-underwriting-tools")
+    permit (principal, action == Action::"invoke", resource);
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: mortgage-underwriting-pack
+  namespace: {{ $ns }}
+spec:
+  packName: mortgage-underwriting-pack
+  version: "1.0.0"
+  source:
+    type: configmap
+    configMapRef:
+      name: mortgage-underwriting-pack-v1
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mortgage-underwriting-pack-v1
+  namespace: {{ $ns }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/mortgage-underwriting-pack.json" | indent 4 }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: mortgage-underwriting
+  namespace: {{ $ns }}
+  {{- if .Values.mortgageUnderwriting.deterministic }}
+  annotations:
+    omnia.altairalabs.ai/mock-provider: "true"
+  {{- end }}
+spec:
+  mode: function
+  promptPackRef:
+    name: mortgage-underwriting-pack
+  toolRegistryRef:
+    name: mortgage-underwriting-tools
+  providers:
+    - name: default
+      providerRef:
+        name: mortgage-underwriting-llm
+  facades:
+    - type: rest
+      port: 8080
+  inputSchema:
+    type: object
+    required: [case_ref]
+    properties:
+      case_ref: { type: string }
+  outputFormat: json_schema
+  outputSchema:
+    type: object
+    required: [recommendation, note]
+    properties:
+      recommendation: { type: string }
+      note: { type: string }
+{{- end }}
