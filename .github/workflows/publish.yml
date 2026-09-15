@@ -3,6 +3,7 @@ name: Publish demo images
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths:
       - memory-ingestion/**
       - demos/memory-seeder/**
@@ -66,3 +67,24 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  chart:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Package chart
+        env:
+          CHART_VERSION: ${{ github.ref_name }}
+        run: |
+          version="${CHART_VERSION#v}"
+          helm package charts/omnia-demo --version "${version}" --app-version "${version}"
+      - name: Login to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "${GHCR_TOKEN}" | helm registry login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Publish chart
+        env:
+          CHART_VERSION: ${{ github.ref_name }}
+        run: helm push "omnia-demo-${CHART_VERSION#v}.tgz" oci://ghcr.io/altairalabs/charts
