@@ -6,6 +6,9 @@ on:
     paths:
       - memory-ingestion/**
       - demos/memory-seeder/**
+      - demos/mortgage-underwriting/**
+      - demos/sharepoint-adapter/**
+      - demos/larkmere-portal/**
       - .github/workflows/publish.yml
   workflow_dispatch:
 
@@ -27,6 +30,18 @@ jobs:
             context: .
             file: demos/memory-seeder/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-memory-seeder
+          - name: mortgage-underwriting
+            context: .
+            file: demos/mortgage-underwriting/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
+          - name: sharepoint-adapter
+            context: .
+            file: demos/sharepoint-adapter/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-sharepoint-adapter
+          - name: larkmere-portal
+            context: .
+            file: demos/larkmere-portal/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-larkmere-portal
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
