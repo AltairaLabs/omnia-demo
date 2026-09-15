@@ -28,6 +28,13 @@ helm upgrade --install omnia-demo ./charts/omnia-demo \
   --set memory.auth.secretName=memory-api-token
 ```
 
+Released chart installs use the OCI registry instead of a local path:
+
+```bash
+helm upgrade --install omnia-demo oci://ghcr.io/altairalabs/charts/omnia-demo \
+  --version <release-version> --namespace omnia-demo --create-namespace
+```
+
 To populate the richer Memory Galaxy as well as the institutional documents,
 enable `galaxy` and provide the metadata UIDs from the target Workspace and
 AgentRuntime:
