@@ -80,3 +80,19 @@ claimsTriage:
     type: claude
     model: claude-sonnet-4-6
     secretRef: anthropic-api-key
+
+sharepoint:
+  # Requires Omnia Enterprise memory ingestion and AgentRuntime CRDs.
+  enabled: false
+  workspace: demo
+  adapter:
+    image:
+      repository: ghcr.io/altairalabs/omnia-demo-sharepoint-adapter
+      tag: latest
+      pullPolicy: IfNotPresent
+    siteID: ""
+    credentialsSecret: sharepoint-graph-credentials
+  provider:
+    type: claude
+    model: claude-sonnet-4-6
+    secretRef: anthropic-api-key
