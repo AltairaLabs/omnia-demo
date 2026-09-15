@@ -147,9 +147,8 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
 
       if (msg.type === "connected") {
         sessionRef.current = msg.session_id || null;
-        // EU AI Act Art. 50(1). The pack DECLARES it
-        // (requires_ai_disclosure in its RFC 0013 governance block), the
-        // facade advertises it on the first frame, and this is the thing that
+        // The pack declares whether disclosure is required, the facade
+        // advertises it on the first frame, and this is the thing that
         // finally shows it to a person — which is what makes session-api's
         // ai_disclosure_delivered column mean something.
         //
