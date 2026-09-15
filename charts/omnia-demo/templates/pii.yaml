@@ -1,0 +1,133 @@
+{{- if .Values.piiChat.enabled }}
+{{- $ns := .Values.namespace }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pii-chat-identity
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: pii-chat-identity }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: pii-chat-identity }
+    spec:
+      containers:
+        - name: identity
+          image: {{ .Values.piiChat.image.repository }}:{{ .Values.piiChat.image.tag }}
+          imagePullPolicy: {{ .Values.piiChat.image.pullPolicy }}
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pii-chat-identity
+  namespace: {{ $ns }}
+spec:
+  selector: { app.kubernetes.io/name: pii-chat-identity }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: pii-chat-llm
+  namespace: {{ $ns }}
+spec:
+  type: {{ .Values.piiChat.provider.type }}
+  role: llm
+  model: {{ .Values.piiChat.provider.model }}
+  credential:
+    secretRef:
+      name: {{ .Values.piiChat.provider.secretRef }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: pii-chat-tools
+  namespace: {{ $ns }}
+spec:
+  handlers:
+    - name: verify-identity-handler
+      type: http
+      tool:
+        name: verify_identity
+        description: Verify a synthetic cardholder identity.
+        inputSchema:
+          type: object
+          required: [ssn, dob]
+          properties:
+            ssn: { type: string }
+            dob: { type: string }
+      httpConfig:
+        endpoint: http://pii-chat-identity.{{ $ns }}:8080/verify-identity
+        method: POST
+        contentType: application/json
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: pii-chat-policy
+  namespace: {{ $ns }}
+spec:
+  selector: { registry: pii-chat-tools }
+  mode: enforce
+  onFailure: deny
+  policy: |
+    @id("permit-synthetic-identity-check")
+    permit (principal, action == Action::"invoke", resource);
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: SessionPrivacyPolicy
+metadata:
+  name: pii-chat-privacy
+  namespace: {{ $ns }}
+spec:
+  recording:
+    enabled: true
+    pii:
+      redact: {{ .Values.piiChat.privacy.redact }}
+      strategy: {{ .Values.piiChat.privacy.strategy }}
+      patterns: {{ .Values.piiChat.privacy.patterns | toJson }}
+  auditLog:
+    enabled: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pii-chat-pack-v1
+  namespace: {{ $ns }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/pii-chat-pack.json" | indent 4 }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: pii-chat-pack
+  namespace: {{ $ns }}
+spec:
+  packName: pii-chat-pack
+  version: "1.0.0"
+  source:
+    type: configmap
+    configMapRef: { name: pii-chat-pack-v1 }
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: pii-chat
+  namespace: {{ $ns }}
+spec:
+  promptPackRef: { name: pii-chat-pack }
+  toolRegistryRef: { name: pii-chat-tools }
+  privacyPolicyRef: { name: pii-chat-privacy }
+  providers:
+    - name: default
+      providerRef: { name: pii-chat-llm }
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+{{- end }}

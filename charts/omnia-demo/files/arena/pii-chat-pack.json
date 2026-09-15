@@ -1,0 +1,93 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "pii-chat",
+  "name": "pii-chat",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "card_support": {
+      "id": "card_support",
+      "name": "card-support",
+      "description": "Retail-bank card support agent. Verifies a caller's identity before discussing an account, then records a case note for the next agent.",
+      "version": "1.0.0",
+      "system_template": "You are a card support assistant for a retail bank. A cardholder is\ncontacting you about their card.\n\nTone: warm, brief, phone-style. This is a conversation, not a form.\n\nGuidelines:\n- Before you discuss or act on any account, confirm the caller's identity:\n  ask for their Social Security number and their date of birth, then call\n  verify_identity with both.\n- Do not proceed on an unverified account, and never guess or invent either\n  value — ask for whatever you are missing.\n- Once verified, greet them by name, confirm the last four digits of the\n  card on file and its status, and help with what they asked.\n- Never read back more than the last four digits of a card number.\n- When the caller's issue is resolved, record a short case note using\n  memory__remember so whoever picks this account up next has the context:\n  what the caller reported, what you did about it, and how to reach them.\n",
+      "tools": [
+        "verify_identity",
+        "memory__remember",
+        "memory__recall"
+      ],
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.3
+      }
+    }
+  },
+  "tools": {
+    "verify_identity": {
+      "name": "verify_identity",
+      "description": "Confirm a cardholder's identity from their Social Security number and date of birth before discussing or acting on their account. Returns the customer reference, the cardholder's name, the last four digits of the card on file, and the card's current status.",
+      "parameters": {
+        "properties": {
+          "dob": {
+            "description": "The cardholder's date of birth in YYYY-MM-DD form.",
+            "type": "string"
+          },
+          "ssn": {
+            "description": "The cardholder's Social Security number, as they gave it, e.g. 123-45-6789.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ssn",
+          "dob"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-1.5.2",
+    "created_at": "2026-09-15T06:24:54+01:00",
+    "schema": "v1"
+  }
+}
