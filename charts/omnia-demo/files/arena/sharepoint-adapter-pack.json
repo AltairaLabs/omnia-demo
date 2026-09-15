@@ -1,0 +1,62 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "sharepoint-adapter",
+  "name": "sharepoint-adapter",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "assistant": {
+      "id": "assistant",
+      "name": "assistant",
+      "description": "Placeholder prompt for fleet-mode load testing. The rag-hero AgentRuntime runs its own PromptPack; this template is never used for inference, it only satisfies arena LoadConfig validation.",
+      "version": "v1.0.0",
+      "system_template": "You are a helpful assistant.",
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-1.5.2",
+    "created_at": "2026-09-15T06:36:38+01:00",
+    "schema": "v1"
+  }
+}

@@ -1,0 +1,163 @@
+{{- if .Values.sharepoint.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $memoryURL := .Values.memory.apiURL }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sharepoint-adapter
+  namespace: {{ $ns }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: sharepoint-adapter }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: sharepoint-adapter }
+    spec:
+      containers:
+        - name: adapter
+          image: {{ .Values.sharepoint.adapter.image.repository }}:{{ .Values.sharepoint.adapter.image.tag }}
+          imagePullPolicy: {{ .Values.sharepoint.adapter.image.pullPolicy }}
+          args: ["serve"]
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: SHAREPOINT_SITE_ID, value: {{ .Values.sharepoint.adapter.siteID | quote }} }
+          envFrom:
+            - secretRef: { name: {{ .Values.sharepoint.adapter.credentialsSecret }} }
+          ports: [{ name: http, containerPort: 8080 }]
+          readinessProbe: { httpGet: { path: /healthz, port: http } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sharepoint-adapter
+  namespace: {{ $ns }}
+spec:
+  selector: { app.kubernetes.io/name: sharepoint-adapter }
+  ports: [{ name: http, port: 8080, targetPort: http }]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: sharepoint-memory-seed
+  namespace: {{ $ns }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "25"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 2
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: {{ .Values.sharepoint.adapter.image.repository }}:{{ .Values.sharepoint.adapter.image.tag }}
+          imagePullPolicy: {{ .Values.sharepoint.adapter.image.pullPolicy }}
+          args: ["seed"]
+          env:
+            - { name: SHAREPOINT_SITE_ID, value: {{ .Values.sharepoint.adapter.siteID | quote }} }
+            - { name: MEMORY_API_URL, value: {{ $memoryURL | quote }} }
+            - { name: WORKSPACE_ID, value: {{ .Values.sharepoint.workspace | quote }} }
+            - { name: SESSION_API_TOKEN_PATH, value: /var/run/omnia/memory-token/token }
+          envFrom:
+            - secretRef: { name: {{ .Values.sharepoint.adapter.credentialsSecret }} }
+          volumeMounts:
+            - { name: memory-token, mountPath: /var/run/omnia/memory-token, readOnly: true }
+      volumes:
+        - name: memory-token
+          secret:
+            secretName: {{ .Values.memory.auth.secretName | default "memory-api-token" }}
+            optional: true
+            items:
+              - key: {{ .Values.memory.auth.secretKey }}
+                path: token
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: sharepoint-llm
+  namespace: {{ $ns }}
+spec:
+  type: {{ .Values.sharepoint.provider.type }}
+  role: llm
+  model: {{ .Values.sharepoint.provider.model }}
+  credential:
+    secretRef: { name: {{ .Values.sharepoint.provider.secretRef }} }
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: sharepoint-tools
+  namespace: {{ $ns }}
+spec:
+  handlers:
+    - name: fetch-sharepoint-handler
+      type: http
+      tool:
+        name: fetch_sharepoint
+        description: Fetch a synthetic SharePoint document by filename.
+        inputSchema:
+          type: object
+          required: [url]
+          properties: { url: { type: string } }
+      httpConfig:
+        endpoint: http://sharepoint-adapter.{{ $ns }}:8080/fetch
+        method: POST
+        contentType: application/json
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: sharepoint-policy
+  namespace: {{ $ns }}
+spec:
+  selector: { registry: sharepoint-tools }
+  mode: enforce
+  onFailure: deny
+  policy: |
+    @id("permit-sharepoint-fetch")
+    permit (principal, action == Action::"invoke", resource);
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sharepoint-pack-v1
+  namespace: {{ $ns }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/sharepoint-adapter-pack.json" | indent 4 }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: sharepoint-pack
+  namespace: {{ $ns }}
+spec:
+  packName: sharepoint-pack
+  version: "1.0.0"
+  source:
+    type: configmap
+    configMapRef: { name: sharepoint-pack-v1 }
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: sharepoint-assistant
+  namespace: {{ $ns }}
+spec:
+  promptPackRef: { name: sharepoint-pack }
+  toolRegistryRef: { name: sharepoint-tools }
+  providers:
+    - name: default
+      providerRef: { name: sharepoint-llm }
+  memory:
+    enabled: true
+    retrieval:
+      strategy: semantic
+      limit: 3
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+{{- end }}
