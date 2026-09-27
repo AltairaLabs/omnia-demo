@@ -50,7 +50,9 @@ metadata:
 spec:
   handlers:
 {{- range $tool := list (dict "name" "claim_fetch" "path" "/claim") (dict "name" "claim_policy_fetch" "path" "/claim-policy") (dict "name" "claim_settle" "path" "/claim-settle") (dict "name" "claim_refer" "path" "/claim-refer") }}
-    - name: {{ $tool.name }}-handler
+    # A handler name is a DNS label; the tool keeps its underscore name, which
+    # the pack's prompts call it by.
+    - name: {{ $tool.name | replace "_" "-" }}-handler
       type: http
       tool:
         name: {{ $tool.name }}
