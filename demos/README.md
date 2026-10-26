@@ -7,7 +7,7 @@ repository and do not access platform databases.
 | Example | Contents | Requirements |
 | --- | --- | --- |
 | `sharepoint-adapter/` | Microsoft Graph document adapter, Office extraction, synthetic corpus generator, and Arena load-test source | Graph credentials and an Omnia institutional-memory endpoint |
-| `memory-seeder/` | Synthetic multi-tier Galaxy data generator with categories and relations | Workspace and AgentRuntime IDs plus a memory API |
+| `memory-seeder/` | Synthetic multi-tier Galaxy data generator with consent categories | Omnia Enterprise, Workspace and AgentRuntime UIDs, the workspace memory API and its pseudonym key |
 | `mortgage-underwriting/` | Synthetic case-system and income-verification services plus Arena source | Omnia Enterprise for policy enforcement |
 | `pii-chat/` | Synthetic card-support Arena source and privacy-governance declarations | Omnia Enterprise for privacy policy behavior |
 | `claims-triage/` | Synthetic claims Arena source | Omnia Enterprise when policy enforcement is enabled |

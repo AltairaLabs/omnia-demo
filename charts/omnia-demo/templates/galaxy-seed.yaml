@@ -2,11 +2,29 @@
 {{- if or (eq .Values.galaxy.workspaceUID "") (eq .Values.galaxy.agentUID "") }}
 {{- fail "galaxy.workspaceUID and galaxy.agentUID are required when galaxy.enabled is true" }}
 {{- end }}
+{{- if and .Values.galaxy.namespace (not .Values.galaxy.memoryAPIURL) }}
+{{- fail "galaxy.memoryAPIURL is required when galaxy.namespace is set: give the workspace memory-api (kubectl get workspace <name> -o jsonpath='{.status.services[*].memoryURL}'); memory.apiURL is the ingestion example's endpoint, not the workspace's" }}
+{{- end }}
+{{- $ns := default .Values.namespace .Values.galaxy.namespace }}
+{{- $memoryAPI := default .Values.memory.apiURL .Values.galaxy.memoryAPIURL }}
+{{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
+# The seed Job runs in the Workspace's namespace: memory-api trusts
+# ServiceAccounts from that namespace only, and the operator writes the
+# workspace's pseudonym key (omnia-workspace-pseudonym-key) there.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: omnia-demo-memory-galaxy
+  namespace: {{ $ns }}
+# The default API token is not mounted; the Job uses only its projected,
+# audience-bound token (galaxy.serviceAuth).
+automountServiceAccountToken: false
+---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: omnia-demo-memory-galaxy
-  namespace: {{ .Values.namespace }}
+  namespace: {{ $ns }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "30"
@@ -16,13 +34,58 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      serviceAccountName: omnia-demo-memory-galaxy
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: seeder
           image: {{ .Values.galaxy.image.repository }}:{{ .Values.galaxy.image.tag }}
           imagePullPolicy: {{ .Values.galaxy.image.pullPolicy }}
           args:
-            - --memory-api={{ default .Values.memory.apiURL .Values.galaxy.memoryAPIURL }}
+            - --memory-api={{ $memoryAPI }}
             - --workspace-uid={{ .Values.galaxy.workspaceUID }}
             - --agent-uid={{ .Values.galaxy.agentUID }}
             - --seed={{ .Values.galaxy.seed }}
+            - --build-galaxy={{ .Values.galaxy.buildGalaxy }}
+          env:
+            # The workspace's pseudonym key, read the way Omnia's own workspace
+            # pods read it. Optional: an install without a key has no Secret
+            # and pseudonymises unkeyed. The seeder checks its key's fingerprint
+            # against the one memory-api's database is bound to before writing.
+            - name: OMNIA_PSEUDONYM_HMAC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.galaxy.pseudonymKey.secretName }}
+                  key: {{ .Values.galaxy.pseudonymKey.secretKey }}
+                  optional: true
+{{- if .Values.galaxy.serviceAuth.enabled }}
+            - name: SESSION_API_TOKEN_PATH
+              value: {{ $tokenDir }}/token
+{{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+{{- if .Values.galaxy.serviceAuth.enabled }}
+          volumeMounts:
+            - name: session-api-token
+              mountPath: {{ $tokenDir }}
+              readOnly: true
+      volumes:
+        # Omnia's internal service auth: a ServiceAccount token bound to the
+        # audience memory-api enforces (internalServiceAuth.audience).
+        - name: session-api-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.galaxy.serviceAuth.audience }}
+                  expirationSeconds: {{ .Values.galaxy.serviceAuth.tokenExpirationSeconds }}
+{{- end }}
 {{- end }}
