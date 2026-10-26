@@ -8,8 +8,8 @@ type Scenario struct {
 	AgentMemories     int
 	Users             int
 	MemoriesPerUser   int
-	HotEntities       int
-	ObsPerHotEntity   int
+	ObservationThemes int
+	ObsPerTheme       int
 	Seed              int64
 }
 
@@ -25,8 +25,8 @@ func DefaultScenario(workspaceUID string) Scenario {
 		AgentMemories:     240,
 		Users:             60,
 		MemoriesPerUser:   18,
-		HotEntities:       12,
-		ObsPerHotEntity:   12,
+		ObservationThemes: 12,
+		ObsPerTheme:       12,
 		Seed:              1,
 	}
 }

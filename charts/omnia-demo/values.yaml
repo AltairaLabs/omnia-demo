@@ -28,12 +28,35 @@ memory:
     secretKey: minioadmin
 
 galaxy:
-  # Seed the dashboard with synthetic multi-tier memories and relations.
+  # Seed the dashboard's Memory Galaxy with synthetic institutional, agent and
+  # user memories. Requires Omnia Enterprise (Galaxy and institutional memory)
+  # and a workspace memory service with an embedding provider.
   enabled: false
   workspaceUID: ""
   agentUID: ""
+  # Namespace of the target Workspace (its spec.namespace.name). The seed Job
+  # runs there: memory-api trusts ServiceAccounts from that namespace only, and
+  # the workspace pseudonym key Secret lives there. Defaults to `namespace`.
+  namespace: ""
+  # The workspace memory-api, e.g. http://memory-<workspace>-<group>.<ns>:8080
+  # (kubectl get workspace <name> -o jsonpath='{.status.services[*].memoryURL}').
+  # Required when galaxy.namespace is set; otherwise defaults to memory.apiURL.
   memoryAPIURL: ""
   seed: "1"
+  # After seeding, drain pending embeddings and fit the Galaxy's leaf clusters
+  # so the dashboard shows the cluster tree instead of its flat fallback.
+  buildGalaxy: true
+  # The workspace's pseudonym key, written by the Omnia operator. Read through
+  # a secretKeyRef only; never set the key in values.
+  pseudonymKey:
+    secretName: omnia-workspace-pseudonym-key
+    secretKey: key
+  # Present an audience-bound projected ServiceAccount token, as Omnia's
+  # internalServiceAuth expects. Harmless when that auth is off.
+  serviceAuth:
+    enabled: true
+    audience: omnia-session-api
+    tokenExpirationSeconds: 3600
   image:
     repository: ghcr.io/altairalabs/omnia-demo-memory-seeder
     tag: latest

@@ -24,6 +24,24 @@ var Categories = []string{
 	catPreferences, catHistory, catContext,
 }
 
+// Memory types. memory-api validates user- and agent-tier writes against the
+// MemoryPolicy schema, or without one against its built-in schema (general,
+// fact, preference, observation, temporal_summary for these tiers), so the
+// seed uses only built-in types. Institutional facts are not constrained by
+// the built-in schema and keep a domain type.
+const (
+	typeFact        = "fact"
+	typePreference  = "preference"
+	typeObservation = "observation"
+	typePolicy      = "policy"
+)
+
+// UserTierTypes are the built-in schema's types allowed in the user tier.
+var UserTierTypes = []string{"general", typeFact, typePreference, typeObservation, "temporal_summary"}
+
+// AgentTierTypes are the built-in schema's types allowed in the agent tier.
+var AgentTierTypes = UserTierTypes
+
 type Doc struct{ Title, URL, Site, Text string }
 type UserMemory struct {
 	RawUserID, Category, Type, Content string
@@ -33,14 +51,18 @@ type AgentMemory struct {
 	AgentID, Type, Content string
 	Confidence             float64
 }
-type HotObservation struct{ AboutKind, AboutKey, Content string }
+
+// Observation is a system-generated observation on one topic, attributed to
+// the synthetic operations user. A run of them per topic gives the Galaxy
+// dense, related clusters.
+type Observation struct{ Topic, Category, Content string }
 
 // Generated is the full deterministic seed payload.
 type Generated struct {
-	Docs            []Doc
-	AgentMemories   []AgentMemory
-	UserMemories    []UserMemory
-	HotObservations []HotObservation
+	Docs          []Doc
+	AgentMemories []AgentMemory
+	UserMemories  []UserMemory
+	Observations  []Observation
 }
 
 // topic is a semantic cluster: one domain, one consent category, with several
@@ -52,6 +74,7 @@ type Generated struct {
 type topic struct {
 	key      string
 	category string
+	memType  string   // the user-tier memory type this topic's facts take
 	leads    []string // subject / opening clause
 	cores    []string // the core fact — many wordings of one meaning
 	tails    []string // closing detail clause
@@ -70,7 +93,7 @@ const (
 // term-frequency can't cluster them the way meaning can.
 var topics = []topic{
 	{
-		key: "identity", category: catIdentity,
+		key: "identity", category: catIdentity, memType: typeFact,
 		leads: []string{
 			subjCustomer, subjUser, "This account holder",
 			"During onboarding the member", "On their last visit the client",
@@ -87,7 +110,7 @@ var topics = []topic{
 		},
 	},
 	{
-		key: "health", category: catHealth,
+		key: "health", category: catHealth, memType: typePreference,
 		leads: []string{subjCustomer, "This member", "The account holder", "The primary contact"},
 		cores: []string{
 			"requested a high-contrast, screen-reader friendly layout",
@@ -104,7 +127,7 @@ var topics = []topic{
 		},
 	},
 	{
-		key: "location", category: catLocation,
+		key: "location", category: catLocation, memType: typeFact,
 		leads: []string{subjCustomer, subjUser, "This tenant", "The operations lead"},
 		cores: []string{
 			"moved their billing address to Berlin", "requested data residency in the EU region",
@@ -118,7 +141,7 @@ var topics = []topic{
 		},
 	},
 	{
-		key: "preferences", category: catPreferences,
+		key: "preferences", category: catPreferences, memType: typePreference,
 		leads: []string{subjCustomer, subjUser, "The member", "The workspace admin"},
 		cores: []string{
 			"prefers email over phone for support", "opted into the monthly product newsletter",
@@ -132,7 +155,7 @@ var topics = []topic{
 		},
 	},
 	{
-		key: "history", category: catHistory,
+		key: "history", category: catHistory, memType: typeFact,
 		leads: []string{
 			"Last quarter the customer", "Earlier this year the account",
 			"Previously the user", "In a prior ticket the client",
@@ -149,7 +172,7 @@ var topics = []topic{
 		},
 	},
 	{
-		key: "context", category: catContext,
+		key: "context", category: catContext, memType: typeObservation,
 		leads: []string{
 			"Right now the customer", "Currently the team",
 			"At the moment the user", "In the active ticket the client",
@@ -177,10 +200,10 @@ func (t topic) sentence(r *rand.Rand) string {
 // Generate produces the deterministic seed for s using r.
 func Generate(s Scenario, r *rand.Rand) Generated {
 	return Generated{
-		Docs:            genDocs(s, r),
-		AgentMemories:   genAgentMemories(s, r),
-		UserMemories:    genUserMemories(s, r),
-		HotObservations: genHotObservations(s, r),
+		Docs:          genDocs(s, r),
+		AgentMemories: genAgentMemories(s, r),
+		UserMemories:  genUserMemories(s, r),
+		Observations:  genObservations(s, r),
 	}
 }
 
@@ -215,7 +238,7 @@ func genAgentMemories(s Scenario, r *rand.Rand) []AgentMemory {
 		t := topics[r.Intn(len(topics))]
 		out[i] = AgentMemory{
 			AgentID:    s.AgentUID,
-			Type:       "resolution_pattern",
+			Type:       typeFact,
 			Content:    fmt.Sprintf("For %s cases: %s", t.key, t.sentence(r)),
 			Confidence: 0.5 + r.Float64()*0.5,
 		}
@@ -238,7 +261,7 @@ func genUserMemories(s Scenario, r *rand.Rand) []UserMemory {
 			out = append(out, UserMemory{
 				RawUserID:  raw,
 				Category:   t.category,
-				Type:       "profile",
+				Type:       t.memType,
 				Content:    t.sentence(r),
 				Confidence: 0.6 + r.Float64()*0.4,
 			})
@@ -247,19 +270,18 @@ func genUserMemories(s Scenario, r *rand.Rand) []UserMemory {
 	return out
 }
 
-// genHotObservations attaches several topical observations to a few shared
-// entities (compaction fodder), each entity pinned to one topic so its
-// observations cluster together.
-func genHotObservations(s Scenario, r *rand.Rand) []HotObservation {
-	out := make([]HotObservation, 0, s.HotEntities*s.ObsPerHotEntity)
-	for e := range s.HotEntities {
+// genObservations writes several topical observations for each of a few
+// operational themes, each theme pinned to one topic so its observations
+// cluster together.
+func genObservations(s Scenario, r *rand.Rand) []Observation {
+	out := make([]Observation, 0, s.ObservationThemes*s.ObsPerTheme)
+	for e := range s.ObservationThemes {
 		t := topics[e%len(topics)]
-		key := fmt.Sprintf("hot-%s-%02d", t.key, e)
-		for range s.ObsPerHotEntity {
-			out = append(out, HotObservation{
-				AboutKind: aboutKindSupportTopic,
-				AboutKey:  key,
-				Content:   t.sentence(r),
+		for range s.ObsPerTheme {
+			out = append(out, Observation{
+				Topic:    t.key,
+				Category: t.category,
+				Content:  t.sentence(r),
 			})
 		}
 	}
