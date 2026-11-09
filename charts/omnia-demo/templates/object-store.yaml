@@ -1,0 +1,78 @@
+{{- if and .Values.memory.enabled .Values.memory.objectStore.enabled }}
+{{- $os := .Values.memory.objectStore }}
+# The in-cluster S3 the memory example ingests from: Versity Gateway
+# (Apache-2.0) on its POSIX backend, over emptyDir. Object metadata goes in a
+# sidecar directory, so nothing depends on xattr support on the node's disk.
+# Demo data only: it is gone when the pod restarts, and the ingest Job
+# re-uploads it on the next install or upgrade.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: memory-s3-credentials
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  accessKey: {{ $os.accessKey | quote }}
+  secretKey: {{ $os.secretKey | quote }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: memory-s3
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: memory-s3 }
+  template:
+    metadata:
+      labels: { app.kubernetes.io/name: memory-s3 }
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: gateway
+          image: {{ $os.image }}
+          command: ["versitygw"]
+          args: ["--port", ":9000", "--health", "/health", "posix", "--sidecar", "/meta", "/data"]
+          env:
+            - name: ROOT_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: accessKey } }
+            - name: ROOT_SECRET_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: secretKey } }
+          ports:
+            - { name: api, containerPort: 9000 }
+          readinessProbe:
+            httpGet: { path: /health, port: api }
+            periodSeconds: 2
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+            - { name: meta, mountPath: /meta }
+      volumes:
+        - name: data
+          emptyDir: { sizeLimit: 1Gi }
+        - name: meta
+          emptyDir: { sizeLimit: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: memory-s3
+  namespace: {{ .Values.namespace }}
+spec:
+  selector: { app.kubernetes.io/name: memory-s3 }
+  ports:
+    - { name: api, port: 9000, targetPort: api }
+{{- end }}

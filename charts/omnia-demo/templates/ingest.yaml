@@ -1,10 +1,11 @@
 {{- if .Values.memory.enabled }}
 {{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
-{{- $s3 := .Values.memory.minio.enabled }}
-# Ingests the fixture documents as institutional memory. By default straight
-# from the fixtures ConfigMap (SOURCE_DIR). With memory.minio.enabled it shows
-# the S3 path instead: the fixtures are uploaded to an in-cluster MinIO and the
-# ingestion service reads them back out of the bucket.
+{{- $s3 := .Values.memory.objectStore.enabled }}
+# Ingests the fixture documents as institutional memory. With
+# memory.objectStore.enabled (the default) it shows the S3 path: the AWS CLI
+# uploads the fixtures to the in-cluster S3 gateway and the ingestion service
+# reads them back out of the bucket. Without it, the service reads the fixtures
+# straight from their ConfigMap (SOURCE_DIR).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -22,14 +23,21 @@ spec:
       {{- if $s3 }}
       initContainers:
         - name: upload-fixtures
-          image: {{ .Values.memory.minio.mcImage }}
+          image: {{ .Values.memory.objectStore.uploaderImage }}
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
-              until mc alias set local http://memory-s3:9000 {{ .Values.memory.minio.accessKey }} {{ .Values.memory.minio.secretKey }}; do sleep 2; done
-              mc mb --ignore-existing local/{{ .Values.memory.s3.bucket }}
-              mc cp /fixtures/*.md local/{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }}
+              s3() { aws --endpoint-url http://memory-s3:9000 "$@"; }
+              until s3 s3 ls >/dev/null 2>&1; do sleep 2; done
+              s3 s3 mb s3://{{ .Values.memory.s3.bucket }} 2>/dev/null || true
+              s3 s3 cp /fixtures/ s3://{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }} --recursive --exclude '*' --include '*.md'
+          env:
+            - { name: AWS_DEFAULT_REGION, value: {{ .Values.memory.s3.region | quote }} }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: accessKey } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: secretKey } }
           volumeMounts:
             - { name: fixtures, mountPath: /fixtures }
       {{- end }}
@@ -47,8 +55,10 @@ spec:
             - { name: S3_REGION, value: {{ .Values.memory.s3.region | quote }} }
             - { name: S3_ENDPOINT, value: {{ .Values.memory.s3.endpoint | quote }} }
             - { name: S3_FORCE_PATH_STYLE, value: {{ .Values.memory.s3.forcePathStyle | quote }} }
-            - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.memory.minio.accessKey | quote }} }
-            - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: accessKey } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: secretKey } }
             {{- else }}
             - { name: SOURCE_DIR, value: /fixtures }
             {{- end }}

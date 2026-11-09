@@ -1,7 +1,7 @@
 # Omnia public memory demo
 
 This chart is an add-on for an existing Omnia installation. It deploys a
-local MinIO source, uploads the synthetic fixtures, and runs the public example
+local S3 gateway (Versity Gateway) source, uploads the synthetic fixtures, and runs the public example
 ingestion service once. It does not install or copy Omnia's private templates.
 
 Install Omnia separately, with Enterprise institutional ingestion enabled, then

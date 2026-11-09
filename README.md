@@ -15,7 +15,7 @@ documents its prerequisites and can be enabled or disabled through values.
 - [`memory-ingestion/`](memory-ingestion/) — a public S3-compatible source
   connector that sends documents to Omnia institutional memory.
 - [`charts/omnia-demo/`](charts/omnia-demo/) — the Helm add-on that deploys the
-  demos, one release per tenant, with the memory ingestion example, local MinIO
+  demos, one release per tenant, with the memory ingestion example, local S3 gateway (Versity Gateway)
   and synthetic fixtures.
 
 More public-safe examples will be added as independent packages. Enterprise
