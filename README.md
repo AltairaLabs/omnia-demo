@@ -8,12 +8,15 @@ documents its prerequisites and can be enabled or disabled through values.
 
 ## Examples
 
-- [`acme-apparel-support/`](acme-apparel-support/) — synthetic customer-support
-  agent content, tools, personas, scenarios, and knowledge-base articles.
+- [`demos/`](demos/) — PromptArena sources and synthetic back-end services for
+  the demo cast's agents: Larkmere Mutual (mortgage underwriting, claims
+  triage, card support) and Wrenmoor Energy (on-call incident agent, grid data
+  analyst, field-service copilot).
 - [`memory-ingestion/`](memory-ingestion/) — a public S3-compatible source
   connector that sends documents to Omnia institutional memory.
-- [`charts/omnia-demo/`](charts/omnia-demo/) — the Helm add-on for the memory
-  ingestion example, including local MinIO and synthetic fixtures.
+- [`charts/omnia-demo/`](charts/omnia-demo/) — the Helm add-on that deploys the
+  demos, one release per tenant, with the memory ingestion example, local MinIO
+  and synthetic fixtures.
 
 More public-safe examples will be added as independent packages. Enterprise
 examples may require an Omnia Enterprise installation; they will not copy
