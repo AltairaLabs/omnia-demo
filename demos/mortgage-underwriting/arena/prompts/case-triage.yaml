@@ -7,22 +7,11 @@ spec:
   version: "v1.1.0"
   description: "Backend triage for residential mortgage applications: gathers the case file, credit, valuation, affordability and AML checks, verifies income with the approved supplier, and files an underwriter case note with a recommendation."
 
-  metadata:
-    domain: financial-services
-    tags: [underwriting, mortgage, backend, customer-data]
-    governance:
-      intended_purpose: "Triage a residential mortgage application for a human underwriter and file a recommendation."
-      foreseeable_misuse:
-        - "Treating the recommendation as the lending decision itself"
-        - "Running it over a product it was not assessed for"
-      autonomy_level: acts_with_oversight
-      accountable_owner: Demo Credit Review Board
-      operator_role: eu-aiact:AIDeployer
-      risk_classification: eu-aiact:HighRiskAI
-      intended_deployment_contexts: [Residential mortgage underwriting, regulated retail lending]
-      approved_environments: [demo]
-      requires_ai_disclosure: false
-
+  # NOTE: governance metadata is NOT authored here. packc drops a PromptConfig's
+  # metadata block on compile, so governance lives in ../governance.yaml
+  # (asserted, this firm's schema) and ../governance-declarations.yaml (RFC
+  # 0013), and hack/build-packs.sh merges both into the compiled pack — which
+  # is also what lets the observed half be derived from git rather than typed.
 
   system_template: |
     You triage residential mortgage applications for a human underwriter.
@@ -60,7 +49,28 @@ spec:
     reading on trust. A self-employed case with variable income is exactly where
     the underlying records earn their keep.
 
+    Your FINAL reply — after case_note_write has been called — is not prose.
+    It is a single JSON object with exactly these two fields:
 
+      {"recommendation": "APPROVE|DECLINE|REFER", "case_note": "..."}
+
+    Put the recommendation word, and nothing else, in "recommendation". The full
+    case note goes in "case_note". Both values are JSON strings in double
+    quotes, with newlines escaped as \n. Emit the object and nothing else — no
+    markdown, no table, no commentary around it.
+
+    Keep the case note tight — around 350 words. Short labelled sections, one
+    or two lines each. It is an underwriter's working note, not a report: state
+    what each check returned, what could not be established, and why you are
+    recommending what you are. A note that runs long is truncated in transit
+    and the whole answer is lost, so brevity is a hard requirement.
+
+  # The output contract and the length bound above are what keep the answer
+  # inside the provider's maxTokens: the note is the bulk of the answer, and a
+  # cut-off arrives at the caller as "unexpected end of JSON input".
+
+  # message lives under params: the compiled pack schema rejects it at the
+  # validator's top level, which is where packc 1.5.2 used to move it from.
   validators:
     - type: content_excludes
       params:
@@ -71,13 +81,13 @@ spec:
           - "you are approved"
           - "we will lend"
           - "guaranteed"
-      message: "A recommendation may not state a lending decision. The decision is reserved to a named underwriter (decision_authority)."
+        message: "A recommendation may not state a lending decision. The decision is reserved to a named underwriter (decision_authority)."
       fail_on_violation: true
 
     - type: max_length
       params:
         max_characters: 4000
-      message: "Case note truncated at 4000 characters."
+        message: "Case note truncated at 4000 characters."
       fail_on_violation: true
 
   evals:

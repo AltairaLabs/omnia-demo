@@ -4,7 +4,10 @@
 #
 # This directory is the editable source for the example pack.
 #
-# Regenerate with: demos/pii-chat/hack/build-pack.sh
+# The chart ships a COMPILED pack (charts/omnia-demo/files/arena/), with the
+# governance block from governance-declarations.yaml merged in.
+#
+# Regenerate with: hack/build-packs.sh pii-chat
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
