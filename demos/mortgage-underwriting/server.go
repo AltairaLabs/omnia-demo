@@ -10,8 +10,9 @@
 // call — and a second image to build, publish and keep alive would buy nothing
 // but a tidier path. The directory name is the cost; see PII_CHAT.md.
 //
-// Wrenmoor Energy: the on-call incident agent's operations back end and the
-// data analyst's grid dataset (wrenmoor.go), for the same reason.
+// Wrenmoor Energy: the on-call incident agent's operations back end
+// (wrenmoor.go), the grid analyst's generation dataset (wrenmoorgrid.go) and
+// Wren's account system (wren.go), for the same reason.
 //
 // Why any of this is a real HTTP service rather than canned data inside the
 // runtime: a ToolRegistry handler is one of http/openapi/grpc/mcp/client.
@@ -85,8 +86,7 @@ type toolRequest struct {
 	Replicas  *int   `json:"replicas"`
 	Namespace string `json:"namespace"`
 	Cluster   string `json:"cluster"`
-	FeederID  string `json:"feeder_id"`
-	Region    string `json:"region"`
+	SiteID    string `json:"site_id"`
 	Date      string `json:"date"`
 	Cursor    string `json:"cursor"`
 }
@@ -112,7 +112,7 @@ func (r toolRequest) ref() string {
 	case r.Cluster != "":
 		return r.Cluster
 	default:
-		return r.FeederID
+		return r.SiteID
 	}
 }
 

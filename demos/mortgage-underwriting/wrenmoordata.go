@@ -8,8 +8,8 @@ import (
 )
 
 // Synthetic data for Wrenmoor Energy's demos: the platform team's on-call
-// world (alerts, logs, deploys, the services they belong to) and the grid
-// dataset the data analyst answers load and consumption questions over.
+// world (alerts, logs, deploys, the services they belong to). The generation
+// dataset the grid analyst answers from is in wrenmoorgrid.go.
 //
 // It lives in the shared stub binary for the same reason the claims and
 // identity endpoints do: one more set of back-office endpoints on a service
@@ -23,7 +23,7 @@ import (
 // date.
 
 // incidentDay is the date the on-call world is frozen on. Alert and deploy
-// timestamps are all on it, and it is the default date for a load question
+// timestamps are all on it, and it is the default date for an output question
 // that names none.
 const incidentDay = "2026-11-09"
 
@@ -53,9 +53,10 @@ type alert struct {
 	// hour. It is what lets an agent tell noise from an incident without
 	// being told which is which.
 	FlapCount int `json:"flap_count_last_hour"`
-	// Feeders are the grid feeders an alert affects, when it affects any: the
-	// thread the incident agent pulls to ask the data analyst about load.
-	Feeders []string `json:"affected_feeders,omitempty"`
+	// Sites are the generation sites an alert affects, when it affects any:
+	// the thread the incident agent pulls to ask the grid analyst about
+	// their output.
+	Sites []string `json:"affected_sites,omitempty"`
 }
 
 // logLine is one structured log line.
@@ -106,7 +107,7 @@ func seedAlerts() []alert {
 			ID: "ALT-7731", Service: "meter-ingest", Severity: "critical",
 			Summary: "meter-ingest HTTP 5xx rate 18.4% (threshold 2%) on POST /v1/readings",
 			Status:  alertFiring, FiredAt: incidentDay + "T08:14:00Z", FlapCount: 0,
-			Feeders: []string{"WM-F112", "WM-F118"},
+			Sites: []string{"WM-EDGE", "WM-CRAGG"},
 		},
 		{
 			ID: "ALT-7702", Service: "grid-telemetry", Severity: "warning",
@@ -132,7 +133,7 @@ func seedLogs() map[string][]logLine {
 			{At: incidentDay + "T08:11:58Z", Level: "info", Message: "rollout: revision 42 (meter-ingest:v2.14.0) ready 4/4"},
 			{At: incidentDay + "T08:13:07Z", Level: "error", Message: "POST /v1/readings 500: decode batch: unexpected null in field interval_kwh (decoder v3)"},
 			{At: incidentDay + "T08:13:09Z", Level: "error", Message: "POST /v1/readings 500: decode batch: unexpected null in field interval_kwh (decoder v3)"},
-			{At: incidentDay + "T08:13:40Z", Level: "warn", Message: "batch rejected from head-end HE-NORTHMOOR-2 (feeders WM-F112, WM-F118): 1,912 readings"},
+			{At: incidentDay + "T08:13:40Z", Level: "warn", Message: "batch rejected from head-end HE-EDGE-2 (export meters for sites WM-EDGE, WM-CRAGG): 1,912 readings"},
 			{At: incidentDay + "T08:15:02Z", Level: "error", Message: "POST /v1/readings 500: decode batch: unexpected null in field interval_kwh (decoder v3)"},
 			{At: incidentDay + "T08:20:00Z", Level: "info", Message: "5xx rate over 5m: 18.4% (412 of 2,239 requests)"},
 		},
@@ -189,65 +190,6 @@ func seedDeploys() map[string][]deploy {
 // dbClusters maps each database cluster to its current primary.
 func seedDatabases() map[string]string {
 	return map[string]string{"wrenmoor-pg-prod": "wrenmoor-pg-prod-0"}
-}
-
-// feeder is one 11kV feeder on Wrenmoor Energy's distribution network.
-type feeder struct {
-	ID         string  `json:"feeder_id"`
-	Name       string  `json:"name"`
-	Substation string  `json:"substation"`
-	Region     string  `json:"region"`
-	RatingMW   float64 `json:"rating_mw"`
-	Customers  int     `json:"customers"`
-	// Mix is the share of energy by customer class, summing to 1.
-	Mix customerMix `json:"customer_mix"`
-	// baseMW scales the daily load shape for this feeder.
-	baseMW float64
-}
-
-type customerMix struct {
-	Domestic   float64 `json:"domestic"`
-	Commercial float64 `json:"commercial"`
-	Industrial float64 `json:"industrial"`
-}
-
-// feeders is ordered, so listings are stable. WM-F112 and WM-F118 are the
-// feeders behind the head-end whose readings meter-ingest rev 42 rejects, and
-// WM-F121 runs hot enough that a digest has something to flag.
-var feeders = []feeder{
-	{ID: "WM-F112", Name: "Hartwell Road", Substation: "Hartwell Primary", Region: "Northmoor", RatingMW: 9.0, Customers: 3120, Mix: customerMix{0.72, 0.24, 0.04}, baseMW: 5.4},
-	{ID: "WM-F118", Name: "Quarry Lane", Substation: "Hartwell Primary", Region: "Northmoor", RatingMW: 8.0, Customers: 1480, Mix: customerMix{0.38, 0.22, 0.40}, baseMW: 5.1},
-	{ID: "WM-F121", Name: "Kestle Industrial Estate", Substation: "Kestle Bridge", Region: "Northmoor", RatingMW: 12.0, Customers: 210, Mix: customerMix{0.05, 0.25, 0.70}, baseMW: 10.4},
-	{ID: "WM-F204", Name: "Penmorrow Town", Substation: "Penmorrow Grid", Region: "Southvale", RatingMW: 10.0, Customers: 4410, Mix: customerMix{0.68, 0.30, 0.02}, baseMW: 6.2},
-	{ID: "WM-F207", Name: "Saltings Harbour", Substation: "Penmorrow Grid", Region: "Southvale", RatingMW: 7.5, Customers: 960, Mix: customerMix{0.41, 0.44, 0.15}, baseMW: 4.3},
-	{ID: "WM-F233", Name: "Tolvan Villages", Substation: "Tolvan Primary", Region: "Southvale", RatingMW: 6.0, Customers: 2280, Mix: customerMix{0.88, 0.11, 0.01}, baseMW: 2.9},
-}
-
-// loadShape is the per-unit demand for each half-hour of the day, 00:00 first:
-// a domestic-weighted winter weekday with a morning shoulder and an evening
-// peak at 17:30.
-var loadShape = [48]float64{
-	0.52, 0.49, 0.47, 0.45, 0.44, 0.44, 0.45, 0.46, 0.48, 0.50, 0.53, 0.58,
-	0.66, 0.74, 0.81, 0.86, 0.88, 0.87, 0.85, 0.83, 0.82, 0.81, 0.80, 0.80,
-	0.81, 0.80, 0.79, 0.79, 0.80, 0.83, 0.88, 0.94, 1.00, 1.04, 1.06, 1.05,
-	1.01, 0.96, 0.90, 0.85, 0.80, 0.76, 0.72, 0.68, 0.64, 0.60, 0.57, 0.54,
-}
-
-// readingGap is a stretch of missing half-hourly readings: what meter-ingest
-// rev 42 rejected, as the analyst sees it. Slot indices, inclusive.
-type readingGap struct {
-	Date      string
-	FeederID  string
-	FirstSlot int
-	LastSlot  int
-}
-
-// From 08:30 on the incident day, the slot after rev 42 started rejecting
-// batches, to 11:30. The analyst reports it as missing data, not as a load
-// drop: zero is a reading, and nobody lost supply.
-var readingGaps = []readingGap{
-	{Date: incidentDay, FeederID: "WM-F112", FirstSlot: 17, LastSlot: 23},
-	{Date: incidentDay, FeederID: "WM-F118", FirstSlot: 17, LastSlot: 23},
 }
 
 // london is the zone the daily digest's days are counted in, matching the

@@ -185,55 +185,6 @@ func TestIrreversibleActionsActIfReached(t *testing.T) {
 	}
 }
 
-func TestFeederLoadIsDeterministicAndShowsTheGap(t *testing.T) {
-	srv := newTestWrenmoor(t)
-	a, status := call(t, srv, "/grid/load", map[string]any{"feeder_id": "WM-F112"})
-	if status != http.StatusOK {
-		t.Fatalf("status %d", status)
-	}
-	b, _ := call(t, srv, "/grid/load", map[string]any{"feeder_id": "WM-F112", "date": incidentDay})
-	if a["peak_mw"] != b["peak_mw"] || a["energy_mwh"] != b["energy_mwh"] {
-		t.Fatalf("load is not deterministic: %v vs %v", a["peak_mw"], b["peak_mw"])
-	}
-	if a["missing_readings"].(float64) != 7 {
-		t.Fatalf("missing readings = %v, want 7 (08:30-11:30)", a["missing_readings"])
-	}
-	readings := a["readings"].([]any)
-	if len(readings) != 48 {
-		t.Fatalf("readings = %d, want 48", len(readings))
-	}
-	if r := readings[17].(map[string]any); r["start"] != "08:30" || r["mw"] != nil {
-		t.Fatalf("slot 17 should be a null 08:30 reading, got %v", r)
-	}
-
-	// The day before has no gap.
-	prev, _ := call(t, srv, "/grid/load", map[string]any{"feeder_id": "WM-F112", "date": "2026-11-08"})
-	if prev["missing_readings"].(float64) != 0 {
-		t.Fatalf("2026-11-08 missing readings = %v, want 0", prev["missing_readings"])
-	}
-
-	if _, status := call(t, srv, "/grid/load", map[string]any{"feeder_id": "WM-F999"}); status != http.StatusNotFound {
-		t.Fatalf("unknown feeder: status %d", status)
-	}
-	if _, status := call(t, srv, "/grid/load", map[string]any{"feeder_id": "WM-F112", "date": "9 Nov"}); status != http.StatusBadRequest {
-		t.Fatalf("bad date: status %d", status)
-	}
-}
-
-func TestConsumptionByRegion(t *testing.T) {
-	srv := newTestWrenmoor(t)
-	all, _ := call(t, srv, "/grid/consumption", map[string]any{"date": "2026-11-08"})
-	north, _ := call(t, srv, "/grid/consumption", map[string]any{"date": "2026-11-08", "region": "Northmoor"})
-	south, _ := call(t, srv, "/grid/consumption", map[string]any{"date": "2026-11-08", "region": "Southvale"})
-	sum := round2(north["total_mwh"].(float64) + south["total_mwh"].(float64))
-	if diff := sum - all["total_mwh"].(float64); diff > 0.05 || diff < -0.05 {
-		t.Fatalf("regions sum to %v, all is %v", sum, all["total_mwh"])
-	}
-	if _, status := call(t, srv, "/grid/consumption", map[string]any{"region": "Atlantis"}); status != http.StatusNotFound {
-		t.Fatalf("unknown region: status %d", status)
-	}
-}
-
 func TestDailySummariesCarryTheCursor(t *testing.T) {
 	srv := newTestWrenmoor(t)
 
@@ -267,15 +218,6 @@ func TestDailySummariesCarryTheCursor(t *testing.T) {
 	}
 }
 
-// The industrial estate feeder runs hot on weekdays, so a digest always has
-// something to say.
-func TestHotFeederIsFlagged(t *testing.T) {
-	s := summarise("2026-11-09") // a Monday
-	if s.PeakFeeder != "WM-F121" || len(s.FeedersOver90Pct) == 0 {
-		t.Fatalf("weekday summary %+v", s)
-	}
-}
-
 func TestStateIsPerServer(t *testing.T) {
 	first := newTestWrenmoor(t)
 	if _, status := call(t, first, "/ops/rollback", map[string]any{"service": "meter-ingest"}); status != http.StatusOK {
@@ -285,5 +227,101 @@ func TestStateIsPerServer(t *testing.T) {
 	out, _ := call(t, second, "/ops/deploys", map[string]any{"service": "meter-ingest"})
 	if out["current_revision"].(float64) != 42 {
 		t.Fatal("a rollback on one server leaked into another")
+	}
+}
+
+func TestSiteOutputIsDeterministicAndShowsTheGap(t *testing.T) {
+	srv := newTestWrenmoor(t)
+	a, status := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-EDGE"})
+	if status != http.StatusOK {
+		t.Fatalf("status %d", status)
+	}
+	b, _ := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-EDGE", "date": incidentDay})
+	if a["peak_mw"] != b["peak_mw"] || a["energy_mwh"] != b["energy_mwh"] {
+		t.Fatalf("output is not deterministic: %v vs %v", a["peak_mw"], b["peak_mw"])
+	}
+	if a["missing_readings"].(float64) != 7 {
+		t.Fatalf("missing readings = %v, want 7 (08:30-11:30)", a["missing_readings"])
+	}
+	readings := a["readings"].([]any)
+	if len(readings) != 48 {
+		t.Fatalf("readings = %d, want 48", len(readings))
+	}
+	if r := readings[17].(map[string]any); r["start"] != "08:30" || r["mw"] != nil {
+		t.Fatalf("slot 17 should be a null 08:30 reading, got %v", r)
+	}
+	if a["peak_mw"].(float64) > 29 {
+		t.Fatalf("Wrenmoor Edge peaked at %v MW, over its 29 MW capacity", a["peak_mw"])
+	}
+
+	prev, _ := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-EDGE", "date": "2026-11-08"})
+	if prev["missing_readings"].(float64) != 0 {
+		t.Fatalf("2026-11-08 missing readings = %v, want 0", prev["missing_readings"])
+	}
+
+	// Solar makes nothing at night.
+	sun, _ := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-CRAGG", "date": "2026-11-08"})
+	if r := sun["readings"].([]any)[2].(map[string]any); r["mw"].(float64) != 0 {
+		t.Fatalf("solar at 01:00 = %v", r["mw"])
+	}
+
+	if _, status := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-F112"}); status != http.StatusNotFound {
+		t.Fatalf("unknown site: status %d", status)
+	}
+	if _, status := call(t, srv, "/grid/output", map[string]any{"site_id": "WM-EDGE", "date": "9 Nov"}); status != http.StatusBadRequest {
+		t.Fatalf("bad date: status %d", status)
+	}
+}
+
+// The live mix is the website's card: 41.6 MW, wind 64%, solar 21%, battery 15%.
+func TestLiveMixMatchesTheWebsite(t *testing.T) {
+	srv := newTestWrenmoor(t)
+	out, _ := call(t, srv, "/grid/mix", map[string]any{})
+	if out["total_mw"].(float64) != 41.6 {
+		t.Fatalf("live total %v MW, want 41.6", out["total_mw"])
+	}
+	want := map[string]float64{"wind": 64, "solar": 21, "battery": 15}
+	for _, p := range out["parts"].([]any) {
+		m := p.(map[string]any)
+		if m["pct"].(float64) != want[m["source"].(string)] {
+			t.Fatalf("live %s = %v%%, want %v%%", m["source"], m["pct"], want[m["source"].(string)])
+		}
+	}
+
+	day, _ := call(t, srv, "/grid/mix", map[string]any{"date": "2026-11-08"})
+	if day["live"] != false || day["total_mwh"].(float64) <= 0 {
+		t.Fatalf("daily mix %v", day)
+	}
+}
+
+func TestSitesAreTheWebsitesSites(t *testing.T) {
+	srv := newTestWrenmoor(t)
+	out, _ := call(t, srv, "/grid/sites", map[string]any{})
+	got := out["sites"].([]any)
+	if len(got) != 3 {
+		t.Fatalf("sites %v", got)
+	}
+	edge := got[0].(map[string]any)
+	if edge["name"] != "Wrenmoor Edge" || edge["capacity_mw"].(float64) != 29 || edge["units"] != "14 turbines" {
+		t.Fatalf("Wrenmoor Edge %v", edge)
+	}
+	if store := got[2].(map[string]any); store["storage_mwh"].(float64) != 40 {
+		t.Fatalf("Heptonstall Store %v", store)
+	}
+}
+
+// The battery cannot give back more than it took in.
+func TestBatteryRoundTrip(t *testing.T) {
+	s, _ := siteByID("WM-HEPT")
+	d := dayFor(s, "2026-11-08", false)
+	if d.EnergyMWh > d.ChargedMWh || d.ChargedMWh > 40 {
+		t.Fatalf("battery discharged %v MWh from %v charged", d.EnergyMWh, d.ChargedMWh)
+	}
+}
+
+func TestDigestFlagsTheGap(t *testing.T) {
+	s := summarise(incidentDay)
+	if len(s.SitesWithGaps) != 2 || s.MissingReadings != 14 || s.GenerationMWh <= 0 {
+		t.Fatalf("incident-day summary %+v", s)
 	}
 }

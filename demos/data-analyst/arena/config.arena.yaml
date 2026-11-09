@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
 #
-# Source of truth for Wrenmoor Energy's grid data analyst: a function agent
-# for load and consumption questions, fired daily for a digest, and reachable
+# Source of truth for Wrenmoor Energy's grid analyst: a function agent
+# for generation and energy-mix questions, fired daily for a digest, and reachable
 # over A2A by the on-call incident agent.
 #
 # Regenerate with: hack/build-packs.sh data-analyst
@@ -19,13 +19,13 @@ spec:
 
   # Four reads. Nothing here changes anything, and every tool says so.
   tools:
-    - file: tools/list-feeders.tool.yaml
-    - file: tools/get-feeder-load.tool.yaml
-    - file: tools/get-consumption.tool.yaml
+    - file: tools/list-sites.tool.yaml
+    - file: tools/get-site-output.tool.yaml
+    - file: tools/get-energy-mix.tool.yaml
     - file: tools/get-daily-summaries.tool.yaml
 
   scenarios:
-    - file: scenarios/feeder-load.scenario.yaml
+    - file: scenarios/site-output.scenario.yaml
     - file: scenarios/daily-digest.scenario.yaml
 
   defaults:

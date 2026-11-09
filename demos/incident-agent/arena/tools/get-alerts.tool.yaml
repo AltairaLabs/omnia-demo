@@ -7,7 +7,7 @@ spec:
   description: >-
     List alerts from Wrenmoor Energy's platform monitoring, newest first, with
     severity, status, when each fired, how often it has flapped in the last
-    hour, and any grid feeders it affects.
+    hour, and any generation sites it affects.
   input_schema:
     type: object
     properties:
@@ -33,7 +33,7 @@ spec:
             status: { type: string }
             fired_at: { type: string }
             flap_count_last_hour: { type: integer }
-            affected_feeders:
+            affected_sites:
               type: array
               items: { type: string }
   # A read changes nothing, so it is reversible by construction. Declared
@@ -51,4 +51,4 @@ spec:
         status: firing
         fired_at: "2026-11-09T08:14:00Z"
         flap_count_last_hour: 0
-        affected_feeders: [WM-F112, WM-F118]
+        affected_sites: [WM-EDGE, WM-CRAGG]

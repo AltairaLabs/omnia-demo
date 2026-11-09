@@ -5,11 +5,12 @@ metadata:
 spec:
   name: get_daily_summaries
   description: >-
-    Network summaries for every complete day after the cursor, up to
-    yesterday, at most seven days per call: total energy, the most heavily
-    loaded feeder, feeders that peaked at 90% of rating or more, and missing
-    readings. Returns next_cursor, the last day covered; pass it as the cursor
-    next time to carry on from there. An empty cursor returns yesterday only.
+    Generation summaries for every complete day after the cursor, up to
+    yesterday, at most seven days per call: total generation, energy and mix
+    by source, wind and solar capacity factors, what the battery charged, and
+    missing readings with the sites they are from. Returns next_cursor, the
+    last day covered; pass it as the cursor next time to carry on from there.
+    An empty cursor returns yesterday only.
   input_schema:
     type: object
     properties:
@@ -29,13 +30,16 @@ spec:
           type: object
           properties:
             date: { type: string }
-            total_mwh: { type: number }
-            peak_feeder: { type: string }
-            peak_utilisation_pct: { type: number }
-            feeders_over_90pct:
+            generation_mwh: { type: number }
+            by_source_mwh: { type: object }
+            mix_pct: { type: object }
+            wind_capacity_factor_pct: { type: number }
+            solar_capacity_factor_pct: { type: number }
+            battery_charged_mwh: { type: number }
+            missing_readings: { type: integer }
+            sites_with_gaps:
               type: array
               items: { type: string }
-            missing_readings: { type: integer }
   action_scope: { effect: read, reversibility: reversible, data_classes: [grid-operational] }
   mode: mock
   timeout_ms: 30000
@@ -45,8 +49,11 @@ spec:
     caught_up: true
     days:
       - date: "2026-11-09"
-        total_mwh: 1203.6
-        peak_feeder: WM-F121
-        peak_utilisation_pct: 93.4
-        feeders_over_90pct: [WM-F121]
+        generation_mwh: 623.79
+        by_source_mwh: { wind: 551.76, solar: 36.03, battery: 36 }
+        mix_pct: { wind: 88.45, solar: 5.78, battery: 5.77 }
+        wind_capacity_factor_pct: 92.81
+        solar_capacity_factor_pct: 9.76
+        battery_charged_mwh: 40
         missing_readings: 14
+        sites_with_gaps: [WM-CRAGG, WM-EDGE]

@@ -8,12 +8,12 @@ tags:
   - reporting
   - scheduled
 
-approved_by: "Head of Network Analytics, Wrenmoor Energy"
+approved_by: "Head of Generation Analytics, Wrenmoor Energy"
 approval_date: "2026-10-02"
 change_ticket: "WE-CHG-2294"
 
-decision_authority: "Reporting only. It takes no action on the network or the platform."
-data_classification: "Aggregate feeder telemetry. No customer-level data."
+decision_authority: "Reporting only. It takes no action on the sites, the battery or the platform."
+data_classification: "Aggregate site generation and export-meter data. No customer-level data."
 schedule: "Daily digest at 06:00 Europe/London"
 retention: "Digests and session transcripts 90 days"
 

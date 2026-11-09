@@ -2,27 +2,27 @@
 # metadata.governance by hack/build-packs.sh. ASSERTED, not evidence.
 
 intended_purpose: >-
-  Answer load and consumption questions over Wrenmoor Energy's feeder data,
-  and write a daily grid digest for the network operations team.
+  Answer questions about Wrenmoor Energy's generation sites and energy mix,
+  and write a daily generation digest for the operations team.
 
 foreseeable_misuse:
-  - Treating a gap in readings as a loss of supply, or as evidence that customers are off supply
+  - Treating a gap in export readings as lost generation, or a still day as a fault
   - Using its figures for settlement or billing, which run from metered data it does not see
-  - Asking it to forecast or to operate the network; it reports what the data shows
+  - Asking it to forecast, or to dispatch the sites or the battery; it reports what the data shows
 
 # suggests: it reads and reports. Every action on the network or the platform
 # is someone else's, human or agent.
 autonomy_level: suggests
 
-accountable_owner: Wrenmoor Energy Network Analytics
+accountable_owner: Wrenmoor Energy Generation Analytics
 
 operator_role: eu-aiact:AIDeployer
 
-# Reporting over aggregate feeder data. It controls nothing on the grid.
+# Reporting over aggregate generation data. It controls no site and no battery.
 risk_classification: eu-aiact:RiskLevelMinimal
 
 intended_deployment_contexts:
-  - Network operations reporting, internal
+  - Generation and operations reporting, internal
 
 approved_environments:
   - demo

@@ -1,23 +1,23 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
 # The question the incident agent asks over A2A during the meter-ingest
-# incident. WM-F112's readings are missing from 08:30; the pass is reading
-# that as missing data, not as a load drop.
+# incident. Wrenmoor Edge's export readings are missing from 08:30 to 11:30;
+# the pass is reading that as missing data, not as lost generation.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
-  name: feeder-load
+  name: site-output
 spec:
   task_type: grid_analysis
-  description: Load on an affected feeder, with a gap in its readings.
+  description: Output at an affected site, with a gap in its readings.
   turns:
     - role: user
       content: >-
-        {"question": "What does load look like on feeder WM-F112 today, 2026-11-09?"}
+        {"question": "What does output look like at Wrenmoor Edge (WM-EDGE) today, 2026-11-09?"}
       assertions:
         - type: tools_called
           params:
-            tool_names: [get_feeder_load]
-          message: "The analyst should read the feeder's load"
+            tool_names: [get_site_output]
+          message: "The analyst should read the site's output"
         - type: json_valid
           message: "The reply is a single JSON object"
