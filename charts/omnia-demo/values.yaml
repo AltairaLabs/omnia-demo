@@ -418,3 +418,25 @@ sharepoint:
     type: claude
     model: claude-sonnet-4-6
     secretRef: anthropic-api-key
+
+catalogue:
+  # A static page describing every demo tenant and its demos, served on the
+  # dashboard's own host at `path`, behind the dashboard's sign-in. Enable it in
+  # one release only. The page is files/catalogue/index.html.
+  enabled: false
+  path: /demo-catalog
+  image: nginxinc/nginx-unprivileged:1.27.3-alpine
+  # management-api's in-cluster base URL, e.g.
+  # http://omnia-management-api.omnia.svc.cluster.local:8080. nginx checks each
+  # request's session cookie against <authURL>/api/v1/auth/me. Empty serves the
+  # page to anyone, with no sign-in.
+  authURL: ""
+  # Where a caller with no session is sent (relative to the dashboard host).
+  loginPath: /api/v1/auth/login
+  route:
+    enabled: true
+    # The Gateway the dashboard's HTTPRoute uses, e.g.
+    # [{name: omnia-external, namespace: omnia}].
+    parentRefs: []
+    # The dashboard's host, e.g. [omnia.example.com].
+    hostnames: []
