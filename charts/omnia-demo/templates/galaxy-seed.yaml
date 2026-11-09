@@ -6,7 +6,7 @@
 {{- fail "galaxy.memoryAPIURL is required when galaxy.namespace is set: give the workspace memory-api (kubectl get workspace <name> -o jsonpath='{.status.services[*].memoryURL}'); memory.apiURL is the ingestion example's endpoint, not the workspace's" }}
 {{- end }}
 {{- $ns := default .Values.namespace .Values.galaxy.namespace }}
-{{- $memoryAPI := default .Values.memory.apiURL .Values.galaxy.memoryAPIURL }}
+{{- $memoryAPI := default (include "omnia-demo.memoryURL" .) .Values.galaxy.memoryAPIURL }}
 {{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
 # The seed Job runs in the Workspace's namespace: memory-api trusts
 # ServiceAccounts from that namespace only, and the operator writes the
@@ -44,7 +44,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: seeder
-          image: {{ .Values.galaxy.image.repository }}:{{ .Values.galaxy.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.galaxy.image) }}
           imagePullPolicy: {{ .Values.galaxy.image.pullPolicy }}
           args:
             - --memory-api={{ $memoryAPI }}

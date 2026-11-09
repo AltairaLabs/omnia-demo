@@ -54,7 +54,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: {{ .Values.mortgageUnderwriting.image.repository }}:{{ .Values.mortgageUnderwriting.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.mortgageUnderwriting.image) }}
           imagePullPolicy: {{ .Values.mortgageUnderwriting.image.pullPolicy }}
           args: ["serve"]
           ports:
@@ -80,7 +80,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: {{ .Values.mortgageUnderwriting.image.repository }}:{{ .Values.mortgageUnderwriting.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.mortgageUnderwriting.image) }}
           imagePullPolicy: {{ .Values.mortgageUnderwriting.image.pullPolicy }}
           args: ["serve"]
           ports:
@@ -89,6 +89,7 @@ spec:
           readinessProbe:
             httpGet: { path: /healthz, port: http }
 ---
+{{- if or .Values.mortgageUnderwriting.deterministic (not .Values.llm.providerRef) }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: Provider
 metadata:
@@ -110,6 +111,7 @@ spec:
       name: {{ .Values.mortgageUnderwriting.provider.secretRef }}
 {{- end }}
 ---
+{{- end }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolRegistry
 metadata:
@@ -190,7 +192,7 @@ spec:
   providers:
     - name: default
       providerRef:
-        name: mortgage-underwriting-llm
+        name: {{ if .Values.mortgageUnderwriting.deterministic }}mortgage-underwriting-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "mortgage-underwriting-llm") }}{{ end }}
   facades:
     - type: rest
       port: 8080

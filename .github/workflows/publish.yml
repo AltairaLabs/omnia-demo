@@ -55,8 +55,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ matrix.image }}
+          # A v* tag also tags every image with its version, which is the
+          # chart's appVersion: a chart release pulls the images built with it.
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
             type=sha
       - uses: docker/build-push-action@v6
         with:

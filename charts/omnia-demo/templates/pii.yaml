@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: portal
-          image: {{ .Values.piiChat.portal.image.repository }}:{{ .Values.piiChat.portal.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.piiChat.portal.image) }}
           imagePullPolicy: {{ .Values.piiChat.portal.image.pullPolicy }}
           args: ["--agent-url", "http://pii-chat.{{ $ns }}:8080"]
           ports: [{ name: http, containerPort: 8080 }]
@@ -47,7 +47,7 @@ spec:
     spec:
       containers:
         - name: identity
-          image: {{ .Values.piiChat.image.repository }}:{{ .Values.piiChat.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.piiChat.image) }}
           imagePullPolicy: {{ .Values.piiChat.image.pullPolicy }}
           ports: [{ name: http, containerPort: 8080 }]
           readinessProbe: { httpGet: { path: /healthz, port: http } }
@@ -61,6 +61,7 @@ spec:
   selector: { app.kubernetes.io/name: pii-chat-identity }
   ports: [{ name: http, port: 8080, targetPort: http }]
 ---
+{{- if not $.Values.llm.providerRef }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: Provider
 metadata:
@@ -74,6 +75,7 @@ spec:
     secretRef:
       name: {{ .Values.piiChat.provider.secretRef }}
 ---
+{{- end }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolRegistry
 metadata:
@@ -116,14 +118,14 @@ metadata:
   name: pii-chat-privacy
   namespace: {{ $ns }}
 spec:
+  # The CRD's spec is recording.pii and encryption since Omnia #3003
+  # (beta.22): recording.enabled and auditLog were removed because nothing read
+  # them.
   recording:
-    enabled: true
     pii:
       redact: {{ .Values.piiChat.privacy.redact }}
       strategy: {{ .Values.piiChat.privacy.strategy }}
       patterns: {{ .Values.piiChat.privacy.patterns | toJson }}
-  auditLog:
-    enabled: true
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -161,7 +163,7 @@ spec:
   {{- end }}
   providers:
     - name: default
-      providerRef: { name: pii-chat-llm }
+      providerRef: { name: {{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm") }} }
   facades:
     - type: websocket
       port: 8080

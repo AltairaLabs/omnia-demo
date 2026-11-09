@@ -1,0 +1,65 @@
+{{- if .Values.workspace.create }}
+{{- $name := include "omnia-demo.workspaceName" . }}
+# The demo tenant's Workspace. Install the release into the workspace namespace
+# with --create-namespace: Helm owns the namespace, and the operator adopts it
+# (namespace.create: false), so the chart's other resources never race the
+# operator's reconcile.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Workspace
+metadata:
+  name: {{ $name }}
+spec:
+  displayName: {{ default $name .Values.workspace.displayName | quote }}
+  {{- with .Values.workspace.description }}
+  description: {{ . | quote }}
+  {{- end }}
+  environment: {{ .Values.workspace.environment }}
+  namespace:
+    name: {{ .Values.namespace }}
+    create: false
+    {{- with .Values.workspace.namespaceLabels }}
+    labels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  roleBindings:
+    {{- toYaml .Values.workspace.roleBindings | nindent 4 }}
+  {{- if .Values.workspace.runtimeServiceAccount.name }}
+  # Every agent in the workspace, including ones deployed through the API with
+  # no pod overrides, runs as this ServiceAccount: workload identity to a
+  # keyless model Provider needs nothing per agent.
+  runtime:
+    serviceAccountName: {{ .Values.workspace.runtimeServiceAccount.name }}
+    {{- with .Values.workspace.runtimeServiceAccount.podLabels }}
+    podLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- with .Values.workspace.services }}
+  services:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.storage }}
+  storage:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.privacy }}
+  privacy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.costControls }}
+  costControls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if and .Values.workspace.runtimeServiceAccount.name .Values.workspace.runtimeServiceAccount.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.workspace.runtimeServiceAccount.name }}
+  namespace: {{ .Values.namespace }}
+  {{- with .Values.workspace.runtimeServiceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

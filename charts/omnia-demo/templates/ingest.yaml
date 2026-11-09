@@ -1,4 +1,5 @@
 {{- if .Values.memory.enabled }}
+{{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -27,10 +28,10 @@ spec:
             - { name: fixtures, mountPath: /fixtures }
       containers:
         - name: ingest
-          image: {{ .Values.memory.image.repository }}:{{ .Values.memory.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.memory.image) }}
           imagePullPolicy: {{ .Values.memory.image.pullPolicy }}
           env:
-            - { name: MEMORY_API_URL, value: {{ .Values.memory.apiURL | quote }} }
+            - { name: MEMORY_API_URL, value: {{ include "omnia-demo.memoryURL" . | quote }} }
             - { name: WORKSPACE_ID, value: {{ .Values.memory.workspaceID | quote }} }
             - { name: MEMORY_SOURCE, value: {{ .Values.memory.source | quote }} }
             - { name: S3_BUCKET, value: {{ .Values.memory.s3.bucket | quote }} }
@@ -42,11 +43,18 @@ spec:
             - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
 {{- if .Values.memory.auth.secretName }}
             - { name: MEMORY_TOKEN_PATH, value: /var/run/omnia/memory-token/token }
+{{- else if .Values.memory.serviceAuth.enabled }}
+            - { name: MEMORY_TOKEN_PATH, value: {{ $tokenDir }}/token }
 {{- end }}
 {{- if .Values.memory.auth.secretName }}
           volumeMounts:
             - name: memory-token
               mountPath: /var/run/omnia/memory-token
+              readOnly: true
+{{- else if .Values.memory.serviceAuth.enabled }}
+          volumeMounts:
+            - name: session-api-token
+              mountPath: {{ $tokenDir }}
               readOnly: true
 {{- end }}
       volumes:
@@ -59,5 +67,15 @@ spec:
             items:
               - key: {{ .Values.memory.auth.secretKey }}
                 path: token
+{{- else if .Values.memory.serviceAuth.enabled }}
+        # Omnia's internal service auth: a ServiceAccount token bound to the
+        # audience memory-api enforces.
+        - name: session-api-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.memory.serviceAuth.audience }}
+                  expirationSeconds: {{ .Values.memory.serviceAuth.tokenExpirationSeconds }}
 {{- end }}
 {{- end }}

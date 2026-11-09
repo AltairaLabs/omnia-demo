@@ -9,9 +9,52 @@ install this chart:
 
 ```bash
 helm upgrade --install omnia-demo ./charts/omnia-demo \
-  --namespace omnia-demo --create-namespace \
-  --set memory.apiURL=http://<memory-api-service>.<omnia-namespace>:8080
+  --namespace omnia-demo --create-namespace
 ```
+
+`memory.apiURL` defaults to the workspace's memory-api; set it to target
+another.
+
+## One release per tenant
+
+Each release can create its own tenant Workspace and run every demo agent on a
+Provider that already exists in it. For example, a keyless Azure AI Foundry
+Provider with workload identity:
+
+```yaml
+# tenant.yaml
+namespace: larkmere-mutual
+llm:
+  providerRef: azure-foundry-gpt-4o      # no demo creates a Provider of its own
+workspace:
+  create: true
+  displayName: Larkmere Mutual
+  services:
+    - name: default
+      mode: managed
+      session: { database: { secretRef: { name: omnia-postgres } } }
+      memory:
+        database: { secretRef: { name: omnia-postgres-memory } }
+        providerRef: { name: azure-foundry-embedding }   # memory needs one
+  runtimeServiceAccount:                 # every agent runs as this SA
+    name: omnia-runtime-wi
+    annotations: { azure.workload.identity/client-id: <client-id> }
+    podLabels: { azure.workload.identity/use: "true" }
+mortgageUnderwriting: { enabled: true }
+claimsTriage: { enabled: true }
+piiChat: { enabled: true }
+```
+
+```bash
+helm upgrade --install larkmere-mutual oci://ghcr.io/altairalabs/charts/omnia-demo \
+  --version <release-version> -n larkmere-mutual --create-namespace -f tenant.yaml
+```
+
+The Providers and database Secrets named in `tenant.yaml` live in the
+workspace namespace and are the installer's to create: a Workspace cannot use
+another namespace's Provider. Image tags default to the chart's appVersion.
+`memory.apiURL` defaults to the workspace's own memory-api
+(`memory-<workspace>-<workspace.serviceGroup>`).
 
 The chart is intentionally an add-on rather than an umbrella chart. This keeps
 the public repository independent of private Omnia implementation details and
@@ -64,9 +107,8 @@ Workspace's namespace because both things it needs from Omnia live there:
   with the `omnia-session-api` audience (`galaxy.serviceAuth`), from its own
   `omnia-demo-memory-galaxy` ServiceAccount. It needs no RBAC.
 
-`galaxy.memoryAPIURL` is required whenever `galaxy.namespace` is set: the
-fallback, `memory.apiURL`, is the ingestion example's endpoint, not the
-workspace's.
+`galaxy.memoryAPIURL` is required whenever `galaxy.namespace` is set. Without
+it the job targets the release's own workspace memory-api.
 
 With Omnia's `internalServiceAuth.enabled: true` (its default), the job seeds
 only what a workspace ServiceAccount may write. Once Omnia lets any workspace
