@@ -31,7 +31,7 @@ spec:
       timeout: 30s
       tool:
         name: get_alerts
-        description: "List alerts from Wrenmoor Energy's platform monitoring, with severity, status, when each fired, how often it has flapped in the last hour, and any grid feeders it affects."
+        description: "List alerts from Wrenmoor Energy's platform monitoring, with severity, status, when each fired, how often it has flapped in the last hour, and any generation sites it affects."
         inputSchema:
           type: object
           properties:

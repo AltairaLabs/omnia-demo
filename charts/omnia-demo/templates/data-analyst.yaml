@@ -22,10 +22,10 @@ spec:
     maxTokens: {{ $da.provider.maxTokens }}
 {{- end }}
 ---
-# The grid dataset: feeders, half-hourly load, consumption, daily summaries.
-# Same image as the mortgage stubs. Stateless — every figure is a function of
-# the feeder and the date — so unlike wrenmoor-ops it could scale; one is
-# plenty.
+# The generation dataset: the three sites, half-hourly output, the energy mix,
+# daily summaries. Same image as the mortgage stubs. Stateless — every figure
+# is a function of the site, the date and the half-hour — so unlike
+# wrenmoor-ops it could scale; one is plenty.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -124,7 +124,7 @@ spec:
     properties:
       question:
         type: string
-        description: "A load or consumption question, or a request for the daily grid digest."
+        description: "A question about the generation sites or the energy mix, or a request for the daily generation digest."
       cursor:
         type: string
         description: "For the digest: the last day already digested, YYYY-MM-DD, or empty."
@@ -166,8 +166,8 @@ spec:
 # two surfaces.
 #
 # The agent card is what the caller's tool is built from: PromptKit names the
-# tool a2a__<card name>__<skill id>, so "Grid Analyst" and feeder_load give
-# a2a__grid_analyst__feeder_load. Rename either and the tool name moves.
+# tool a2a__<card name>__<skill id>, so "Grid Analyst" and site_output give
+# a2a__grid_analyst__site_output. Rename either and the tool name moves.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: AgentRuntime
 metadata:
@@ -188,16 +188,16 @@ spec:
         agentCard:
           name: Grid Analyst
           organization: Wrenmoor Energy
-          description: "Answers load and consumption questions over Wrenmoor Energy's 11kV feeder data."
-          version: "1.0.0"
+          description: "Answers questions about Wrenmoor Energy's generation sites (Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store) and its energy mix."
+          version: "2.0.0"
           skills:
-            - id: feeder_load
-              name: Feeder load and consumption
-              description: "What load looks like on a feeder on a given day: peak, utilisation against rating, energy, and any missing readings. Also consumption by region or customer class."
-              tags: ["grid", "load", "feeder"]
+            - id: site_output
+              name: Site output and energy mix
+              description: "What output looks like at a generation site on a given day: peak, energy, capacity factor, and any missing export readings. Also the live energy mix, or a day's mix by source."
+              tags: ["generation", "wind", "solar", "battery"]
               examples:
-                - "What does load look like on feeder WM-F112 today?"
-                - "How much energy did Northmoor use on 2026-11-08?"
+                - "What does output look like at Wrenmoor Edge (WM-EDGE) today?"
+                - "What is the energy mix right now?"
   runtime:
     replicas: 1
   providers:

@@ -461,10 +461,10 @@ incidentAgent:
     secretRef: anthropic-api-key
     maxTokens: 2048
 
-  # -- Ask the data analyst over A2A about load on an alert's affected
-  # feeders. Takes effect only with dataAnalyst.enabled and
+  # -- Ask the grid analyst over A2A about output at an alert's affected
+  # generation sites. Takes effect only with dataAnalyst.enabled and
   # dataAnalyst.a2a.enabled; the tool appears as
-  # a2a__grid_analyst__feeder_load.
+  # a2a__grid_analyst__site_output.
   a2a:
     enabled: true
     # Above the analyst's longest turn: a slower call fails here while the
@@ -472,11 +472,12 @@ incidentAgent:
     timeout: 90s
 
 # ---------------------------------------------------------------------------
-# dataAnalyst — Wrenmoor Energy's grid data analyst: a function, a schedule
-# and an A2A peer
+# dataAnalyst — Wrenmoor Energy's grid analyst: a function, a schedule and an
+# A2A peer
 #
-# A FUNCTION with typed input and output for load and consumption questions
-# over a synthetic feeder dataset, fired every morning by a ScheduledFunction
+# A FUNCTION with typed input and output for questions about Wrenmoor Energy's
+# generation sites (Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store) and
+# its energy mix, over a synthetic dataset, fired every morning by a ScheduledFunction
 # that carries a cursor between runs to write a daily digest. With a2a on, the
 # same pack also runs as an agent behind an A2A facade (data-analyst-a2a),
 # because a function-mode AgentRuntime serves only rest and mcp facades and so
@@ -490,7 +491,7 @@ dataAnalyst:
   providerRef: ""
   enabled: false
 
-  # The grid dataset. Same image as the mortgage stubs; deterministic, so the
+  # The generation dataset. Same image as the mortgage stubs; deterministic, so the
   # same question gets the same figures on every take.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
@@ -556,6 +557,66 @@ fieldService:
     strategy: semantic
     limit: 4
 
+# ---------------------------------------------------------------------------
+# wren — Wrenmoor Energy's customer assistant: consent before a contract change
+#
+# A chat agent in the customer portal's side panel (wrenmoorSite). It reads
+# the signed-in customer's bill, half-hourly usage and local weather, quotes
+# tariffs against their own usage, and switches tariff only with their OK:
+# request_consent is a client tool the portal renders as "Needs your OK", and
+# switch_tariff is refused without the consent_id that click creates — by the
+# ToolPolicy before dispatch, and by the account system after it. See
+# charts/omnia-demo/templates/wren-tools.yaml.
+#
+# Requires Omnia Enterprise: ToolPolicy and the policy broker are EE.
+# ---------------------------------------------------------------------------
+wren:
+  # -- A Provider in the namespace for this demo alone. Wins over
+  # llm.providerRef.
+  providerRef: ""
+  enabled: false
+
+  # The account system: Amira's bills, usage, weather, tariffs, and the
+  # consent and receipt routes. Same image as the mortgage stubs
+  # (demos/mortgage-underwriting, wren.go). In memory, so a pod restart puts
+  # Amira back on Moor Steady for the next take.
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
+    # Empty: the chart's appVersion.
+    tag: ""
+    pullPolicy: IfNotPresent
+
+  # Model behind the agent, used only when no providerRef applies.
+  provider:
+    type: claude
+    model: claude-sonnet-4-6
+    secretRef: anthropic-api-key
+    maxTokens: 1024
+
+  # -- How long a "Needs your OK" card waits for the customer's click
+  # (the websocket facade's clientToolTimeout). On timeout the request is
+  # denied and nothing changes.
+  consentTimeout: 5m
+
+# ---------------------------------------------------------------------------
+# wrenmoorSite — Wrenmoor Energy's websites
+#
+# The public site, the customer portal with the Wren panel, and the Wrenmoor
+# Hub intranet: the demo-sites image run with --site wrenmoor-energy. Serve it
+# through the catalogue at /wrenmoor-energy (catalogue.proxies); every URL in
+# the site is relative, so it needs no rewrites. With wren on, the AgentRuntime
+# also gains externalAuth.edgeTrust so the site can proxy the conversation and
+# assert the customer's identity.
+# ---------------------------------------------------------------------------
+wrenmoorSite:
+  enabled: false
+  # Built from demos/demo-sites, the one image for every brand's site.
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-sites
+    # Empty: the chart's appVersion.
+    tag: ""
+    pullPolicy: IfNotPresent
+
 sharepoint:
   # Requires Omnia Enterprise memory ingestion and AgentRuntime CRDs.
   enabled: false
@@ -593,6 +654,8 @@ catalogue:
   #     upstream: http://larkmere-portal.<ns>.svc.cluster.local:8080
   #     rewrites:            # absolute paths the site uses, put under the prefix
   #       - { from: '"/api/assistant/ws"', to: '"/larkmere-mutual/api/assistant/ws"' }
+  #   - path: /wrenmoor-energy  # every URL relative: no rewrites
+  #     upstream: http://wrenmoor-site.<ns>.svc.cluster.local:8080
   proxies: []
   route:
     enabled: true

@@ -34,7 +34,7 @@ spec:
   suspend: {{ $d.suspend }}
   timeoutSeconds: {{ $d.timeoutSeconds }}
   input:
-    question: "Write the daily grid digest for Wrenmoor Energy's network operations team: each day's total energy, the most heavily loaded feeder, any feeder at 90% of rating or more, and any missing readings."
+    question: "Write the daily generation digest for Wrenmoor Energy's operations team: each day's total generation, the mix by source, wind and solar capacity factors, what Heptonstall Store charged, and any missing readings and the sites they are from."
     cursor: {{ $d.initialCursor | quote }}
   state:
     cursorFrom: /cursor

@@ -2,7 +2,8 @@
 {{- $ns := .Values.namespace }}
 {{- $grid := printf "http://wrenmoor-grid-data.%s:8080" $ns }}
 ---
-# Four reads over the grid dataset. Shared by the data-analyst function and
+# Four reads over the generation dataset: Wrenmoor Edge, Cragg Vale Solar and
+# Heptonstall Store, and the energy mix. Shared by the data-analyst function and
 # its A2A twin, so one ToolPolicy covers both.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolRegistry
@@ -13,51 +14,49 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 spec:
   handlers:
-    - name: list-feeders-handler
+    - name: list-sites-handler
       type: http
       timeout: 30s
       tool:
-        name: list_feeders
-        description: "List Wrenmoor Energy's 11kV feeders: id, name, substation, region, rating, customers and customer mix."
+        name: list_sites
+        description: "List Wrenmoor Energy's generation sites: id, name, kind (wind, solar, battery), capacity, storage, units and export meter."
         inputSchema:
           type: object
-          properties:
-            region: { type: string, description: "Only feeders in this region (Northmoor or Southvale)." }
+          properties: {}
       httpConfig:
-        endpoint: {{ $grid }}/grid/feeders
+        endpoint: {{ $grid }}/grid/sites
         method: POST
         contentType: application/json
 
-    - name: get-feeder-load-handler
+    - name: get-site-output-handler
       type: http
       timeout: 30s
       tool:
-        name: get_feeder_load
-        description: "Half-hourly demand on one feeder for one day, with peak, utilisation against rating, energy and missing readings."
+        name: get_site_output
+        description: "Half-hourly output of one site for one day, with peak, energy, capacity factor and missing readings."
         inputSchema:
           type: object
           properties:
-            feeder_id: { type: string, description: "Feeder id, e.g. WM-F112." }
+            site_id: { type: string, description: "Site id, e.g. WM-EDGE." }
             date: { type: string, description: "The day, YYYY-MM-DD." }
-          required: ["feeder_id"]
+          required: ["site_id"]
       httpConfig:
-        endpoint: {{ $grid }}/grid/load
+        endpoint: {{ $grid }}/grid/output
         method: POST
         contentType: application/json
 
-    - name: get-consumption-handler
+    - name: get-energy-mix-handler
       type: http
       timeout: 30s
       tool:
-        name: get_consumption
-        description: "Energy consumed on one day in MWh: total, by customer class and by feeder, for a region or the whole network."
+        name: get_energy_mix
+        description: "The energy mix by source (wind, solar, battery): live in MW without a date, or a day's MWh with one."
         inputSchema:
           type: object
           properties:
-            date: { type: string, description: "The day, YYYY-MM-DD." }
-            region: { type: string, description: "Northmoor or Southvale; omit for the whole network." }
+            date: { type: string, description: "The day, YYYY-MM-DD; omit for the live mix." }
       httpConfig:
-        endpoint: {{ $grid }}/grid/consumption
+        endpoint: {{ $grid }}/grid/mix
         method: POST
         contentType: application/json
 
@@ -66,7 +65,7 @@ spec:
       timeout: 30s
       tool:
         name: get_daily_summaries
-        description: "Network summaries for every complete day after the cursor, up to yesterday, at most seven per call, with next_cursor to carry on from."
+        description: "Generation summaries for every complete day after the cursor, up to yesterday, at most seven per call, with next_cursor to carry on from."
         inputSchema:
           type: object
           properties:

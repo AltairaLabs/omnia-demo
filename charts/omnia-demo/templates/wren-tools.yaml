@@ -1,0 +1,189 @@
+{{- if .Values.wren.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $acct := printf "http://wren-account.%s:8080" $ns }}
+---
+# Wren's tool surface, as the design handoff names it:
+#
+#   reads           read_bill, read_usage, get_weather, quote_tariff
+#   client          request_consent   the portal's "Needs your OK" card
+#   write           switch_tariff     a contract change: needs consent
+#
+# The descriptions and schemas here are the BINDING, not what the model reads.
+# PromptKit builds the model's tool descriptors from the pack
+# (demos/wren/arena/tools/), including the action_scope the policy reads.
+# Kept in step anyway, because a drifted schema here breaks dispatch.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: wren-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: read-bill-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: read_bill
+        description: "Read one of the signed-in customer's bills, with line items and the change on the previous month, and the account's current tariff."
+        inputSchema:
+          type: object
+          properties:
+            period: { type: string, description: "The billing month, YYYY-MM (default the latest, 2026-10)." }
+      httpConfig:
+        endpoint: {{ $acct }}/wren/bill
+        method: POST
+        contentType: application/json
+
+    - name: read-usage-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: read_usage
+        description: "Read the signed-in customer's half-hourly smart-meter data for the last N days (max 60), summarised by day with the overnight share."
+        inputSchema:
+          type: object
+          properties:
+            days: { type: integer, description: "How many days back from today, 1 to 60 (default 60)." }
+      httpConfig:
+        endpoint: {{ $acct }}/wren/usage
+        method: POST
+        contentType: application/json
+
+    - name: get-weather-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: get_weather
+        description: "Daily overnight minimum temperature and wind on Wrenmoor Edge for a postcode district in Wrenmoor Energy's area (HX7)."
+        inputSchema:
+          type: object
+          properties:
+            postcode: { type: string, description: "Postcode or district, e.g. HX7." }
+            from: { type: string, description: "First day, YYYY-MM-DD." }
+            to: { type: string, description: "Last day, YYYY-MM-DD." }
+      httpConfig:
+        endpoint: {{ $acct }}/wren/weather
+        method: POST
+        contentType: application/json
+
+    - name: quote-tariff-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: quote_tariff
+        description: "Price a tariff against the signed-in customer's own October half-hourly usage. Changes nothing."
+        inputSchema:
+          type: object
+          properties:
+            tariff: { type: string, enum: ["moor-steady", "moor-flex"], description: "The tariff to price." }
+      httpConfig:
+        endpoint: {{ $acct }}/wren/quote
+        method: POST
+        contentType: application/json
+
+    # A CLIENT tool: the facade sends the call to the browser, the portal
+    # renders it as the "Needs your OK" card, and the customer's click is the
+    # result. "Switch me" returns {approved, consent_id}; "Not now" nacks the
+    # call, which the session records as denied. Client tools never reach the
+    # policy broker, so the ToolPolicy below does not govern this one; it
+    # governs what may happen after it.
+    - name: request-consent-handler
+      type: client
+      tool:
+        name: request_consent
+        description: "Ask the customer, in their portal, to agree to a change on their account before you make it. Returns approved with a consent_id when they agree; denied when they decline."
+        inputSchema:
+          type: object
+          properties:
+            action: { type: string, enum: ["switch_tariff"], description: "The change you are asking to make." }
+            tariff: { type: string, enum: ["moor-steady", "moor-flex"], description: "The tariff to switch to." }
+            effective_date: { type: string, description: "When the change takes effect, YYYY-MM-DD." }
+            summary: { type: string, description: "One plain sentence describing the change and what it costs to leave." }
+            how_to_reverse: { type: string, description: "One plain sentence on how the customer can undo it." }
+          required: ["action", "tariff", "effective_date", "summary", "how_to_reverse"]
+        outputSchema:
+          type: object
+          properties:
+            approved: { type: boolean }
+            consent_id: { type: string }
+            tariff: { type: string }
+            effective_date: { type: string }
+
+    - name: switch-tariff-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: switch_tariff
+        description: "Switch the signed-in customer's tariff from a future date, on the consent_id request_consent returned."
+        inputSchema:
+          type: object
+          properties:
+            tariff: { type: string, enum: ["moor-steady", "moor-flex"], description: "The tariff to switch to." }
+            effective_date: { type: string, description: "When the change takes effect, YYYY-MM-DD." }
+            consent_id: { type: string, description: "The consent_id from request_consent, exactly as returned." }
+          required: ["tariff", "effective_date", "consent_id"]
+      httpConfig:
+        endpoint: {{ $acct }}/wren/switch
+        method: POST
+        contentType: application/json
+---
+# THE CONTROL: a contract change needs the customer's consent.
+#
+# What the broker can see, and what it cannot. A ToolPolicy evaluates ONE call:
+# its arguments, the caller's identity, and the tool's declared action_scope.
+# It cannot see earlier calls in the session, so it cannot ask "did
+# request_consent come back approved?" — and request_consent, a client tool,
+# never passes through the broker at all.
+#
+# So the gate is in two halves, and neither is the prompt:
+#
+#   1. HERE, before dispatch: any tool that declares itself a write is refused
+#      unless the call carries a consent_id. Keyed on the declared effect, not
+#      on the tool's name, so a second write added next quarter is gated the
+#      day it declares itself one. An undeclared tool is refused outright.
+#   2. In the account system (wren-account, /wren/switch): the consent_id must
+#      be one the customer created by clicking "Switch me" — issued to this
+#      customer (X-Omnia-User-Id), for this tariff and date, and unused. The
+#      model can put any string in an argument; it cannot make one of these.
+#
+# Half 1 alone would be argument hygiene: a model that invented an id would
+# pass it. Half 2 is what makes the click the only way through.
+#
+# Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: wren-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: wren-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: writeWithoutConsent
+      type: cel
+      cel: 'tool.declared && tool.effect != "read" && (!has(body.consent_id) || string(body.consent_id) == "")'
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+  policy: |
+    @id("permit-wren-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"wren-tools");
+
+    // WE-CX-03: contract changes require the account holder's explicit consent.
+    @id("deny-write-without-consent")
+    @message("This changes the customer's account, so it needs their explicit OK first: call request_consent and pass the consent_id it returns. Nothing has been changed. (Wrenmoor Energy control WE-CX-03.)")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.writeWithoutConsent };
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so Wren may not call it. (Wrenmoor Energy control WE-CX-03.)")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
+{{- end }}

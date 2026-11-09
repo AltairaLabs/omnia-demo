@@ -114,7 +114,8 @@ spec:
       port: 8080
       handler: runtime
 {{- if and $ia.a2a.enabled .Values.dataAnalyst.enabled .Values.dataAnalyst.a2a.enabled }}
-  # The grid analyst, called over A2A when an alert names affected feeders.
+  # The grid analyst, called over A2A when an alert names affected generation
+  # sites.
   #
   # The target is data-analyst-a2a, the analyst's pack behind an A2A facade,
   # not the data-analyst function itself: a function-mode AgentRuntime serves
@@ -122,7 +123,7 @@ spec:
   # with no a2a facade as unresolved.
   #
   # exposeAsTools turns each skill on the analyst's agent card into a tool
-  # named a2a__<card name>__<skill id>: a2a__grid_analyst__feeder_load. It is
+  # named a2a__<card name>__<skill id>: a2a__grid_analyst__site_output. It is
   # an implicit PromptKit capability, so the pack's allow-list need not name
   # it — and it is not in the ToolRegistry, so the ToolPolicy below does not
   # govern it. That is right for a read; the analyst's own registry is

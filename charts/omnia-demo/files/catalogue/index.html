@@ -114,13 +114,19 @@
 <section class="tenant" id="wrenmoor-energy">
   <div class="tenant-head">
     <h2>Wrenmoor Energy</h2>
-    <span class="role">Utility and grid operator</span>
+    <span class="role">Wind and solar supplier</span>
     <a href="/agents?workspace=wrenmoor-energy">Open workspace &rarr;</a>
   </div>
-  <p class="story">Operations, quality and cost: agents that act on live systems, evaluated across models, inside a budget that holds.</p>
+  <p class="story">Operations, quality and cost: agents that act on live systems, evaluated across models, inside a budget that holds. See it as a customer on the <a href="/wrenmoor-energy/">Wrenmoor Energy website</a>.</p>
   <table>
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
+      <tr>
+        <td class="name"><a href="/wrenmoor-energy/ui_kits/portal/">Wren, the customer assistant</a></td>
+        <td>A customer asks why their bill went up in the <a href="/wrenmoor-energy/ui_kits/portal/">Wrenmoor Energy portal</a>. Wren reads the bill, the half-hourly usage and the weather, shows what it checked, and finds a cheaper tariff. Switching needs the customer's "Switch me": without the consent that click creates, the policy and the account system both refuse it. Staff see the same agents in the <a href="/wrenmoor-energy/ui_kits/intranet/">Wrenmoor Hub intranet</a>.</td>
+        <td><span class="cap">Client tools</span><span class="cap">Consent before a write</span><span class="cap">Edge-trust identity</span></td>
+        <td class="status live">Live</td>
+      </tr>
       <tr>
         <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">On-call incident agent</a></td>
         <td>Reads alerts, logs and deploy history, diagnoses an incident, and can roll back or scale. Reversible actions go through; irreversible ones are refused by policy, and a human must take them.</td>
@@ -134,8 +140,8 @@
         <td class="status live">Live</td>
       </tr>
       <tr>
-        <td class="name"><a href="/functions?workspace=wrenmoor-energy">Data analyst and daily digest</a></td>
-        <td>Load and consumption questions as a function, plus a 06:00 scheduled digest that carries its position between runs. The incident agent asks it about an affected feeder over A2A.</td>
+        <td class="name"><a href="/functions?workspace=wrenmoor-energy">Grid analyst and daily digest</a></td>
+        <td>Questions about Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store and the live energy mix as a function, plus a 06:00 scheduled digest that carries its position between runs. The incident agent asks it about an affected site over A2A.</td>
         <td><span class="cap">Scheduled functions</span><span class="cap">A2A</span></td>
         <td class="status live">Live</td>
       </tr>

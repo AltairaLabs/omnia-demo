@@ -71,30 +71,44 @@ its own Provider only, not to `llm.providerRef`.
 
 ## The Wrenmoor Energy demos
 
-Wrenmoor Energy, the utility and grid operator, has three agents:
+Wrenmoor Energy, the wind and solar supplier, has four agents and a website:
+
+- `wren` — Wren, the customer assistant (chat), in the customer portal's
+  side panel. It reads the customer's bill, half-hourly usage and weather,
+  quotes tariffs, and switches tariff only with the customer's OK:
+  `request_consent` is a client tool the portal renders as "Needs your OK",
+  and `switch_tariff` is refused without the `consent_id` that click creates,
+  by the ToolPolicy before dispatch and by the account system after it.
+- `wrenmoorSite` — the public website, the customer portal and the Wrenmoor
+  Hub intranet (`demos/demo-sites`, `--site wrenmoor-energy`). Serve it
+  through the catalogue at `/wrenmoor-energy`; it needs no rewrites.
 
 - `incidentAgent` — the on-call incident agent (chat). It reads alerts, logs
   and deploy history, rolls back and scales. Its ToolPolicy forbids any tool
   whose declared `action_scope.reversibility` is `irreversible`, or that
   declares nothing: namespace deletion and database failover are in its
   registry, and refused by what they declare, not by name.
-- `dataAnalyst` — a function (`POST /functions/data-analyst`) for load and
-  consumption questions over a synthetic feeder dataset, fired at 06:00
+- `dataAnalyst` — the grid analyst, a function (`POST /functions/data-analyst`)
+  for questions about Wrenmoor Edge (wind, 29 MW), Cragg Vale Solar (18 MW),
+  Heptonstall Store (a 40 MWh battery) and the live energy mix, fired at 06:00
   Europe/London by the `grid-daily-digest` ScheduledFunction, which carries a
   cursor between runs. With `dataAnalyst.a2a.enabled` the same pack also runs
   as `data-analyst-a2a` behind an A2A facade, and the incident agent calls it
-  as `a2a__grid_analyst__feeder_load` (a function-mode agent cannot serve A2A
+  as `a2a__grid_analyst__site_output` (a function-mode agent cannot serve A2A
   itself).
 - `fieldService` — the field-service copilot (chat), answering from the field
   manuals in `files/fixtures/wrenmoor-field-procedures/`. They reach it as
   institutional memory: enable `memory` with
   `memory.fixtures: wrenmoor-field-procedures`.
 
-The incident agent and the data analyst use the stub image the Larkmere demos
-use; it serves Wrenmoor Energy's `/ops` and `/grid` endpoints too.
+Wren, the incident agent and the data analyst use the stub image the Larkmere
+demos use; it serves Wrenmoor Energy's `/wren`, `/ops` and `/grid` endpoints
+too.
 
 ```yaml
 # wrenmoor-energy.yaml, on top of the tenant values above
+wren: { enabled: true }
+wrenmoorSite: { enabled: true }
 incidentAgent: { enabled: true }
 dataAnalyst: { enabled: true }
 fieldService: { enabled: true }
