@@ -13,3 +13,6 @@ promptarena validate demos/pii-chat/arena/config.arena.yaml
 The project needs an Omnia Enterprise AgentRuntime to run. Provider
 credentials and platform deployment manifests are supplied by the operator,
 not stored here.
+
+[RUNBOOK.md](RUNBOOK.md) covers installing, running and recording the demo with
+the `omnia-demo` chart.
