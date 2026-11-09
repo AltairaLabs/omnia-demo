@@ -1,5 +1,10 @@
 {{- if .Values.memory.enabled }}
 {{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
+{{- $s3 := .Values.memory.minio.enabled }}
+# Ingests the fixture documents as institutional memory. By default straight
+# from the fixtures ConfigMap (SOURCE_DIR). With memory.minio.enabled it shows
+# the S3 path instead: the fixtures are uploaded to an in-cluster MinIO and the
+# ingestion service reads them back out of the bucket.
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -14,9 +19,10 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      {{- if $s3 }}
       initContainers:
         - name: upload-fixtures
-          image: quay.io/minio/mc:RELEASE.2024-06-13T17-11-24Z
+          image: {{ .Values.memory.minio.mcImage }}
           command: ["/bin/sh", "-c"]
           args:
             - |
@@ -26,6 +32,7 @@ spec:
               mc cp /fixtures/*.md local/{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }}
           volumeMounts:
             - { name: fixtures, mountPath: /fixtures }
+      {{- end }}
       containers:
         - name: ingest
           image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.memory.image) }}
@@ -34,6 +41,7 @@ spec:
             - { name: MEMORY_API_URL, value: {{ include "omnia-demo.memoryURL" . | quote }} }
             - { name: WORKSPACE_ID, value: {{ default (include "omnia-demo.workspaceName" .) .Values.memory.workspaceID | quote }} }
             - { name: MEMORY_SOURCE, value: {{ .Values.memory.source | quote }} }
+            {{- if $s3 }}
             - { name: S3_BUCKET, value: {{ .Values.memory.s3.bucket | quote }} }
             - { name: S3_PREFIX, value: {{ .Values.memory.s3.prefix | quote }} }
             - { name: S3_REGION, value: {{ .Values.memory.s3.region | quote }} }
@@ -41,33 +49,34 @@ spec:
             - { name: S3_FORCE_PATH_STYLE, value: {{ .Values.memory.s3.forcePathStyle | quote }} }
             - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.memory.minio.accessKey | quote }} }
             - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
-{{- if .Values.memory.auth.secretName }}
+            {{- else }}
+            - { name: SOURCE_DIR, value: /fixtures }
+            {{- end }}
+            {{- if .Values.memory.auth.secretName }}
             - { name: MEMORY_TOKEN_PATH, value: /var/run/omnia/memory-token/token }
-{{- else if .Values.memory.serviceAuth.enabled }}
+            {{- else if .Values.memory.serviceAuth.enabled }}
             - { name: MEMORY_TOKEN_PATH, value: {{ $tokenDir }}/token }
-{{- end }}
-{{- if .Values.memory.auth.secretName }}
+            {{- end }}
           volumeMounts:
-            - name: memory-token
-              mountPath: /var/run/omnia/memory-token
-              readOnly: true
-{{- else if .Values.memory.serviceAuth.enabled }}
-          volumeMounts:
-            - name: session-api-token
-              mountPath: {{ $tokenDir }}
-              readOnly: true
-{{- end }}
+            {{- if not $s3 }}
+            - { name: fixtures, mountPath: /fixtures, readOnly: true }
+            {{- end }}
+            {{- if .Values.memory.auth.secretName }}
+            - { name: memory-token, mountPath: /var/run/omnia/memory-token, readOnly: true }
+            {{- else if .Values.memory.serviceAuth.enabled }}
+            - { name: session-api-token, mountPath: {{ $tokenDir }}, readOnly: true }
+            {{- end }}
       volumes:
         - name: fixtures
           configMap: { name: omnia-demo-memory-fixtures }
-{{- if .Values.memory.auth.secretName }}
+        {{- if .Values.memory.auth.secretName }}
         - name: memory-token
           secret:
             secretName: {{ .Values.memory.auth.secretName }}
             items:
               - key: {{ .Values.memory.auth.secretKey }}
                 path: token
-{{- else if .Values.memory.serviceAuth.enabled }}
+        {{- else if .Values.memory.serviceAuth.enabled }}
         # Omnia's internal service auth: a ServiceAccount token bound to the
         # audience memory-api enforces.
         - name: session-api-token
@@ -77,5 +86,5 @@ spec:
                   path: token
                   audience: {{ .Values.memory.serviceAuth.audience }}
                   expirationSeconds: {{ .Values.memory.serviceAuth.tokenExpirationSeconds }}
-{{- end }}
+        {{- end }}
 {{- end }}

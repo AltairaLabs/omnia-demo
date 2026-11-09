@@ -74,9 +74,14 @@ memory:
     region: us-east-1
     endpoint: http://memory-s3:9000
     forcePathStyle: "true"
+  # Off by default: the ingest Job reads the fixtures straight from their
+  # ConfigMap. On, it demonstrates the S3 path through an in-cluster MinIO.
+  # MinIO's public images on quay.io and Docker Hub are now gated, so point
+  # these at a mirror you can pull before turning it on.
   minio:
-    enabled: true
+    enabled: false
     image: quay.io/minio/minio:RELEASE.2024-06-13T22-53-53Z
+    mcImage: quay.io/minio/mc:RELEASE.2024-06-13T17-11-24Z
     accessKey: minioadmin
     secretKey: minioadmin
 

@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command memory-ingestion is a small, source-only example of an ingestion
-// service. It reads text-like objects from S3 and sends documents to Omnia's
-// institutional batch-ingest API. It never connects to the memory database.
+// service. It reads text-like objects from S3, or text-like files from a local
+// directory (SOURCE_DIR, for example a mounted ConfigMap), and sends documents to
+// Omnia's institutional batch-ingest API. It never connects to the memory
+// database.
 package main
 
 import (
@@ -37,7 +39,7 @@ type objectStore interface {
 }
 
 type config struct {
-	memoryURL, workspace, bucket, prefix, source, tokenPath string
+	memoryURL, workspace, bucket, prefix, source, tokenPath, dir string
 }
 
 type document struct {
@@ -69,6 +71,13 @@ func main() {
 	}
 
 	ctx := context.Background()
+	if cfg.dir != "" {
+		if err := syncDir(ctx, cfg, http.DefaultClient, log); err != nil {
+			log.Error("sync failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(env("S3_REGION", "us-east-1")))
 	if err != nil {
 		log.Error("load AWS configuration", "error", err)
@@ -91,8 +100,13 @@ func loadConfig() (config, error) {
 		memoryURL: env("MEMORY_API_URL", ""), workspace: env("WORKSPACE_ID", ""),
 		bucket: env("S3_BUCKET", ""), prefix: env("S3_PREFIX", ""),
 		source: env("MEMORY_SOURCE", "s3"), tokenPath: env("MEMORY_TOKEN_PATH", ""),
+		dir: env("SOURCE_DIR", ""),
 	}
-	for name, value := range map[string]string{"MEMORY_API_URL": c.memoryURL, "WORKSPACE_ID": c.workspace, "S3_BUCKET": c.bucket} {
+	required := map[string]string{"MEMORY_API_URL": c.memoryURL, "WORKSPACE_ID": c.workspace}
+	if c.dir == "" {
+		required["S3_BUCKET"] = c.bucket
+	}
+	for name, value := range required {
 		if value == "" {
 			return config{}, fmt.Errorf("%s is required", name)
 		}
@@ -137,6 +151,49 @@ func sync(ctx context.Context, store objectStore, cfg config, client *http.Clien
 		return err
 	}
 	log.Info("sync complete", "bucket", cfg.bucket, "prefix", cfg.prefix, "documents", len(present.Keys))
+	return nil
+}
+
+// syncDir ingests every text-like file directly in cfg.dir, then sends the
+// manifest so memory-api forgets documents no longer present. Entries whose
+// names start with "." are skipped: a mounted ConfigMap keeps its real files
+// under "..data" and exposes them as symlinks, which os.ReadFile follows.
+func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Logger) error {
+	entries, err := os.ReadDir(cfg.dir)
+	if err != nil {
+		return fmt.Errorf("read source directory: %w", err)
+	}
+	present := &manifest{Kind: "document", Keys: []string{}}
+	batch := make([]document, 0, batchSize)
+	for _, entry := range entries {
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") || entry.IsDir() || !textLike(name) {
+			continue
+		}
+		body, err := os.ReadFile(filepath.Join(cfg.dir, name))
+		if err != nil {
+			log.Warn("skip file", "name", name, "error", err)
+			continue
+		}
+		if len(body) > maxObjectBytes {
+			log.Warn("skip file", "name", name, "error", "exceeds size limit")
+			continue
+		}
+		url := "file://" + cfg.source + "/" + name
+		present.Keys = append(present.Keys, url)
+		hash := sha256.Sum256(body)
+		batch = append(batch, document{Title: name, URL: url, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])})
+		if len(batch) == batchSize {
+			if err := post(ctx, client, cfg, batch, nil); err != nil {
+				return err
+			}
+			batch = batch[:0]
+		}
+	}
+	if err := post(ctx, client, cfg, batch, present); err != nil {
+		return err
+	}
+	log.Info("sync complete", "dir", cfg.dir, "documents", len(present.Keys))
 	return nil
 }
 
