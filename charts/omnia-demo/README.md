@@ -69,6 +69,40 @@ Omnia needs a queue backend (Redis). Provider tuning in a demo's `provider`
 block (`maxTokens`, `streamIdleTimeout`, `thinkingBudgetTokens`) applies to
 its own Provider only, not to `llm.providerRef`.
 
+## The Wrenmoor Energy demos
+
+Wrenmoor Energy, the utility and grid operator, has three agents:
+
+- `incidentAgent` — the on-call incident agent (chat). It reads alerts, logs
+  and deploy history, rolls back and scales. Its ToolPolicy forbids any tool
+  whose declared `action_scope.reversibility` is `irreversible`, or that
+  declares nothing: namespace deletion and database failover are in its
+  registry, and refused by what they declare, not by name.
+- `dataAnalyst` — a function (`POST /functions/data-analyst`) for load and
+  consumption questions over a synthetic feeder dataset, fired at 06:00
+  Europe/London by the `grid-daily-digest` ScheduledFunction, which carries a
+  cursor between runs. With `dataAnalyst.a2a.enabled` the same pack also runs
+  as `data-analyst-a2a` behind an A2A facade, and the incident agent calls it
+  as `a2a__grid_analyst__feeder_load` (a function-mode agent cannot serve A2A
+  itself).
+- `fieldService` — the field-service copilot (chat), answering from the field
+  manuals in `files/fixtures/wrenmoor-field-procedures/`. They reach it as
+  institutional memory: enable `memory` with
+  `memory.fixtures: wrenmoor-field-procedures`.
+
+The incident agent and the data analyst use the stub image the Larkmere demos
+use; it serves Wrenmoor Energy's `/ops` and `/grid` endpoints too.
+
+```yaml
+# wrenmoor-energy.yaml, on top of the tenant values above
+incidentAgent: { enabled: true }
+dataAnalyst: { enabled: true }
+fieldService: { enabled: true }
+memory:
+  enabled: true
+  fixtures: wrenmoor-field-procedures
+```
+
 Runbooks: [mortgage underwriting](../../demos/mortgage-underwriting/RUNBOOK.md),
 [PII chat](../../demos/pii-chat/RUNBOOK.md). The packs are compiled from
 `demos/<demo>/arena` by `hack/build-packs.sh`.

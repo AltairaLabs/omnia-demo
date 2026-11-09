@@ -1,0 +1,212 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "data-analyst",
+  "name": "data-analyst",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "grid_analysis": {
+      "id": "grid_analysis",
+      "name": "grid-analyst",
+      "description": "Answers load and consumption questions over Wrenmoor Energy's feeder data, and writes the daily grid digest.",
+      "version": "1.0.0",
+      "system_template": "You are the grid data analyst for Wrenmoor Energy, a utility and grid\noperator. You answer questions about load and consumption on its 11kV\nfeeders from the data your tools return, and nothing else.\n\nA request is usually a JSON object with a \"question\" and, for the daily\ndigest, a \"cursor\". A plain-text request is the question itself.\n\nAnswering a question:\n- Use list_feeders to find feeder ids, get_feeder_load for one feeder's\n  day, and get_consumption for energy by region or customer class.\n- Quote figures with units (MW, MWh, % of rating) and the date they are\n  for. Do not estimate a figure a tool did not return.\n- A missing reading means no data arrived. Say how many are missing and\n  when; never report a gap as a drop in load or as customers off supply.\n\nThe daily digest (the question asks for it, or a cursor is given):\n- Call get_daily_summaries with the cursor exactly as given, empty if none.\n- Summarise each day returned: total energy, the most heavily loaded\n  feeder, any feeder at 90% of rating or more, and any missing readings.\n- If no days are returned, say there is nothing new since the cursor.\n\nYour FINAL reply is a single JSON object and nothing else:\n\n  {\"answer\": \"...\", \"findings\": [\"...\", \"...\"], \"cursor\": \"...\"}\n\n\"answer\" is two to four sentences. \"findings\" lists the specific figures\nbehind it, one per item. \"cursor\" is next_cursor from get_daily_summaries\nwhen you called it; otherwise the cursor you were given, or \"\" if none.\nNo markdown and no text around the object.\n",
+      "tools": [
+        "list_feeders",
+        "get_feeder_load",
+        "get_consumption",
+        "get_daily_summaries"
+      ],
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.1
+      }
+    }
+  },
+  "tools": {
+    "get_consumption": {
+      "name": "get_consumption",
+      "description": "Energy consumed on one day, in MWh: the total, the split by customer class (domestic, commercial, industrial) and the figure for each feeder, for one region or for the whole network.",
+      "parameters": {
+        "properties": {
+          "date": {
+            "description": "The day, YYYY-MM-DD (default 2026-11-09)",
+            "type": "string"
+          },
+          "region": {
+            "description": "Northmoor or Southvale; omit for the whole network",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "get_daily_summaries": {
+      "name": "get_daily_summaries",
+      "description": "Network summaries for every complete day after the cursor, up to yesterday, at most seven days per call: total energy, the most heavily loaded feeder, feeders that peaked at 90% of rating or more, and missing readings. Returns next_cursor, the last day covered; pass it as the cursor next time to carry on from there. An empty cursor returns yesterday only.",
+      "parameters": {
+        "properties": {
+          "cursor": {
+            "description": "The last day already digested, YYYY-MM-DD, or empty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cursor"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "get_feeder_load": {
+      "name": "get_feeder_load",
+      "description": "Half-hourly demand on one feeder for one day: 48 readings in MW, the peak and when it fell, peak utilisation against the feeder's rating, energy delivered in MWh, and how many readings are missing. A missing reading is null, which means no data arrived, not that load was zero.",
+      "parameters": {
+        "properties": {
+          "date": {
+            "description": "The day, YYYY-MM-DD (default 2026-11-09)",
+            "type": "string"
+          },
+          "feeder_id": {
+            "description": "Feeder id, e.g. WM-F112",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feeder_id"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "list_feeders": {
+      "name": "list_feeders",
+      "description": "List Wrenmoor Energy's 11kV feeders: id, name, substation, region, thermal rating in MW, customers connected and the customer mix by class.",
+      "parameters": {
+        "properties": {
+          "region": {
+            "description": "Only feeders in this region (Northmoor or Southvale)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-1.5.2",
+    "created_at": "2026-11-09T16:46:38Z",
+    "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "bb87317873a1f1ee72e218997bb12a20d9dc92ca",
+      "working_tree_clean": true,
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-09T16:41:40Z",
+      "source_describe": "bb87317-dirty"
+    },
+    "asserted": {
+      "domain": "energy-utilities",
+      "tags": [
+        "grid-analytics",
+        "reporting",
+        "scheduled"
+      ],
+      "approved_by": "Head of Network Analytics, Wrenmoor Energy",
+      "approval_date": "2026-10-02",
+      "change_ticket": "WE-CHG-2294",
+      "decision_authority": "Reporting only. It takes no action on the network or the platform.",
+      "data_classification": "Aggregate feeder telemetry. No customer-level data.",
+      "schedule": "Daily digest at 06:00 Europe/London",
+      "retention": "Digests and session transcripts 90 days",
+      "review_due": "2027-04-02",
+      "review_trigger": "A new data source, or any tool that writes"
+    },
+    "governance": {
+      "intended_purpose": "Answer load and consumption questions over Wrenmoor Energy's feeder data, and write a daily grid digest for the network operations team.",
+      "foreseeable_misuse": [
+        "Treating a gap in readings as a loss of supply, or as evidence that customers are off supply",
+        "Using its figures for settlement or billing, which run from metered data it does not see",
+        "Asking it to forecast or to operate the network; it reports what the data shows"
+      ],
+      "autonomy_level": "suggests",
+      "accountable_owner": "Wrenmoor Energy Network Analytics",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:RiskLevelMinimal",
+      "intended_deployment_contexts": [
+        "Network operations reporting, internal"
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": false
+    }
+  }
+}

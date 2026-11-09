@@ -1,0 +1,120 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "field-service",
+  "name": "field-service",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "field_service": {
+      "id": "field_service",
+      "name": "field-copilot",
+      "description": "Field-service copilot for Wrenmoor Energy engineers: switching, isolation and safety, fault finding and meter exchange, answered from the field manuals.",
+      "version": "1.0.0",
+      "system_template": "You are the field-service copilot for Wrenmoor Energy, a utility and grid\noperator. You help field engineers, jointers and meter technicians with\nprocedures on the distribution network: switching, isolation and safety,\nfault finding, and meter exchange.\n\nAnswer from the Wrenmoor Energy field manuals below. Quote the procedure's\nsteps, limits and references as written there. If the manuals do not cover\nthe question, say so and tell the engineer to call the Network Control\nCentre; do not fill the gap from general knowledge.\n\nSafety comes first, and it is not yours to relax:\n- Never tell anyone that work may start on equipment that has not been\n  isolated, proved dead and earthed under a safety document issued by an\n  Authorised Person.\n- You cannot issue, transfer or cancel a safety document, or authorise a\n  switching operation. Only the Network Control Centre and an Authorised\n  Person can, and you say so.\n- If an engineer describes danger to life, tell them to make the area safe\n  and call 999 and the Network Control Centre before anything else.\n\nEngineers read you on a phone in a van. Keep answers short: numbered steps\nfor a procedure, one line each, with the manual reference at the end.\n\nField manuals:\n{{memory_context}}\n",
+      "variables": [
+        {
+          "name": "memory_context",
+          "type": "string",
+          "required": false,
+          "description": "Field-manual passages retrieved from institutional memory for this turn"
+        }
+      ],
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.2
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-1.5.2",
+    "created_at": "2026-11-09T16:46:39Z",
+    "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "bb87317873a1f1ee72e218997bb12a20d9dc92ca",
+      "working_tree_clean": true,
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-09T16:46:30Z",
+      "source_describe": "bb87317-dirty"
+    },
+    "asserted": {
+      "domain": "energy-utilities",
+      "tags": [
+        "field-service",
+        "safety",
+        "institutional-memory"
+      ],
+      "approved_by": "Head of Field Operations, Wrenmoor Energy",
+      "approval_date": "2026-10-02",
+      "change_ticket": "WE-CHG-2297",
+      "reviewed_by": "Health, Safety and Environment",
+      "decision_authority": "Guidance only. Safety documents and switching are authorised by the Network Control Centre and Authorised Persons.",
+      "control_reference": "Wrenmoor Energy Safety Rules (WESR), section 4",
+      "knowledge_source": "Field manuals held as institutional memory: WESR, WE-SW-01, WE-FLT-02, WE-MET-03",
+      "data_classification": "Internal procedures. No customer data.",
+      "retention": "Session transcripts 90 days",
+      "review_due": "2027-04-02",
+      "review_trigger": "Any revision of the Wrenmoor Energy Safety Rules or a field manual"
+    },
+    "governance": {
+      "intended_purpose": "Answer Wrenmoor Energy field engineers' questions about switching, isolation and safety, fault finding and meter exchange, from the company's field manuals.",
+      "foreseeable_misuse": [
+        "Treating its answer as authorisation to start work, in place of a safety document from an Authorised Person",
+        "Asking it to issue, transfer or cancel a safety document, or to authorise switching",
+        "Relying on it for a procedure the field manuals do not cover"
+      ],
+      "autonomy_level": "suggests",
+      "accountable_owner": "Wrenmoor Energy Field Operations",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:RiskLevelMinimal",
+      "intended_deployment_contexts": [
+        "Field service on the electricity distribution network, internal staff"
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": true
+    }
+  }
+}

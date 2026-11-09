@@ -1,0 +1,46 @@
+{{- if and .Values.dataAnalyst.enabled .Values.dataAnalyst.digest.enabled }}
+{{- $d := .Values.dataAnalyst.digest }}
+---
+# The daily grid digest: the data-analyst function fired every morning with
+# frozen input, carrying a cursor between fires.
+#
+# The cursor is the last day digested. Each fire passes it in at /cursor; the
+# function asks get_daily_summaries for every day after it, and returns the
+# last day covered at /cursor in its output, which the controller stores in a
+# ConfigMap for the next fire. A fire that misses a day (operator downtime, a
+# suspended week) therefore catches up rather than skipping, a week at a time.
+#
+# The cursor is a resumption pointer, not a record: lose the ConfigMap and the
+# next fire digests yesterday again, which is the safe direction.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ScheduledFunction
+metadata:
+  name: grid-daily-digest
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  functionRef:
+    name: data-analyst
+  # The only identity a fire can have today: a stable per-schedule system
+  # principal, system:schedule:<workspace>/grid-daily-digest. Its sessions
+  # are recorded under the virtualUserID the status publishes.
+  runAs:
+    systemUser: {}
+  schedule:
+    cron: {{ $d.cron | quote }}
+    timezone: {{ $d.timezone }}
+    concurrencyPolicy: {{ $d.concurrencyPolicy }}
+  suspend: {{ $d.suspend }}
+  timeoutSeconds: {{ $d.timeoutSeconds }}
+  input:
+    question: "Write the daily grid digest for Wrenmoor Energy's network operations team: each day's total energy, the most heavily loaded feeder, any feeder at 90% of rating or more, and any missing readings."
+    cursor: {{ $d.initialCursor | quote }}
+  state:
+    cursorFrom: /cursor
+    cursorInto: /cursor
+    initial: {{ $d.initialCursor | quote }}
+    store:
+      # Defaults to grid-daily-digest-state, owned by the schedule.
+      configMap: {}
+{{- end }}

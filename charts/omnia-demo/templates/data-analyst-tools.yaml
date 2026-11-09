@@ -1,0 +1,110 @@
+{{- if .Values.dataAnalyst.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $grid := printf "http://wrenmoor-grid-data.%s:8080" $ns }}
+---
+# Four reads over the grid dataset. Shared by the data-analyst function and
+# its A2A twin, so one ToolPolicy covers both.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: data-analyst-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: list-feeders-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: list_feeders
+        description: "List Wrenmoor Energy's 11kV feeders: id, name, substation, region, rating, customers and customer mix."
+        inputSchema:
+          type: object
+          properties:
+            region: { type: string, description: "Only feeders in this region (Northmoor or Southvale)." }
+      httpConfig:
+        endpoint: {{ $grid }}/grid/feeders
+        method: POST
+        contentType: application/json
+
+    - name: get-feeder-load-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: get_feeder_load
+        description: "Half-hourly demand on one feeder for one day, with peak, utilisation against rating, energy and missing readings."
+        inputSchema:
+          type: object
+          properties:
+            feeder_id: { type: string, description: "Feeder id, e.g. WM-F112." }
+            date: { type: string, description: "The day, YYYY-MM-DD." }
+          required: ["feeder_id"]
+      httpConfig:
+        endpoint: {{ $grid }}/grid/load
+        method: POST
+        contentType: application/json
+
+    - name: get-consumption-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: get_consumption
+        description: "Energy consumed on one day in MWh: total, by customer class and by feeder, for a region or the whole network."
+        inputSchema:
+          type: object
+          properties:
+            date: { type: string, description: "The day, YYYY-MM-DD." }
+            region: { type: string, description: "Northmoor or Southvale; omit for the whole network." }
+      httpConfig:
+        endpoint: {{ $grid }}/grid/consumption
+        method: POST
+        contentType: application/json
+
+    - name: get-daily-summaries-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: get_daily_summaries
+        description: "Network summaries for every complete day after the cursor, up to yesterday, at most seven per call, with next_cursor to carry on from."
+        inputSchema:
+          type: object
+          properties:
+            cursor: { type: string, description: "The last day already digested, YYYY-MM-DD, or empty." }
+          required: ["cursor"]
+      httpConfig:
+        endpoint: {{ $grid }}/grid/daily-summaries
+        method: POST
+        contentType: application/json
+---
+# A read-only agent, and the policy says so. The permit grants the registry;
+# the forbid refuses anything that does not declare itself a read — which
+# today is nothing, and is the point: a write tool added to this registry is
+# refused until someone decides this agent should have one and changes the
+# policy, rather than silently inherited.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: data-analyst-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: data-analyst-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: notADeclaredRead
+      type: cel
+      cel: '!tool.declared || tool.effect != "read"'
+  policy: |
+    @id("permit-grid-reads")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"data-analyst-tools");
+
+    @id("deny-anything-but-reads")
+    @message("The grid data analyst only reads. This tool does not declare itself a read, so the analyst may not call it.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.notADeclaredRead };
+{{- end }}

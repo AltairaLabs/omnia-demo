@@ -1,0 +1,35 @@
+{{- if .Values.incidentAgent.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: incident-agent-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: incident-agent-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: incident-agent-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/incident-agent/arena. Regenerate with:
+#   hack/build-packs.sh incident-agent
+#
+# The build merges each tool's action_scope into the pack. The ToolPolicy
+# reads it, so a pack built without the merge is one where every tool reads as
+# undeclared, and the policy refuses every call.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: incident-agent-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/incident-agent-pack.json" | indent 4 }}
+{{- end }}

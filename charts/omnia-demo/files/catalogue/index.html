@@ -122,22 +122,22 @@
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
       <tr>
-        <td class="name">On-call incident agent</td>
-        <td>Reads alerts, logs and deploy history, diagnoses an incident, and can roll back or scale. Reversible actions go through; irreversible ones are held.</td>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">On-call incident agent</a></td>
+        <td>Reads alerts, logs and deploy history, diagnoses an incident, and can roll back or scale. Reversible actions go through; irreversible ones are refused by policy, and a human must take them.</td>
         <td><span class="cap">Policy on consequence</span><span class="cap">action_scope</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="status live">Live</td>
       </tr>
       <tr>
-        <td class="name">Field-service copilot</td>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=field-service">Field-service copilot</a></td>
         <td>Engineers in vans ask about procedures; answers come from field manuals held as institutional memory.</td>
         <td><span class="cap">Institutional memory</span><span class="cap">Document ingestion</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="status live">Live</td>
       </tr>
       <tr>
-        <td class="name">Data analyst and daily digest</td>
-        <td>Load and consumption questions as a function, plus a 06:00 scheduled digest that carries its position between runs.</td>
+        <td class="name"><a href="/functions?workspace=wrenmoor-energy">Data analyst and daily digest</a></td>
+        <td>Load and consumption questions as a function, plus a 06:00 scheduled digest that carries its position between runs. The incident agent asks it about an affected feeder over A2A.</td>
         <td><span class="cap">Scheduled functions</span><span class="cap">A2A</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="status live">Live</td>
       </tr>
       <tr>
         <td class="name">Multi-provider evaluation</td>
