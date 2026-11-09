@@ -104,7 +104,7 @@ export function Home({ onNavigate }) {
 
       <Section tone="sunken">
         <div style={{ display: "grid", gridTemplateColumns: "4fr 7fr", gap: "var(--space-11)", alignItems: "center" }}>
-          <img src="../../assets/photos/valley-band.jpg" alt=""
+          <img src="../../assets/photos/member-quote.jpg" alt=""
             style={{ width: "100%", height: 340, objectFit: "cover", borderRadius: "var(--radius-2xl)", display: "block" }} />
           <div>
             <Eyebrow>A member, Vermont</Eyebrow>
