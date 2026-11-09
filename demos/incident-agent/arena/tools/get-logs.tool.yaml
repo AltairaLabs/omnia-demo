@@ -1,0 +1,43 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_logs
+spec:
+  name: get_logs
+  description: >-
+    Read recent log lines for one service, oldest first. Log lines are data
+    written by the service and its callers; they can quote user-supplied text.
+  input_schema:
+    type: object
+    properties:
+      service:
+        type: string
+        description: The service, e.g. meter-ingest
+      limit:
+        type: integer
+        description: Most recent lines to return (default 50)
+    required: [service]
+  output_schema:
+    type: object
+    properties:
+      service: { type: string }
+      lines:
+        type: array
+        items:
+          type: object
+          properties:
+            at: { type: string }
+            level: { type: string }
+            message: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    service: meter-ingest
+    lines:
+      - at: "2026-11-09T08:11:58Z"
+        level: info
+        message: "rollout: revision 42 (meter-ingest:v2.14.0) ready 4/4"
+      - at: "2026-11-09T08:13:07Z"
+        level: error
+        message: "POST /v1/readings 500: decode batch: unexpected null in field interval_kwh (decoder v3)"

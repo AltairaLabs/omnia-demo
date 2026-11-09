@@ -1,0 +1,48 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: rollback_deploy
+spec:
+  name: rollback_deploy
+  description: >-
+    Roll a service back to an earlier revision's image. Rolls forward to a new
+    revision, so nothing is lost and the rollback can itself be undone.
+    Without to_revision, rolls back to the revision before the current one.
+  input_schema:
+    type: object
+    properties:
+      service:
+        type: string
+        description: The service to roll back
+      to_revision:
+        type: integer
+        description: The revision whose image to restore (default the previous one)
+      reason:
+        type: string
+        description: Why, in a sentence. Recorded in the deploy history.
+    required: [service, reason]
+  output_schema:
+    type: object
+    properties:
+      service: { type: string }
+      rolled_back_from: { type: integer }
+      now_serving: { type: integer }
+      image: { type: string }
+      status: { type: string }
+      undo: { type: string }
+      resolved_alert_ids:
+        type: array
+        items: { type: string }
+  # Reversible: the rollback is a new revision, and rolling forward again is
+  # one more call. This declaration is what the ToolPolicy reads.
+  action_scope: { effect: write, reversibility: reversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    service: meter-ingest
+    rolled_back_from: 42
+    now_serving: 43
+    image: "meter-ingest:v2.13.2"
+    status: rolled_out
+    undo: "rollback_deploy with to_revision 42 restores the previous image"
+    resolved_alert_ids: [ALT-7731]

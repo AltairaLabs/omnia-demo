@@ -24,7 +24,8 @@ set -euo pipefail
 #
 # action_scope is not decoration: the mortgage ToolPolicy's leavesTheFirm
 # producer reads tool.effect from it, so a pack without it never fires the
-# DSA-114 forbids.
+# DSA-114 forbids, and the incident agent's ToolPolicy refuses every tool whose
+# reversibility is irreversible or undeclared.
 #
 # observed is derived here rather than typed, so it reports the tree that
 # produced the pack, and a dirty tree is recorded as dirty. asserted and
@@ -39,7 +40,8 @@ mkdir -p "${OUT}"
 if [[ $# -gt 0 ]]; then
   demos=("$@")
 else
-  demos=(mortgage-underwriting pii-chat claims-triage sharepoint-adapter)
+  demos=(mortgage-underwriting pii-chat claims-triage sharepoint-adapter
+    incident-agent data-analyst field-service)
 fi
 
 TMP="$(mktemp -d)"

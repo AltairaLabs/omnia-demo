@@ -1,0 +1,57 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_deploy_history
+spec:
+  name: get_deploy_history
+  description: >-
+    Read a service's deploy history, newest first: each revision's image, when
+    and by whom it was deployed, what changed, and whether it is current,
+    superseded or rolled back. Also returns the current revision and replica
+    count.
+  input_schema:
+    type: object
+    properties:
+      service:
+        type: string
+        description: The service, e.g. meter-ingest
+    required: [service]
+  output_schema:
+    type: object
+    properties:
+      service: { type: string }
+      namespace: { type: string }
+      replicas: { type: integer }
+      current_revision: { type: integer }
+      history:
+        type: array
+        items:
+          type: object
+          properties:
+            revision: { type: integer }
+            image: { type: string }
+            deployed_at: { type: string }
+            deployed_by: { type: string }
+            change: { type: string }
+            status: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    service: meter-ingest
+    namespace: platform-prod
+    replicas: 4
+    current_revision: 42
+    history:
+      - revision: 42
+        image: "meter-ingest:v2.14.0"
+        deployed_at: "2026-11-09T08:11:00Z"
+        deployed_by: m.oyelaran
+        change: "Readings decoder v3 (streaming batch decode)"
+        status: current
+      - revision: 41
+        image: "meter-ingest:v2.13.2"
+        deployed_at: "2026-11-03T14:20:00Z"
+        deployed_by: j.adeyemi
+        change: "Bump TLS bundle"
+        status: superseded

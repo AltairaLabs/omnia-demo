@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Wrenmoor Energy's grid data analyst: a function agent
+# for load and consumption questions, fired daily for a digest, and reachable
+# over A2A by the on-call incident agent.
+#
+# Regenerate with: hack/build-packs.sh data-analyst
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: data-analyst
+spec:
+  prompt_configs:
+    - id: grid-analyst
+      file: prompts/grid-analyst.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # Four reads. Nothing here changes anything, and every tool says so.
+  tools:
+    - file: tools/list-feeders.tool.yaml
+    - file: tools/get-feeder-load.tool.yaml
+    - file: tools/get-consumption.tool.yaml
+    - file: tools/get-daily-summaries.tool.yaml
+
+  scenarios:
+    - file: scenarios/feeder-load.scenario.yaml
+    - file: scenarios/daily-digest.scenario.yaml
+
+  defaults:
+    temperature: 0.1
+    max_tokens: 1200
+    output:
+      dir: out
+      formats: ["json"]

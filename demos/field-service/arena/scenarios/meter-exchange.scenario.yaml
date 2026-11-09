@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: meter-exchange
+spec:
+  task_type: field_service
+  description: A meter technician asks for the single-phase meter exchange procedure.
+  turns:
+    - role: user
+      content: What's the procedure for swapping a single-phase meter?
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["polarity", "Polarity"]
+          message: "A meter exchange ends with a polarity check"
+        - type: contains_any
+          params:
+            patterns: ["cut-out", "cut out"]
+          message: "The cut-out is checked before the exchange"

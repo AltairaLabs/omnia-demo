@@ -1,0 +1,40 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: failover_database
+spec:
+  name: failover_database
+  # Not in the beta.20 brief's table. It is here to show the policy covering a
+  # tool nobody named in it: declare the consequence, and the existing rule
+  # applies the day the tool is added.
+  description: >-
+    Promote a database cluster's replica to primary and fence the old primary.
+    Writes the old primary accepted after the last replicated position are
+    lost.
+  input_schema:
+    type: object
+    properties:
+      cluster:
+        type: string
+        description: The database cluster, e.g. wrenmoor-pg-prod
+      reason:
+        type: string
+        description: Why, in a sentence
+    required: [cluster, reason]
+  output_schema:
+    type: object
+    properties:
+      cluster: { type: string }
+      old_primary: { type: string }
+      new_primary: { type: string }
+      status: { type: string }
+      note: { type: string }
+  action_scope: { effect: write, reversibility: irreversible, data_classes: [operational, customer-data] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    cluster: wrenmoor-pg-prod
+    old_primary: wrenmoor-pg-prod-0
+    new_primary: wrenmoor-pg-prod-1
+    status: failed_over
+    note: "The old primary was fenced; writes it accepted after the last replicated position are lost."

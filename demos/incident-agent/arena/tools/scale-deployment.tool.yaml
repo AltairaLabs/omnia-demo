@@ -1,0 +1,37 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: scale_deployment
+spec:
+  name: scale_deployment
+  description: >-
+    Set a service's replica count. Scaling back to the previous count undoes
+    it.
+  input_schema:
+    type: object
+    properties:
+      service:
+        type: string
+        description: The service to scale
+      replicas:
+        type: integer
+        description: The replica count to set
+      reason:
+        type: string
+        description: Why, in a sentence
+    required: [service, replicas, reason]
+  output_schema:
+    type: object
+    properties:
+      service: { type: string }
+      previous_replicas: { type: integer }
+      replicas: { type: integer }
+      status: { type: string }
+  action_scope: { effect: write, reversibility: reversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    service: billing-api
+    previous_replicas: 4
+    replicas: 6
+    status: scaled

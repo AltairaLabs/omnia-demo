@@ -1,0 +1,54 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_alerts
+spec:
+  name: get_alerts
+  description: >-
+    List alerts from Wrenmoor Energy's platform monitoring, newest first, with
+    severity, status, when each fired, how often it has flapped in the last
+    hour, and any grid feeders it affects.
+  input_schema:
+    type: object
+    properties:
+      service:
+        type: string
+        description: Only alerts for this service, e.g. meter-ingest
+      status:
+        type: string
+        enum: [firing, resolved]
+        description: Only alerts in this state
+  output_schema:
+    type: object
+    properties:
+      alerts:
+        type: array
+        items:
+          type: object
+          properties:
+            id: { type: string }
+            service: { type: string }
+            severity: { type: string }
+            summary: { type: string }
+            status: { type: string }
+            fired_at: { type: string }
+            flap_count_last_hour: { type: integer }
+            affected_feeders:
+              type: array
+              items: { type: string }
+  # A read changes nothing, so it is reversible by construction. Declared
+  # rather than left blank: the ToolPolicy refuses any tool that declares
+  # nothing, because absence means undeclared, not safe.
+  action_scope: { effect: read, reversibility: reversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    alerts:
+      - id: ALT-7731
+        service: meter-ingest
+        severity: critical
+        summary: "meter-ingest HTTP 5xx rate 18.4% (threshold 2%) on POST /v1/readings"
+        status: firing
+        fired_at: "2026-11-09T08:14:00Z"
+        flap_count_last_hour: 0
+        affected_feeders: [WM-F112, WM-F118]

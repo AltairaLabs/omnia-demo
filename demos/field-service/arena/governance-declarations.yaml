@@ -1,0 +1,38 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh. ASSERTED, not evidence.
+
+intended_purpose: >-
+  Answer Wrenmoor Energy field engineers' questions about switching,
+  isolation and safety, fault finding and meter exchange, from the company's
+  field manuals.
+
+foreseeable_misuse:
+  - Treating its answer as authorisation to start work, in place of a safety document from an Authorised Person
+  - Asking it to issue, transfer or cancel a safety document, or to authorise switching
+  - Relying on it for a procedure the field manuals do not cover
+
+# suggests: it answers; the engineer does the work, under a safety document
+# someone else issues.
+autonomy_level: suggests
+
+accountable_owner: Wrenmoor Energy Field Operations
+
+operator_role: eu-aiact:AIDeployer
+
+# Guidance to competent, trained staff from the company's own manuals. It
+# controls no equipment, and the safety document regime it points to stays
+# with people.
+risk_classification: eu-aiact:RiskLevelMinimal
+
+intended_deployment_contexts:
+  - Field service on the electricity distribution network, internal staff
+
+approved_environments:
+  - demo
+
+# True. It holds a conversation with an engineer that reads like a colleague
+# on the radio, and on a safety question the engineer must know the answer
+# came from an AI system, not from Network Control. Declared so the facade
+# advertises it on the wire and a client can show the notice before the first
+# turn.
+requires_ai_disclosure: true

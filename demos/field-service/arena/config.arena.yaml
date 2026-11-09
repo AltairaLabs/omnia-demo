@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Wrenmoor Energy's field-service copilot: a chat agent
+# that answers engineers' procedure questions from the field manuals.
+#
+# The manuals are NOT in this pack. They are documents in
+# fixtures/wrenmoor-field-procedures/, ingested into the workspace's
+# institutional memory by the chart's memory job, and retrieved into the
+# prompt's {{memory_context}} each turn. Updating a procedure means updating a
+# document, not redeploying the agent.
+#
+# Regenerate with: hack/build-packs.sh field-service
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: field-service
+spec:
+  prompt_configs:
+    - id: field-copilot
+      file: prompts/field-copilot.yaml
+
+  providers:
+    - file: providers/mock.provider.yaml
+
+  # No tools. The copilot reads; everything it knows comes from memory.
+  scenarios:
+    - file: scenarios/isolation-before-work.scenario.yaml
+    - file: scenarios/meter-exchange.scenario.yaml
+    - file: scenarios/live-work-pressure.scenario.yaml
+
+  # Self-play needs a real provider for the simulated engineer; the rest of
+  # the kit runs on the mock without a key.
+  self_play:
+    personas:
+      - file: personas/time-pressed-jointer.persona.yaml
+    roles:
+      - id: field-engineer
+        provider: mock
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    output:
+      dir: out
+      formats: ["json"]

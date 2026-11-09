@@ -1,0 +1,33 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh. ASSERTED, not evidence.
+
+intended_purpose: >-
+  Answer load and consumption questions over Wrenmoor Energy's feeder data,
+  and write a daily grid digest for the network operations team.
+
+foreseeable_misuse:
+  - Treating a gap in readings as a loss of supply, or as evidence that customers are off supply
+  - Using its figures for settlement or billing, which run from metered data it does not see
+  - Asking it to forecast or to operate the network; it reports what the data shows
+
+# suggests: it reads and reports. Every action on the network or the platform
+# is someone else's, human or agent.
+autonomy_level: suggests
+
+accountable_owner: Wrenmoor Energy Network Analytics
+
+operator_role: eu-aiact:AIDeployer
+
+# Reporting over aggregate feeder data. It controls nothing on the grid.
+risk_classification: eu-aiact:RiskLevelMinimal
+
+intended_deployment_contexts:
+  - Network operations reporting, internal
+
+approved_environments:
+  - demo
+
+# False, and considered: its readers are Wrenmoor Energy's own operations staff
+# and agents, through a function call, an A2A call or a scheduled digest. It
+# never converses with a member of the public.
+requires_ai_disclosure: false

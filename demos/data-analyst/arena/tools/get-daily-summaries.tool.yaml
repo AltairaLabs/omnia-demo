@@ -1,0 +1,52 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_daily_summaries
+spec:
+  name: get_daily_summaries
+  description: >-
+    Network summaries for every complete day after the cursor, up to
+    yesterday, at most seven days per call: total energy, the most heavily
+    loaded feeder, feeders that peaked at 90% of rating or more, and missing
+    readings. Returns next_cursor, the last day covered; pass it as the cursor
+    next time to carry on from there. An empty cursor returns yesterday only.
+  input_schema:
+    type: object
+    properties:
+      cursor:
+        type: string
+        description: The last day already digested, YYYY-MM-DD, or empty
+    required: [cursor]
+  output_schema:
+    type: object
+    properties:
+      from_cursor: { type: string }
+      next_cursor: { type: string }
+      caught_up: { type: boolean }
+      days:
+        type: array
+        items:
+          type: object
+          properties:
+            date: { type: string }
+            total_mwh: { type: number }
+            peak_feeder: { type: string }
+            peak_utilisation_pct: { type: number }
+            feeders_over_90pct:
+              type: array
+              items: { type: string }
+            missing_readings: { type: integer }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [grid-operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    from_cursor: "2026-11-08"
+    next_cursor: "2026-11-09"
+    caught_up: true
+    days:
+      - date: "2026-11-09"
+        total_mwh: 1203.6
+        peak_feeder: WM-F121
+        peak_utilisation_pct: 93.4
+        feeders_over_90pct: [WM-F121]
+        missing_readings: 14

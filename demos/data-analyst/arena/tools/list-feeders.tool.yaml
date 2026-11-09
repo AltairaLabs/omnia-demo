@@ -1,0 +1,47 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: list_feeders
+spec:
+  name: list_feeders
+  description: >-
+    List Wrenmoor Energy's 11kV feeders: id, name, substation, region, thermal
+    rating in MW, customers connected and the customer mix by class.
+  input_schema:
+    type: object
+    properties:
+      region:
+        type: string
+        description: Only feeders in this region (Northmoor or Southvale)
+  output_schema:
+    type: object
+    properties:
+      feeders:
+        type: array
+        items:
+          type: object
+          properties:
+            feeder_id: { type: string }
+            name: { type: string }
+            substation: { type: string }
+            region: { type: string }
+            rating_mw: { type: number }
+            customers: { type: integer }
+            customer_mix:
+              type: object
+              properties:
+                domestic: { type: number }
+                commercial: { type: number }
+                industrial: { type: number }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [grid-operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    feeders:
+      - feeder_id: WM-F112
+        name: Hartwell Road
+        substation: Hartwell Primary
+        region: Northmoor
+        rating_mw: 9.0
+        customers: 3120
+        customer_mix: { domestic: 0.72, commercial: 0.24, industrial: 0.04 }

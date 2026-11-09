@@ -1,0 +1,40 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: delete_namespace
+spec:
+  name: delete_namespace
+  # The description states the consequence and NOT the rule. If it said "a
+  # human must do this", a well-behaved model would decline on its own and the
+  # ToolPolicy would never be reached — the trap the mortgage and claims demos
+  # document. The rule belongs to the policy, which keys on the action_scope
+  # below.
+  description: >-
+    Delete a Kubernetes namespace and everything in it, clearing any
+    finalizers that hold it in Terminating. Volumes and their data are deleted
+    with it.
+  input_schema:
+    type: object
+    properties:
+      namespace:
+        type: string
+        description: The namespace to delete
+      reason:
+        type: string
+        description: Why, in a sentence
+    required: [namespace, reason]
+  output_schema:
+    type: object
+    properties:
+      namespace: { type: string }
+      status: { type: string }
+      note: { type: string }
+  # Irreversible: the data goes with the namespace. This is the field the
+  # ToolPolicy's forbid reads — the tool's NAME appears nowhere in the policy.
+  action_scope: { effect: write, reversibility: irreversible, data_classes: [operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    namespace: outage-map-staging
+    status: deleted
+    note: "Finalizers were removed and every object in the namespace, including its volumes, is gone."

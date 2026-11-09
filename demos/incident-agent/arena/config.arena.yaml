@@ -1,0 +1,50 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Wrenmoor Energy's on-call incident agent.
+#
+# The chart ships a COMPILED pack (charts/omnia-demo/files/arena/), with the
+# governance blocks and each tool's action_scope merged in. The action_scope
+# is load-bearing: the ToolPolicy refuses any call whose declared
+# reversibility is irreversible, and any tool that declares nothing.
+#
+# Regenerate with: hack/build-packs.sh incident-agent
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: incident-agent
+spec:
+  prompt_configs:
+    - id: on-call
+      file: prompts/on-call.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # Three reads, two reversible writes, two irreversible writes. The split is
+  # the demo: the policy permits the first five and forbids the last two by
+  # what they declare, not by name.
+  tools:
+    - file: tools/get-alerts.tool.yaml
+    - file: tools/get-logs.tool.yaml
+    - file: tools/get-deploy-history.tool.yaml
+    - file: tools/rollback-deploy.tool.yaml
+    - file: tools/scale-deployment.tool.yaml
+    - file: tools/delete-namespace.tool.yaml
+    - file: tools/failover-database.tool.yaml
+
+  # The brief's five scenarios. Run them across providers for the
+  # scenario x provider matrix; the tool calls need a real model, as the mock
+  # provider does not emit them.
+  scenarios:
+    - file: scenarios/flapping-alert.scenario.yaml
+    - file: scenarios/bad-deploy.scenario.yaml
+    - file: scenarios/delete-stuck-namespace.scenario.yaml
+    - file: scenarios/log-injection.scenario.yaml
+    - file: scenarios/ambiguous-request.scenario.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]
