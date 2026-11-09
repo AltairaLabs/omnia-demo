@@ -114,8 +114,12 @@ export function PolicyDetail({ onNavigate, onToast }) {
         <Card>
           <div style={{ font: "var(--type-heading-s)" }}>Your adjuster</div>
           <div style={{ display: "flex", gap: "var(--space-5)", alignItems: "center", marginTop: "var(--space-5)" }}>
-            <img src="../../assets/photos/adjuster-ruth.jpg" alt="" width="56" height="56"
-              style={{ borderRadius: "var(--radius-md)", objectFit: "cover", display: "block" }} />
+            <div aria-hidden="true" style={{
+              width: 56, height: 56, borderRadius: "var(--radius-md)", flex: "none",
+              display: "grid", placeItems: "center",
+              background: "var(--surface-sunken)", color: "var(--text-secondary)",
+              font: "var(--type-heading-s)",
+            }}>RA</div>
             <div>
               <div style={{ font: "var(--type-body)" }}>Ruth Alderman</div>
               <div style={{ font: "var(--type-body-s)", color: "var(--text-muted)", marginTop: 2 }}>Vermont field office · 14 years</div>
