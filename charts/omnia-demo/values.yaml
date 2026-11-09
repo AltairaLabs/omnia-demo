@@ -445,6 +445,13 @@ catalogue:
   authURL: ""
   # Where a caller with no session is sent (relative to the dashboard host).
   loginPath: /api/v1/auth/login
+  # Other in-cluster sites to serve under a path on the dashboard host, behind
+  # the same sign-in, e.g. a demo's customer-facing portal:
+  #   - path: /larkmere-mutual
+  #     upstream: http://larkmere-portal.<ns>.svc.cluster.local:8080
+  #     rewrites:            # absolute paths the site uses, put under the prefix
+  #       - { from: '"/api/assistant/ws"', to: '"/larkmere-mutual/api/assistant/ws"' }
+  proxies: []
   route:
     enabled: true
     # The Gateway the dashboard's HTTPRoute uses, e.g.

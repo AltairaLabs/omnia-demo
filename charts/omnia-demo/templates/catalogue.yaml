@@ -17,6 +17,11 @@ data:
   index.html: |
 {{ .Files.Get "files/catalogue/index.html" | indent 4 }}
   default.conf: |
+    # WebSocket upgrades through the proxied sites (catalogue.proxies).
+    map $http_upgrade $omnia_connection_upgrade {
+      default upgrade;
+      ''      close;
+    }
     server {
       listen 8080;
       server_tokens off;
@@ -35,6 +40,40 @@ data:
         add_header Cache-Control "no-store" always;
         add_header X-Content-Type-Options nosniff always;
       }
+      {{- range $i, $p := $c.proxies }}
+      {{- $pp := trimSuffix "/" $p.path }}
+      # {{ $pp }}/ -> {{ $p.upstream }}, behind the same sign-in. Absolute paths
+      # the site uses are rewritten under the prefix (rewrites), and its
+      # redirects and WebSocket upgrades pass through.
+      location = {{ $pp }} { return 302 {{ $pp }}/; }
+      location {{ $pp }}/ {
+        {{- if $c.authURL }}
+        auth_request /_omnia_auth;
+        error_page 401 403 = @omnia_login_{{ $i }};
+        {{- end }}
+        proxy_pass {{ trimSuffix "/" $p.upstream }}/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $omnia_connection_upgrade;
+        proxy_read_timeout 1h;
+        proxy_redirect / {{ $pp }}/;
+        {{- with $p.rewrites }}
+        # sub_filter needs the response uncompressed.
+        proxy_set_header Accept-Encoding "";
+        sub_filter_once off;
+        sub_filter_types *;
+        {{- range . }}
+        sub_filter {{ .from | squote }} {{ .to | squote }};
+        {{- end }}
+        {{- end }}
+      }
+      {{- if $c.authURL }}
+      location @omnia_login_{{ $i }} {
+        return 302 {{ $c.loginPath }}?returnTo={{ $pp }}/;
+      }
+      {{- end }}
+      {{- end }}
       {{- if $c.authURL }}
       # The dashboard's session check, with the caller's cookie and nothing
       # else. A 2xx serves the page; a 401 goes to the login.
@@ -122,5 +161,11 @@ spec:
         - path: { type: PathPrefix, value: {{ $path }} }
       backendRefs:
         - { name: demo-catalogue, port: 8080 }
+    {{- range $c.proxies }}
+    - matches:
+        - path: { type: PathPrefix, value: {{ trimSuffix "/" .path }} }
+      backendRefs:
+        - { name: demo-catalogue, port: 8080 }
+    {{- end }}
 {{- end }}
 {{- end }}
