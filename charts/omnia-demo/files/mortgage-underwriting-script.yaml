@@ -1,0 +1,131 @@
+# Scripted model turns for the mortgage-underwriting demo, used only when
+# mortgageUnderwriting.deterministic=true.
+#
+# WHAT IS FAKED: the model's choice of which tool to call, with what arguments.
+# WHAT IS REAL: the ToolRegistry handlers, the HTTP calls to the case systems
+# and the supplier, the policy-broker decision, the denial, the session
+# recording, the composition digest and the pack governance metadata.
+#
+# The turns are indexed, and the index is per session — so a FRESH session
+# replays from turn 1. Re-driving the same session continues from where it got
+# to and will not repeat the chain. Every take needs a new invocation.
+#
+# The case is APP-2026-00417, the self-employed one. Turn 6 attaches the raw
+# bank statement lines the case file legitimately carries, which is what the
+# ToolPolicy refuses. That refusal is NOT scripted: the broker evaluates the
+# payload and decides. Change the evidence type here to something derived and
+# the same script sails through — which is the check worth running if you ever
+# doubt the block is real.
+defaultResponse: "Case triage could not be completed."
+scenarios:
+  default:
+    turns:
+      1:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: case_fetch
+            arguments:
+              case_ref: "APP-2026-00417"
+      2:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: credit_report
+            arguments:
+              applicant_ref: "APP-2026-00417"
+      3:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: property_valuation
+            arguments:
+              case_ref: "APP-2026-00417"
+      4:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: affordability_assess
+            arguments:
+              case_ref: "APP-2026-00417"
+      5:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: aml_screen
+            arguments:
+              applicant_ref: "APP-2026-00417"
+      # The call the policy refuses. The agent is not misbehaving: it holds
+      # statement lines the applicant supplied and is attaching them so the
+      # supplier can answer a genuinely ambiguous self-employed income picture.
+      6:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: income_verify
+            arguments:
+              applicant_ref: "APP-2026-00417"
+              employer_name: "SPECIMEN JOINERY LTD (director)"
+              declared_annual_income: 61000
+              evidence:
+                - type: bank_statement
+                  content: "2026-02-03 BACS CREDIT SPECIMEN JOINERY LTD 4,120.00; 2026-02-28 BACS CREDIT SPECIMEN JOINERY LTD 2,980.00"
+      # THE RETRY, and the most useful thirty seconds of the demo.
+      #
+      # Same tool. Same session. Same supplier. Seconds later. The ONLY thing
+      # that changes is the evidence type — bank_statement becomes
+      # income_summary — and the call goes straight through.
+      #
+      # That is what proves the refusal was a decision about the PAYLOAD rather
+      # than the tool being broken, the credential being wrong, or the demo
+      # being rigged. A viewer does not have to take the deny on trust: they
+      # watch the same call succeed once it complies. And it answers the
+      # obvious objection to any guardrail — "so the work just doesn't get
+      # done?" — with no, the work gets done, within policy.
+      #
+      # The supplier's hit count is the receipt: 0 after turn 6, 1 after this.
+      7:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: income_verify
+            arguments:
+              applicant_ref: "APP-2026-00417"
+              employer_name: "SPECIMEN JOINERY LTD (director)"
+              declared_annual_income: 61000
+              evidence:
+                - type: income_summary
+                  content: "Derived: mean net monthly credits from trading account 3,550 over 6 months; two years' filed accounts averaged 61,000 gross."
+      # The chain CONTINUES and records what actually happened — including that
+      # the first attempt was refused. An agent that fell over on a denied tool
+      # would make the control look like a fault; one that adapts and files an
+      # honest note makes it look like what it is.
+      #
+      # Still REFER, and for the right reason: income is now verified, but
+      # stressed affordability genuinely fails for this case. The policy did
+      # not decide the outcome — it decided what could leave the firm.
+      8:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: case_note_write
+            arguments:
+              case_ref: "APP-2026-00417"
+              recommendation: "REFER"
+              note: >-
+                Self-employed, two years' accounts with 31% year-on-year variance.
+                Bureau score 704, one satisfied default (2023). AVM 397,000 against
+                410,000 requested, giving 87.8% LTV. Income verification: first
+                attempt refused by policy (raw statement data may not be sent to the
+                external supplier); re-submitted as a derived income summary and
+                verified at 0.94 confidence against employer payroll record. Stressed
+                affordability FAILS at 8.0% with 118 monthly disposable income.
+                REFER to a named underwriter on affordability.
+      # The function's RETURN VALUE, and it must be JSON matching the
+      # AgentRuntime's outputSchema — mode:function validates it and fails the
+      # invocation with output_invalid if it does not parse. Prose here is the
+      # easiest way to break this demo, and the error names the offending
+      # first character rather than the missing contract, so it reads as a
+      # parser bug rather than the schema check it is.
+      9:
+        content: '{"recommendation":"REFER","case_note":"Self-employed, two years accounts with 31% year-on-year variance. Bureau score 704, one satisfied default (2023). AVM 397,000 against 410,000 requested, giving 87.8% LTV. Income verification: first attempt refused by policy (raw statement data may not be sent to the external supplier); re-submitted as a derived income summary and verified at 0.94 confidence. Stressed affordability FAILS at 8.0% with 118 monthly disposable income. REFER to a named underwriter on affordability."}'

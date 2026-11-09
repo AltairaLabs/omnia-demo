@@ -1,0 +1,192 @@
+{{- if .Values.claimsTriage.enabled }}
+{{- $ct := .Values.claimsTriage }}
+{{- if $ct.deterministic }}
+---
+# Deterministic mode needs no API key, so it brings its own placeholder
+# credential rather than making you create one. The Provider CRD requires a
+# secretRef; the runtime's mock branch never resolves it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: claims-triage-mock-credential
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
+{{- end }}
+{{- if or $ct.deterministic (not .Values.llm.providerRef) }}
+---
+# The demo's own Provider. Deterministic mode always renders it (as the mock);
+# a live install renders it only when llm.providerRef is empty.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: claims-triage-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+{{- if $ct.deterministic }}
+  # type: mock is a second, independent trigger for the mock provider, set
+  # alongside the annotation on the AgentRuntime so the two agree. A runtime
+  # that took one signal and not the other would try to reach Anthropic with a
+  # placeholder key and crashloop.
+  type: mock
+  role: llm
+  credential:
+    secretRef:
+      name: claims-triage-mock-credential
+{{- else }}
+  type: {{ $ct.provider.type }}
+  role: llm
+  model: {{ $ct.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $ct.provider.secretRef }}
+  defaults:
+    maxTokens: {{ $ct.provider.maxTokens }}
+{{- end }}
+{{- end }}
+---
+# The claims systems stub.
+#
+# ONE service, unlike the mortgage demo's two. That demo splits internal from
+# external because its rule is about a boundary data crosses; this rule is about
+# an AMOUNT, and it applies wherever the payment goes. A second Service would
+# suggest the boundary matters here, and it does not.
+apiVersion: v1
+kind: Service
+metadata:
+  name: claims-systems
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: claims-systems
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: claims-systems
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: claims-systems
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: claims-systems
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: claims-systems
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot" — kubelet refuses
+        # to start the container rather than guess. 65532 is that user's uid.
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $ct.image) }}
+          imagePullPolicy: {{ $ct.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+---
+# Larkmere Mutual's household claims assessor.
+#
+# A FUNCTION, like the mortgage agent and for the same reason: this is a
+# back-office process, not a conversation. A claim arrives already assessed by a
+# loss adjuster and the question is what happens to it — which is answered once,
+# with a decision, not chatted about. It is also why this agent declares no AI
+# disclosure: nothing here speaks to a member.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: claims-triage
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: claims
+{{- if $ct.deterministic }}
+  annotations:
+    omnia.altairalabs.ai/mock-provider: "true"
+    omnia.altairalabs.ai/mock-config-path: "/etc/omnia/mock/mock-responses.yaml"
+{{- end }}
+spec:
+  mode: function
+  promptPackRef:
+    name: claims-triage-pack
+  toolRegistryRef:
+    name: claims-triage-tools
+  facades:
+    - type: rest
+      port: 8080
+      # Synchronous, unlike the mortgage chain. This one is four tool calls and
+      # runs in a couple of seconds, so there is nothing to be gained from
+      # holding an invocation id — and a demo you can drive from the Test tab
+      # and watch finish is worth more than one you have to poll.
+      async:
+        enabled: false
+  inputSchema:
+    type: object
+    required:
+      - claim_ref
+    properties:
+      claim_ref:
+        type: string
+        description: "Claim reference, e.g. LM-40718."
+  outputFormat: json_schema
+  outputSchema:
+    type: object
+    additionalProperties: false
+    required:
+      - outcome
+      - note
+    properties:
+      outcome:
+        type: string
+        description: "SETTLED or REFERRED. What actually happened to the claim."
+      note:
+        type: string
+        description: "What was assessed, what was done about it, and — if it was referred — why it could not be settled here."
+  runtime:
+    replicas: 1
+{{- if $ct.deterministic }}
+    volumes:
+      - name: mock-script
+        configMap:
+          name: claims-triage-script
+    volumeMounts:
+      - name: mock-script
+        mountPath: /etc/omnia/mock
+{{- end }}
+  providers:
+    - name: default
+      providerRef:
+        # Deterministic mode always runs on the demo's own mock Provider.
+        name: {{ if $ct.deterministic }}claims-triage-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "claims-triage-llm") }}{{ end }}
+{{- end }}

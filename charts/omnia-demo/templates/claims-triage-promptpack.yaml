@@ -1,0 +1,49 @@
+{{- if .Values.claimsTriage.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: claims-triage-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: claims-triage-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: claims-triage-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/claims-triage/arena.
+#
+# Regenerate with:
+#   hack/build-packs.sh claims-triage
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claims-triage-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/claims-triage-pack.json" | indent 4 }}
+{{- if .Values.claimsTriage.deterministic }}
+---
+# The scripted model turns, mounted at the path the mock-provider annotation
+# names. Present ONLY in deterministic mode, so a normal install carries no
+# script at all and cannot accidentally run one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: claims-triage-script
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  mock-responses.yaml: |
+{{ .Files.Get "files/claims-triage-script.yaml" | indent 4 }}
+{{- end }}
+{{- end }}

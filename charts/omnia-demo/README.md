@@ -56,6 +56,23 @@ another namespace's Provider. Image tags default to the chart's appVersion.
 `memory.apiURL` defaults to the workspace's own memory-api
 (`memory-<workspace>-<workspace.serviceGroup>`).
 
+## The governance demos
+
+`mortgageUnderwriting`, `claimsTriage` and `piiChat` each show one control: the
+DSA-114 egress forbids, the £500 delegated-authority limit, and session and
+memory redaction. Each has a `deterministic` switch that runs it on its own
+mock Provider and a scripted chain, with no API key and whatever
+`llm.providerRef` says; the tools, policy broker and session record stay live.
+`piiChat.portal.enabled` adds the Larkmere member portal and opens the agent
+to it with `externalAuth.edgeTrust`. The mortgage demo is invoked async, so
+Omnia needs a queue backend (Redis). Provider tuning in a demo's `provider`
+block (`maxTokens`, `streamIdleTimeout`, `thinkingBudgetTokens`) applies to
+its own Provider only, not to `llm.providerRef`.
+
+Runbooks: [mortgage underwriting](../../demos/mortgage-underwriting/RUNBOOK.md),
+[PII chat](../../demos/pii-chat/RUNBOOK.md). The packs are compiled from
+`demos/<demo>/arena` by `hack/build-packs.sh`.
+
 The chart is intentionally an add-on rather than an umbrella chart. This keeps
 the public repository independent of private Omnia implementation details and
 makes the dependency on a released Omnia version explicit in the operator's

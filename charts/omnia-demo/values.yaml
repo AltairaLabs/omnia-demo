@@ -108,57 +108,299 @@ galaxy:
     tag: ""
     pullPolicy: IfNotPresent
 
+# ---------------------------------------------------------------------------
+# mortgageUnderwriting — the egress-control demo (DSA-114)
+#
+# Backend, function-mode: an underwriting case arrives as a typed invocation,
+# the agent triages it, and a ToolPolicy refuses any call that would send raw
+# bank statement data to the external verification supplier. The tool IS in the
+# registry and the agent IS entitled to call it — the refusal turns on what is
+# in the payload, which is what makes it a policy decision rather than an
+# access-control absence.
+#
+# Requires Omnia Enterprise: ToolPolicy and the policy broker are EE.
+# See demos/mortgage-underwriting/RUNBOOK.md.
+# ---------------------------------------------------------------------------
 mortgageUnderwriting:
-  # Requires Omnia Enterprise CRDs. Disabled by default so the chart remains
-  # useful with a memory-only installation.
   enabled: false
-  deterministic: false
-  provider:
-    type: claude
-    model: claude-sonnet-4-6
-    secretRef: anthropic-api-key
+
+  # Stub standing in for the case systems and the approved third-party
+  # income-verification supplier. Built from demos/mortgage-underwriting.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
     # Empty: the chart's appVersion.
     tag: ""
     pullPolicy: IfNotPresent
 
+  # Model behind the triage agent, used only when llm.providerRef is empty.
+  # With llm.providerRef set the agent runs on that Provider, and the tuning
+  # below does not apply — set the same defaults on the shared Provider.
+  provider:
+    type: claude
+    model: claude-sonnet-4-6
+    secretRef: anthropic-api-key
+    # -- Maximum output tokens per response.
+    #
+    # The agent's answer is a full underwriter triage note across seven checks,
+    # which on the self-employed case runs to ~3.4k output tokens. The default
+    # is well under that, and the truncation does not announce itself: the note
+    # is emitted as JSON, so a cut-off arrives at the caller as
+    # "unexpected end of JSON input" and reads like a malformed model response.
+    #
+    # 8192 was still not enough once case_note became a required field and the
+    # model stopped folding the note into the recommendation: the note is the
+    # bulk of the answer, and it is written out in full.
+    maxTokens: 16384
+    # -- How long the streaming response may go silent before it is aborted.
+    #
+    # The default is 30s, and this agent exceeds it: seven tool calls, then a
+    # single long structured answer. Observed failing at 34s with
+    # "stream chunk error: http2: response body closed" — which names the
+    # transport, not the timeout, and so reads like a network fault rather than
+    # a setting. The timer resets on every byte, so raising it does not mask a
+    # hung provider; it only allows a legitimately slow first token.
+    streamIdleTimeout: "120s"
+    # -- Extended thinking budget, in tokens. Empty means thinking is off.
+    #
+    # Reasoning is recorded on the session (it rides a channel separate from
+    # content, and the event bridge records every event type), so enabling this
+    # writes the model's reasoning about the case into the record. A reasoning
+    # trace quotes what it reasoned about — on a real case that can restate the
+    # very data a ToolPolicy refuses to let leave. Fine here: the cases are
+    # synthetic.
+    #
+    # Kept well under maxTokens: the thinking budget is spent from the same
+    # allowance as the answer, and the answer is a full triage note.
+    thinkingBudgetTokens: 2048
+
+  # -- Fire-and-forget invocation for this demo.
+  #
+  # On by default because the function genuinely needs it: a full underwriting
+  # chain is 50-90s, and the synchronous limit is 30s. Invoke it with
+  # POST /functions/mortgage-underwriting?mode=async and read the result back
+  # with GET /functions/mortgage-underwriting/invocations/{id}.
+  #
+  # Requires a queue backend in the Omnia installation (Redis). Without one the
+  # operator reports AsyncInvocationReady=False and the async routes answer
+  # 501 — it does NOT fall back to running the call synchronously, which would
+  # fail at 30s anyway.
+  async:
+    enabled: true
+    # Per pod, not per agent: the real ceiling is workers x replicas, and each
+    # worker holds one claim and one runtime call.
+    workers: 2
+
+  # -- Run the agent from a script rather than a live model.
+  #
+  # Off by default: the honest demo is a real model genuinely deciding to call
+  # these tools, and with a key that is what you get.
+  #
+  # Turn it ON to capture. A live model is free to work the case in a different
+  # order, call a tool twice, or word the case note differently on every take —
+  # which is fine in a meeting and miserable when you are cutting a 40-second
+  # video and need take 7 to match take 3. Deterministic mode fixes the exact
+  # seven-step chain, needs no API key, and still runs through the real
+  # ToolRegistry, the real policy broker and the real session recording. The
+  # ONLY thing faked is the model's choice of what to call.
+  #
+  # It always uses the demo's own mock Provider, whatever llm.providerRef says.
+  #
+  # Say so if asked. "The model's turns are scripted for the recording; the
+  # enforcement, the tools and the record are live" is a fine answer. Claiming
+  # a scripted run is live reasoning is not.
+  deterministic: false
+
+# ---------------------------------------------------------------------------
+# piiChat — the PII redaction demo (card support chat)
+#
+# A chat agent that is GIVEN sensitive data and a tool that legitimately needs
+# it, so the SessionPrivacyPolicy has something real to redact in two places:
+# the stored message content, and the stored tool-call arguments.
+#
+# What this demo does NOT show, and must not be narrated as showing: inbound
+# redaction. The user's text reaches the model intact and the SSN is dispatched
+# to the tool intact. Omnia has no control that strips PII before the model —
+# the redaction is on the write path into session-api. See
+# demos/pii-chat/RUNBOOK.md.
+#
+# Requires Omnia Enterprise CRDs for the runtime and privacy policy.
+# ---------------------------------------------------------------------------
 piiChat:
-  # Requires Omnia Enterprise CRDs for the runtime and privacy policy.
   enabled: false
+
+  # The identity-check backend. Same image and same Go binary as the mortgage
+  # stubs — it serves /verify-identity alongside that demo's seven endpoints.
+  #
+  # The repository name reads as mortgage-specific because it is shared, not
+  # because this demo is part of that one. A second image would have to be
+  # built, published and kept alive to buy nothing but a tidier name.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
     # Empty: the chart's appVersion.
     tag: ""
     pullPolicy: IfNotPresent
+
+  # Model behind the support agent, used only when llm.providerRef is empty.
   provider:
     type: claude
     model: claude-sonnet-4-6
     secretRef: anthropic-api-key
+    # -- Maximum output tokens per response.
+    #
+    # A support turn is two or three sentences. The default would do; this is
+    # set explicitly so a longer scripted variant does not get truncated into
+    # something that reads as a model fault.
+    maxTokens: 2048
+
+  # -- The policy under demonstration.
+  #
+  # These are the values you change on camera. `helm upgrade --reuse-values
+  # --set piiChat.privacy.strategy=mask` re-renders the SessionPrivacyPolicy and
+  # takes effect on the next NEW session — start a fresh conversation, do not
+  # re-drive the open one.
   privacy:
+    # -- Turn redaction off to show the same conversation stored in the clear.
+    #
+    # Worth one take: the contrast between an unredacted and a redacted record
+    # of the identical conversation is a stronger argument than either alone.
     redact: true
+    # -- replace | mask | hash
+    #
+    # replace -> [REDACTED_SSN]; mask -> *******6789; hash -> [HASH_SSN:a1b2...].
+    #
+    # replace is the one to film. The token names the KIND of thing that was
+    # removed, so the record alone tells a viewer "an SSN was here and the
+    # policy took it". mask shows that something was scrubbed but not what, and
+    # *******6789 beside *******4471 is two anonymous runs of stars.
+    #
+    # It also matches the Omnia chart's global default policy, which matters
+    # beyond taste: memory-api resolves its policy with an EMPTY agent name, so
+    # the per-agent privacyPolicyRef is skipped there and memory redaction falls
+    # through to the global default. With both on replace, a session beat and a
+    # memory beat render identically instead of raising a question you then
+    # have to answer on camera.
     strategy: replace
-    patterns: [ssn, credit_card, email]
+    # -- Which built-in patterns apply. Also accepts custom:<go-regexp>.
+    #
+    # phone_number is deliberately ABSENT. Its regex matches any bare ten-digit
+    # run, so with it enabled a case number, order ID or reference in the
+    # conversation is silently redacted too — which on camera reads as a bug
+    # rather than as a policy. Add it back if the script has no other long
+    # digit strings in it.
+    patterns:
+      - ssn
+      - credit_card
+      - email
+
+  # -- Cross-session memory, for the third redaction beat.
+  #
+  # Adds memory__remember / memory__recall to the agent so the demo can show
+  # memory-api's redaction alongside session-api's. Two things make that beat
+  # worth its minute:
+  #
+  #   * The memory redactor is provenance-aware. Structural patterns (SSN, card,
+  #     IP) are scrubbed from everything; email and phone survive in a
+  #     user_requested or operator_curated memory, so "remember my work email
+  #     is …" keeps working while a regulatory identifier never lands.
+  #   * It is the ONLY path that emits pii_redacted, so it is the only thing
+  #     that moves the redactions counter on /memory-analytics. The session
+  #     path emits nothing at all.
+  #
+  # Needs no embedding provider: memory-api runs the consent classifier in
+  # regex-only mode when none is configured, which is all this demo requires.
+  #
+  # The deterministic script calls memory__recall and memory__remember, so
+  # leave this on when deterministic is true.
+  #
+  # GOTCHA: the consent classifier runs BEFORE redaction and upgrades
+  # PII-bearing content to memory:identity, so a write without a matching
+  # consent grant is dropped at 204 and redaction never runs — which looks
+  # exactly like a broken agent. The WebSocket message carries a per-turn
+  # `consent_grants` array; see demos/pii-chat/RUNBOOK.md.
+  memory:
+    enabled: true
+
+  # -- Run the agent from a script rather than a live model.
+  #
+  # Off by default: the honest demo is a real model genuinely asking for the
+  # identifiers and genuinely calling the tool, and with a key that is what you
+  # get.
+  #
+  # Turn it ON to capture. Deterministic mode needs no API key and fixes the
+  # exact three-turn conversation, while the tool call, the identity service,
+  # the privacy policy and the session record all stay live. The ONLY thing
+  # faked is the assistant's words. It always uses the demo's own mock
+  # Provider, whatever llm.providerRef says.
+  #
+  # It also fixes the USER's lines, which the mortgage demo does not have to
+  # worry about: the script replies by turn index, so an off-script question
+  # gets the next scripted answer anyway. Type the lines in
+  # demos/pii-chat/RUNBOOK.md verbatim.
+  #
+  # Say so if asked. "The assistant's turns are scripted for the recording; the
+  # tool call, the policy and the record are live" is a fine answer.
+  deterministic: false
+
+  # -- Larkmere Mutual member portal — the customer-facing surface.
+  #
+  # Off by default like every other demo component. When on, the AgentRuntime
+  # also gains externalAuth.edgeTrust so the portal can proxy the conversation
+  # and assert the member's identity; without the portal the agent keeps its
+  # default posture and rejects unauthenticated callers.
+  #
+  # Why a portal at all: the dashboard Console is an OPERATOR surface, and
+  # filming a cardholder typing their SSN into admin tooling implies customers
+  # can reach your ops console. It is also the only place an EU AI Act Art. 50
+  # disclosure is actually DELIVERED to a person — the panel renders it from
+  # `connected.ai_disclosure` on the wire rather than hardcoding it, which is
+  # what makes session-api's ai_disclosure_delivered column mean something.
   portal:
     enabled: false
+    # Built from demos/larkmere-portal. The site is embedded in the binary, so
+    # there is no ConfigMap and nothing to keep in step at runtime.
     image:
       repository: ghcr.io/altairalabs/omnia-demo-larkmere-portal
       # Empty: the chart's appVersion.
       tag: ""
       pullPolicy: IfNotPresent
 
+# ---------------------------------------------------------------------------
+# claimsTriage — Larkmere Mutual claims triage, the delegated-authority demo
+#
+# A claims assessor that may settle up to £500 on its own and must refer
+# anything above that to a human. The rule is enforced by a ToolPolicy the
+# policy broker evaluates before dispatch, NOT by the agent's own judgement and
+# NOT by the claims system — see charts/omnia-demo/templates/claims-triage-tools.yaml
+# for why both of those would have hidden the control.
+#
+# Requires Omnia Enterprise CRDs for the runtime and policy.
+# ---------------------------------------------------------------------------
 claimsTriage:
-  # Requires Omnia Enterprise CRDs for the runtime and policy.
   enabled: false
+
+  # The claims system stub. Same image and same Go binary as the mortgage
+  # stubs — it serves /claim, /claim-policy, /claim-settle and /claim-refer
+  # alongside that demo's endpoints and the card-support identity check.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
     # Empty: the chart's appVersion.
     tag: ""
     pullPolicy: IfNotPresent
+
+  # Model behind the assessor, used only when llm.providerRef is empty.
   provider:
     type: claude
     model: claude-sonnet-4-6
     secretRef: anthropic-api-key
+    maxTokens: 2048
+
+  # Deterministic mode swaps the live provider for the mock and a scripted
+  # chain, whatever llm.providerRef says. Unlike the mortgage demo this is not
+  # the ONLY path to the refusal — a live model asked to settle £990 will
+  # attempt it, because the amount is correct for the claim and the tool does
+  # not tell it the limit. It is the repeatable path, which is what a
+  # recording wants.
+  deterministic: false
 
 sharepoint:
   # Requires Omnia Enterprise memory ingestion and AgentRuntime CRDs.

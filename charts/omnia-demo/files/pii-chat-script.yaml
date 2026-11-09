@@ -1,0 +1,124 @@
+# Scripted model turns for the card-support demo, used only when
+# piiChat.deterministic=true.
+#
+# WHAT IS FAKED: the assistant's words, and its choice to call each tool with
+# those arguments.
+# WHAT IS REAL: the ToolPolicy decision, the ToolRegistry handler, the HTTP call
+# to the identity service, the consent classifier and its gate, the
+# SessionPrivacyPolicy, the redaction of the stored message content AND the
+# stored tool-call arguments, and the session record.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# THE SHAPE: THREE EXCHANGES, A TOOL CALL OPENING EACH
+#
+# The turn index is NOT "the nth thing the user said". Omnia never sets
+# TurnNumber (nothing in Omnia's internal/runtime does), so PromptKit derives it from
+# the number of ASSISTANT messages in the accumulated context, and the first
+# call has none — so it clamps to 1.
+#
+# With TEXT-ONLY turns that clamp collides and turn 1 is served TWICE. Measured
+# with a probe script whose every turn returned its own number:
+#
+#   user msg 1 -> TURN-1
+#   user msg 2 -> TURN-1     <- served twice
+#   user msg 3 -> TURN-2
+#
+# That is why an earlier cut of this demo could not have the agent ask for
+# identification: turn 1 asking would ask AGAIN as the reply to the answer.
+#
+# A TOOL CALL breaks the collision, because the tool round-trip appends its own
+# messages and the counter advances past the clamp inside a single exchange.
+# Measured with the same probe, tool calls on 1, 3 and 5:
+#
+#   user msg 1 -> TURN-2     (turn 1 was the tool call)
+#   user msg 2 -> TURN-4     (turn 3 was the tool call)
+#   user msg 3 -> TURN-6     (turn 5 was the tool call)
+#   user msg 4 -> TURN-7
+#
+# So each exchange consumes two turns and its reply lands on the even one.
+# Nothing repeats.
+#
+# If you change the shape, MEASURE. Do not derive: reasoning "+2" from an
+# observed number has been wrong here twice.
+# ─────────────────────────────────────────────────────────────────────────────
+defaultResponse: "I'm sorry — I can't help with that until I've confirmed your identity."
+scenarios:
+  default:
+    turns:
+      # ── EXCHANGE 1 ──────────────────────────────────────────────────────────
+      # Member: "Hi, I've lost my card." — no personal data yet.
+      #
+      # memory__recall is not filler to make the turn arithmetic work. It is
+      # what a support agent does first: check whether we already know this
+      # member. It is a real PromptKit platform tool, so the call, the consent
+      # check and the store lookup all actually happen — and on a clean demo it
+      # correctly finds nothing, which is WHY the agent has to ask.
+      1:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: memory__recall
+            arguments:
+              query: "card status and contact details for this member"
+
+      # The ASK. This is the turn that makes the demo honest: the SSN arrives
+      # because the agent requested it, not because the member volunteered one
+      # unprompted into a chat box for no reason.
+      2:
+        type: text
+        content: "I'm sorry to hear that — I can cancel it straight away and get a replacement out to you. First I need to verify you. Could you give me your full name, your date of birth and your Social Security number?"
+
+      # ── EXCHANGE 2 ──────────────────────────────────────────────────────────
+      # Member: "Ellen Whitcomb, ellen.whitcomb@example.com — my SSN is
+      #          123-45-6789 and I was born 1988-03-14."
+      #
+      # verify_identity ONLY. The case note is deliberately NOT written here:
+      # see exchange 3. The SSN goes into the tool call as well as the message,
+      # both are stored, and both are redacted by different code paths in the
+      # same middleware — that is the whole reason this tool exists.
+      3:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: verify_identity
+            arguments:
+              ssn: "123-45-6789"
+              dob: "1988-03-14"
+
+      # Reading back only the last four is the agent behaving well; the
+      # redaction in the record is a separate control doing its own job — do not
+      # conflate the two in the voiceover.
+      4:
+        type: text
+        content: "Thank you, Ellen — you're verified. I can see a card ending 4471, currently active. I've cancelled it and ordered a replacement to the address on file; it should reach you in three to five working days."
+
+      # ── EXCHANGE 3 ──────────────────────────────────────────────────────────
+      # Member: "That's everything, thanks."
+      #
+      # The case note is filed HERE, at the end of the call, because that is
+      # when a support agent writes one and because it makes the memory write a
+      # moment you can see rather than something that already happened while the
+      # audience was reading the verification reply. It is also the honest
+      # shape: the note summarises the call, so it cannot be written before the
+      # call is over.
+      #
+      # memory__remember is a platform tool, not a ToolRegistry entry, so it
+      # does not pass through the policy broker the way verify_identity does.
+      # Its content deliberately carries the email AND the SSN, so memory-api's
+      # redactor has something to do — and the two are treated DIFFERENTLY,
+      # which is the point of beat 4.
+      5:
+        type: tool_calls
+        content: ""
+        tool_calls:
+          - name: memory__remember
+            arguments:
+              content: "Ellen Whitcomb reported card ending 4471 lost on this call; identity verified, card cancelled and a replacement issued to the address on file. Reachable at ellen.whitcomb@example.com; SSN given on the call was 123-45-6789."
+
+      # Saying that the note was made is not decoration. A member who is told
+      # what has been written about them can ask for it to be corrected or
+      # removed, which is the whole premise of the consent gate the next beat
+      # demonstrates.
+      6:
+        type: text
+        content: "Of course. I've made a note on your file so the next person you speak to has the background. Your replacement card is on its way — anything else, just ask."

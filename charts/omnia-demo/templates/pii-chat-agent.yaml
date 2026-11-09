@@ -1,0 +1,228 @@
+{{- if .Values.piiChat.enabled }}
+{{- $pc := .Values.piiChat }}
+{{- if $pc.deterministic }}
+---
+# Deterministic mode needs no API key, so it brings its own placeholder
+# credential rather than making you create one. The Provider CRD requires a
+# secretRef; the runtime's mock branch never resolves it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pii-chat-mock-credential
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
+{{- end }}
+{{- if or $pc.deterministic (not .Values.llm.providerRef) }}
+---
+# The demo's own Provider. Deterministic mode always renders it (as the mock);
+# a live install renders it only when llm.providerRef is empty.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: pii-chat-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+{{- if $pc.deterministic }}
+  # type: mock is a second, independent trigger for the mock provider (Omnia's
+  # runtime auto-enables it when the resolved Provider is type mock). Set
+  # alongside the annotation so the two agree — a runtime that took one signal
+  # and not the other would try to reach Anthropic with a placeholder key and
+  # crashloop.
+  type: mock
+  role: llm
+  credential:
+    secretRef:
+      name: pii-chat-mock-credential
+{{- else }}
+  type: {{ $pc.provider.type }}
+  role: llm
+  model: {{ $pc.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $pc.provider.secretRef }}
+  defaults:
+    maxTokens: {{ $pc.provider.maxTokens }}
+{{- end }}
+{{- end }}
+---
+# The identity-check backend. One Deployment, not two: this demo has no trust
+# boundary to draw — unlike mortgageUnderwriting, where the split into
+# case-systems and income-verify IS the argument. Here the tool exists so the
+# SSN travels through a tool call as well as a message, and one Service is
+# enough to make that true.
+#
+# Same image as the mortgage stubs, which is why the repository value reads as
+# mortgage-specific.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pii-chat-identity
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: identity-stub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pii-chat-identity
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: pii-chat-identity
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot" — kubelet refuses
+        # to start the container rather than guess. 65532 is that user's uid.
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $pc.image) }}
+          imagePullPolicy: {{ $pc.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pii-chat-identity
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: pii-chat-identity
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# A chat agent, deliberately. Everything else in this chart that carries a
+# privacy policy is either a backend function or a RAG assistant; the redaction
+# story needs a conversation, because the shot is the contrast between what the
+# viewer watches stream into the browser and what the recording kept.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: pii-chat
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: card-support
+{{- if $pc.deterministic }}
+  # The runtime reads these from the AgentRuntime, not from an env var: the
+  # operator does stamp OMNIA_MOCK_PROVIDER onto the container, but nothing
+  # reads it. The annotation is the switch.
+  annotations:
+    omnia.altairalabs.ai/mock-provider: "true"
+    omnia.altairalabs.ai/mock-config-path: "/etc/omnia/mock/mock-responses.yaml"
+{{- end }}
+spec:
+  promptPackRef:
+    name: pii-chat-pack
+  toolRegistryRef:
+    name: pii-chat-tools
+  # The binding that makes the demo work. Without it the agent falls back to the
+  # installation's global default policy, which also redacts — so a broken ref
+  # here looks identical to a working one until you change the patterns and
+  # nothing happens.
+  privacyPolicyRef:
+    name: pii-chat-privacy
+{{- if $pc.memory.enabled }}
+  # The third redaction point: memory writes.
+  #
+  # Worth showing because it is the only path that behaves differently from the
+  # session record. The redactor is provenance-aware — structural patterns (SSN,
+  # card, IP) are scrubbed from everything, while email and phone SURVIVE in a
+  # user_requested or operator_curated memory, so "remember my work email is …"
+  # still works and a regulatory identifier never lands. It is also the only
+  # path that emits pii_redacted, so it is what moves the redactions counter on
+  # /memory-analytics — the session path emits nothing.
+  #
+  # NO embedding provider is needed for this. memory-api logs
+  # `providerConfigured: false` and runs the consent classifier in regex-only
+  # mode, which is enough: the demo is about what gets STORED, not about
+  # semantic recall quality.
+  memory:
+    enabled: true
+    tools:
+      # memory__remember / memory__recall, registered through the PromptKit SDK
+      # rather than a ToolRegistry — so unlike verify_identity these are NOT
+      # subject to the ToolPolicy the broker enforces.
+      enabled: true
+    retrieval:
+      # Ambient per-turn RAG injection is off: it would pull earlier memories
+      # into the prompt and make each take depend on what previous takes wrote,
+      # which is the opposite of what a scripted capture needs.
+      enabled: false
+{{- end }}
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+{{- if $pc.portal.enabled }}
+  # Trust the member portal as the edge.
+  #
+  # The facade's external listener rejects an unauthenticated browser — as it
+  # should — so the portal proxies the conversation server-side and asserts who
+  # is asking in headers the browser cannot set
+  # (demos/larkmere-portal/server.go, assistantProxy). edgeTrust reads those
+  # headers and does not re-verify them, which is the same arrangement a real
+  # deployment has behind an API gateway or an Istio RequestAuthentication.
+  #
+  # This is the honest shape for a demo AND avoids the alternatives: clientKeys
+  # are minted in the dashboard UI and never live in a CR, so they cannot be
+  # chart-managed, and pointing the portal at the management-plane twin would
+  # have a customer-facing page holding an operator credential.
+  #
+  # The defaults are what the portal sends (x-user-id, x-user-email,
+  # x-user-roles), so no headerMapping is needed.
+  externalAuth:
+    edgeTrust: {}
+{{- end }}
+  runtime:
+    replicas: 1
+{{- if $pc.deterministic }}
+    volumes:
+      - name: mock-script
+        configMap:
+          name: pii-chat-script
+    volumeMounts:
+      - name: mock-script
+        mountPath: /etc/omnia/mock
+{{- end }}
+  providers:
+    - name: default
+      providerRef:
+        # Deterministic mode always runs on the demo's own mock Provider.
+        name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm") }}{{ end }}
+{{- end }}
