@@ -14,7 +14,7 @@ repository and do not access platform databases.
 | `field-service/` | Wrenmoor Energy field-service copilot Arena source | Omnia Enterprise institutional memory |
 | `pii-chat/` | Synthetic card-support Arena source and privacy-governance declarations | Omnia Enterprise for privacy policy behavior |
 | `claims-triage/` | Synthetic claims Arena source | Omnia Enterprise when policy enforcement is enabled |
-| `larkmere-portal/` | Fictional member-portal frontend and proxy | The corresponding chat example |
+| `demo-sites/` | The demo companies' customer-facing sites (Larkmere Mutual, Wrenmoor Energy) and assistant proxy, one image | The chat examples (piiChat, wren) |
 
 The public Helm chart currently deploys the memory-ingestion example and the
 optional Memory Galaxy seeder. The other examples are deliberately shipped as

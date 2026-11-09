@@ -357,7 +357,7 @@ been wrong here twice.
   click — that was deliberate, since the previous behaviour was a silent bounce
   back to the dashboard, which reads as a broken page — but do not linger on one.
 - **The site is compiled into the binary** (`go:embed all:site`), so any change
-  to `demos/larkmere-portal/site/**` needs the image rebuilt; there is no volume
+  to `demos/demo-sites/site/larkmere-mutual/**` needs the image rebuilt; there is no volume
   to edit in place. If a `.dockerignore` ever excludes the tree the failure is
   at BUILD time — `pattern all:site: cannot embed directory site: contains no
   embeddable files` — not at runtime.

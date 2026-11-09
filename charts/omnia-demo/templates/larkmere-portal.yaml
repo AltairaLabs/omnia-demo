@@ -7,8 +7,9 @@
 # would render a chat panel that answers nothing, which looks like a broken
 # product rather than a disabled demo.
 #
-# The site is embedded in the binary (demos/larkmere-portal), so there is no
-# ConfigMap, no volume and nothing to keep in step at runtime.
+# The site is embedded in the demo-sites binary (demos/demo-sites), one image
+# for every brand, so there is no ConfigMap, no volume and nothing to keep in
+# step at runtime. --site picks Larkmere Mutual's.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,7 +44,7 @@ spec:
           imagePullPolicy: {{ .Values.piiChat.portal.image.pullPolicy }}
           # The agent facade's external listener, which edgeTrust opens to the
           # portal's asserted identity headers.
-          args: ["--agent-url", "http://pii-chat.{{ .Values.namespace }}:8080"]
+          args: ["--site", "larkmere-mutual", "--agent-url", "http://pii-chat.{{ .Values.namespace }}:8080"]
           ports:
             - name: http
               containerPort: 8080

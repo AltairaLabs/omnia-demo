@@ -1,0 +1,62 @@
+/* Wrenmoor Energy colour tokens. Source values are OKLCH, as in the handoff;
+   the hex is its sRGB conversion, for reference.
+
+   RULE: wind and sun colours only ever mean wind and solar. Battery and stored
+   power use moor. */
+:root {
+  --moor: oklch(0.40 0.075 165);         /* #13543d  primary, actions, links */
+  --moor-hover: oklch(0.35 0.07 165);    /* primary, hovered */
+  --moor-tint: oklch(0.93 0.03 165);     /* #d6efe3  active nav, badges */
+  --moor-tint-ink: oklch(0.30 0.06 165); /* text on moor-tint */
+  --moor-bar: oklch(0.86 0.03 165);      /* #c0d8cc  usage bars (default) */
+  --moor-hatch: oklch(0.93 0.02 165);    /* estimated / partial bar stripes */
+  --moor-row: oklch(0.97 0.015 165);     /* highlighted table row */
+
+  --peat: oklch(0.25 0.025 165);         /* #16261f  text, footer, intranet sidebar */
+  --peat-muted: oklch(0.45 0.02 165);    /* #4b5952  secondary text */
+  --peat-body: oklch(0.38 0.02 165);     /* #394640  body copy on paper */
+  --peat-faint: oklch(0.50 0.015 165);   /* timestamps, captions */
+  --peat-raised: oklch(0.33 0.035 165);  /* intranet active nav */
+  --peat-panel: oklch(0.30 0.03 165);    /* intranet sidebar box */
+
+  --wind: oklch(0.80 0.12 215);          /* #4cd1ee  wind only */
+  --wind-tint: oklch(0.95 0.035 215);    /* #d5f5fd  wind badge / banner bg */
+  --wind-ink: oklch(0.38 0.08 225);      /* #004a62  text on wind tint */
+  --wind-body: oklch(0.32 0.04 220);     /* body copy on the wind banner */
+
+  --sun: oklch(0.80 0.12 78);            /* #e8b45e  solar only; agent-confirm border */
+  --sun-tint: oklch(0.95 0.045 85);      /* #fcedcd  solar / warning badge bg */
+  --sun-ink: oklch(0.42 0.08 70);        /* #694413  text on sun tint */
+  --confirm-bg: oklch(0.97 0.03 85);     /* #fef4df  agent "Needs your OK" bg */
+  --confirm-line: oklch(0.85 0.08 80);   /* policy-decision callout border */
+
+  --clay: oklch(0.55 0.13 30);           /* #b14f42  errors, overdue, destructive */
+  --clay-ink: oklch(0.50 0.13 30);       /* clay as text */
+  --clay-tint: oklch(0.94 0.04 30);      /* #ffe2dc  error badge bg */
+  --live: oklch(0.62 0.13 150);          /* #429c5a  live-status dot */
+  --idle: oklch(0.75 0.01 165);          /* scheduled / idle dot */
+
+  --paper: oklch(0.975 0.008 85);        /* #f9f6f1  page background */
+  --paper-sunken: oklch(0.965 0.008 85); /* intranet page background */
+  --card: oklch(0.995 0.003 85);         /* #fefdfb  card surface */
+  --card-ink: oklch(0.99 0.005 85);      /* text on moor */
+  --line: oklch(0.88 0.014 85);          /* #dcd7cd  borders */
+  --line-soft: oklch(0.92 0.01 85);      /* dividers inside a card */
+  --line-faint: oklch(0.93 0.01 85);     /* table row rules */
+  --input-line: oklch(0.82 0.015 85);    /* #c8c4b9  input / secondary button border */
+  --chip-line: oklch(0.85 0.015 85);
+  --neutral-tint: oklch(0.93 0.012 85);  /* neutral badge bg */
+  --neutral-ink: oklch(0.40 0.02 165);
+  --placeholder: oklch(0.55 0.015 165);
+  --receipt-bg: oklch(0.965 0.008 85);   /* #f6f3ed  agent tool-receipt bg */
+  --photo-bg: oklch(0.92 0.015 150);     /* behind a photo while it loads */
+
+  --footer-ink: oklch(0.88 0.015 85);
+  --footer-head: oklch(0.97 0.008 85);
+  --disclaimer-bg: oklch(0.21 0.02 165); /* #0f1b16  demo disclaimer strip */
+  --disclaimer-ink: oklch(0.85 0.015 85);
+
+  /* Elevation: borders, not shadows. Floating surfaces only (agent panel,
+     hero overlay card, menus). */
+  --float: 0 12px 32px -8px oklch(0.25 0.025 165 / 0.18);
+}

@@ -195,7 +195,7 @@ spec:
   # The facade's external listener rejects an unauthenticated browser — as it
   # should — so the portal proxies the conversation server-side and asserts who
   # is asking in headers the browser cannot set
-  # (demos/larkmere-portal/server.go, assistantProxy). edgeTrust reads those
+  # (demos/demo-sites/server.go, assistantProxy). edgeTrust reads those
   # headers and does not re-verify them, which is the same arrangement a real
   # deployment has behind an API gateway or an Istio RequestAuthentication.
   #

@@ -372,10 +372,11 @@ piiChat:
   # what makes session-api's ai_disclosure_delivered column mean something.
   portal:
     enabled: false
-    # Built from demos/larkmere-portal. The site is embedded in the binary, so
+    # Built from demos/demo-sites, the one image for every brand's site, run
+    # with --site larkmere-mutual. The site is embedded in the binary, so
     # there is no ConfigMap and nothing to keep in step at runtime.
     image:
-      repository: ghcr.io/altairalabs/omnia-demo-larkmere-portal
+      repository: ghcr.io/altairalabs/omnia-demo-sites
       # Empty: the chart's appVersion.
       tag: ""
       pullPolicy: IfNotPresent
