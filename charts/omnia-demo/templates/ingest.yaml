@@ -32,7 +32,7 @@ spec:
           imagePullPolicy: {{ .Values.memory.image.pullPolicy }}
           env:
             - { name: MEMORY_API_URL, value: {{ include "omnia-demo.memoryURL" . | quote }} }
-            - { name: WORKSPACE_ID, value: {{ .Values.memory.workspaceID | quote }} }
+            - { name: WORKSPACE_ID, value: {{ default (include "omnia-demo.workspaceName" .) .Values.memory.workspaceID | quote }} }
             - { name: MEMORY_SOURCE, value: {{ .Values.memory.source | quote }} }
             - { name: S3_BUCKET, value: {{ .Values.memory.s3.bucket | quote }} }
             - { name: S3_PREFIX, value: {{ .Values.memory.s3.prefix | quote }} }

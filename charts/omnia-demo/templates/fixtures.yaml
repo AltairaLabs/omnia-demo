@@ -5,5 +5,16 @@ metadata:
   name: omnia-demo-memory-fixtures
   namespace: {{ .Values.namespace }}
 data:
-{{ (.Files.Glob "fixtures/memory-s3/*.md").AsConfig | indent 2 }}
+{{- /*
+The documents live INSIDE the chart (files/fixtures/<set>/), because .Files
+only sees the chart's own directory: from the repository root they rendered an
+empty ConfigMap, and the upload step then failed on `mc cp /fixtures/*.md`
+matching nothing.
+*/}}
+{{- $set := default "memory-s3" .Values.memory.fixtures }}
+{{- $docs := .Files.Glob (printf "files/fixtures/%s/*.md" $set) }}
+{{- if not $docs }}
+{{- fail (printf "memory.fixtures: no documents in files/fixtures/%s/" $set) }}
+{{- end }}
+{{ $docs.AsConfig | indent 2 }}
 {{- end }}

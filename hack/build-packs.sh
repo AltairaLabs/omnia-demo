@@ -131,7 +131,7 @@ for demo in "${demos[@]}"; do
 
   echo "    governance: $(jq -r '.metadata.governance | if . then (keys | length | tostring) + " keys" else "none" end' "${out}")"
   echo "    asserted  : $(jq -r '.metadata.asserted | if . then (keys | length | tostring) + " keys" else "none" end' "${out}")"
-  echo "    scopes    : $(jq -r '[.tools[] | select(.action_scope)] | length' "${out}") of $(jq -r '.tools | length' "${out}") tools"
+  echo "    scopes    : $(jq -r '[(.tools // {})[] | select(.action_scope)] | length' "${out}") of $(jq -r '.tools // {} | length' "${out}") tools"
   # Not `// true`: jq's alternative operator treats false as missing.
   if [[ "$(jq -r '.metadata.observed.working_tree_clean | if . == null then true else . end' "${out}")" == "false" ]]; then
     echo "    WARNING   : arena source is dirty; provenance records working_tree_clean=false"

@@ -2,7 +2,8 @@
 #
 # Wrenmoor Energy's field-service copilot. Engineers in vans ask about
 # procedures; the answers come from the field manuals, ingested as
-# institutional memory (fixtures/wrenmoor-field-procedures/) and placed into
+# institutional memory (charts/omnia-demo/files/fixtures/
+# wrenmoor-field-procedures/) and placed into
 # {{memory_context}} by the runtime's ambient retrieval every turn.
 #
 # {{memory_context}} is load-bearing: Omnia runs retrieval only for a pack
