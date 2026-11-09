@@ -41,7 +41,7 @@ if [[ $# -gt 0 ]]; then
   demos=("$@")
 else
   demos=(mortgage-underwriting pii-chat claims-triage sharepoint-adapter
-    incident-agent data-analyst field-service)
+    incident-agent data-analyst field-service wren)
 fi
 
 TMP="$(mktemp -d)"

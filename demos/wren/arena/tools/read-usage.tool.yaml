@@ -1,0 +1,48 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: read_usage
+spec:
+  name: read_usage
+  description: >-
+    Read the signed-in customer's half-hourly smart-meter data for the last
+    N days (default and maximum 60, ending today). Returns each day's kWh and
+    its overnight (00:00-07:00) share, kWh by month for the days returned, the
+    overall overnight share, and the 48 half-hourly readings when two days or
+    fewer are asked for. Today is read to 14:00 only.
+  input_schema:
+    type: object
+    properties:
+      days:
+        type: integer
+        description: How many days back from today, 1 to 60 (default 60)
+  output_schema:
+    type: object
+    properties:
+      from: { type: string }
+      to: { type: string }
+      total_kwh: { type: number }
+      overnight_share_pct: { type: number }
+      kwh_by_month: { type: object }
+      days:
+        type: array
+        items:
+          type: object
+          properties:
+            date: { type: string }
+            kwh: { type: number }
+            overnight_kwh: { type: number }
+            partial: { type: boolean }
+            half_hourly_kwh: { type: array, items: { type: number } }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, energy-usage] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    from: "2026-11-08"
+    to: "2026-11-09"
+    total_kwh: 19.8
+    overnight_share_pct: 54.2
+    kwh_by_month: { "2026-11": 19.8 }
+    days:
+      - { date: "2026-11-08", kwh: 11.8, overnight_kwh: 6.15 }
+      - { date: "2026-11-09", kwh: 8.0, overnight_kwh: 5.58, partial: true }

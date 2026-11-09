@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Wren, Wrenmoor Energy's customer assistant: the chat
+# agent in the customer portal's side panel.
+#
+# The chart ships a COMPILED pack (charts/omnia-demo/files/arena/wren-pack.json)
+# with the governance blocks and each tool's action_scope merged in.
+#
+# Regenerate with: hack/build-packs.sh wren
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: wren
+spec:
+  prompt_configs:
+    - id: wren
+      file: prompts/wren.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # Four reads, one client tool and one write. The write changes a contract,
+  # so it needs the customer's consent: request_consent asks them in the
+  # portal (a CLIENT tool, run by the browser), and switch_tariff will not run
+  # without the consent_id their click creates.
+  tools:
+    - file: tools/read-bill.tool.yaml
+    - file: tools/read-usage.tool.yaml
+    - file: tools/get-weather.tool.yaml
+    - file: tools/quote-tariff.tool.yaml
+    - file: tools/request-consent.tool.yaml
+    - file: tools/switch-tariff.tool.yaml
+
+  scenarios:
+    - file: scenarios/explain-bill.scenario.yaml
+    - file: scenarios/switch-needs-consent.scenario.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

@@ -1,0 +1,29 @@
+# Governance metadata merged into the compiled pack under metadata.asserted by
+# hack/build-packs.sh.
+#
+# ASSERTED. Every key is typed by a human and verified by nothing. The OBSERVED
+# half (commit, author, pipeline) is derived from git at build time so it
+# cannot be typed. The keys are Wrenmoor Energy's own governance schema, not
+# one Omnia defines.
+
+domain: energy-retail
+tags:
+  - customer-service
+  - billing
+  - tariffs
+
+approved_by: "Head of Customer Operations, Wrenmoor Energy"
+approval_date: "2026-11-02"
+change_ticket: "WE-CHG-2317"
+reviewed_by: "Consumer Duty Champion"
+
+decision_authority: "Explains bills and usage and quotes tariffs. A tariff switch is made only on the account holder's explicit consent in the portal."
+control_reference: "WE-CX-03: contract changes require the account holder's explicit consent"
+permitted_actions: "Read the signed-in customer's bills, usage and local weather; quote tariffs; switch tariff with consent."
+prohibited_actions: "Payments, Direct Debits, meter readings, cancellations, and any change without the account holder's OK."
+
+data_classification: "Customer personal and billing data, the signed-in customer's own only."
+retention: "Session transcripts 90 days"
+
+review_due: "2027-05-02"
+review_trigger: "A new tool, any new write, or a change to the consent flow"

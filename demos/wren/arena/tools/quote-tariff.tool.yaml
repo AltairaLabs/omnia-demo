@@ -1,0 +1,44 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: quote_tariff
+spec:
+  name: quote_tariff
+  description: >-
+    Price a tariff (moor-steady or moor-flex) against the signed-in customer's
+    own October half-hourly usage, so it compares like for like with their
+    October bill. Returns the estimate, the saving against what they actually
+    paid, the earliest switch date, the exit fee and the cooling-off terms.
+    Changes nothing.
+  input_schema:
+    type: object
+    properties:
+      tariff:
+        type: string
+        enum: [moor-steady, moor-flex]
+        description: The tariff to price (default moor-flex)
+  output_schema:
+    type: object
+    properties:
+      tariff: { type: object }
+      current_tariff: { type: string }
+      based_on: { type: string }
+      october_actual_gbp: { type: number }
+      october_estimate: { type: object }
+      saving_vs_actual_gbp: { type: number }
+      earliest_switch_date: { type: string }
+      exit_fee_gbp: { type: number }
+      switch_back_within: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, financial] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    tariff: { id: moor-flex, name: Moor Flex, unit_rate: "14–29p/kWh, by half-hour" }
+    current_tariff: moor-steady
+    based_on: "Your October 2026 half-hourly usage (312.4 kWh)"
+    october_actual_gbp: 84.10
+    october_estimate: { energy_gbp: 65.89, standing_gbp: 14.26, credit_gbp: -5.45, total_gbp: 74.70 }
+    saving_vs_actual_gbp: 9.40
+    earliest_switch_date: "2026-12-01"
+    exit_fee_gbp: 0
+    switch_back_within: "14 days, at no cost"

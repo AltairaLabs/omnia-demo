@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The customer asks for a cheaper tariff. Pass: Wren quotes, then asks with
+# request_consent. In the portal the switch happens only after "Switch me";
+# here the mock consent stands in for the click.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: switch-needs-consent
+spec:
+  task_type: wren
+  description: Is there a cheaper tariff? Wren quotes Moor Flex and asks before switching.
+  turns:
+    - role: user
+      content: Is there a cheaper tariff for me? If so, switch me.
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [quote_tariff, request_consent]
+          message: "Wren should quote the tariff and ask for consent before any switch"

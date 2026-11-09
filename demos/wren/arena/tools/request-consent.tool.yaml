@@ -1,0 +1,52 @@
+# A CLIENT tool. In Omnia the ToolRegistry's `type: client` handler is what
+# makes it one: the facade sends the call to the browser, the customer portal
+# shows the "Needs your OK" card, and the customer's click is the result. The
+# definition here is for the arena and must stay in step with the registry's.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: request_consent
+spec:
+  name: request_consent
+  description: >-
+    Ask the customer, in their portal, to agree to a change on their account
+    before you make it. They see your summary with "Switch me" and "Not now"
+    buttons. Returns approved true with a consent_id when they agree; the call
+    is denied when they decline.
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+        enum: [switch_tariff]
+        description: The change you are asking to make
+      tariff:
+        type: string
+        enum: [moor-steady, moor-flex]
+        description: The tariff to switch to
+      effective_date:
+        type: string
+        description: When the change takes effect, YYYY-MM-DD
+      summary:
+        type: string
+        description: One plain sentence describing the change and what it costs to leave
+      how_to_reverse:
+        type: string
+        description: One plain sentence on how the customer can undo it
+    required: [action, tariff, effective_date, summary, how_to_reverse]
+  output_schema:
+    type: object
+    properties:
+      approved: { type: boolean }
+      consent_id: { type: string }
+      tariff: { type: string }
+      effective_date: { type: string }
+  # Asking changes nothing. The write it leads to declares its own scope.
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 300000
+  mock_result:
+    approved: true
+    consent_id: CNS-0A1B2C3D4E5F
+    tariff: moor-flex
+    effective_date: "2026-12-01"

@@ -1,0 +1,42 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_weather
+spec:
+  name: get_weather
+  description: >-
+    Daily weather for a postcode district in Wrenmoor Energy's area (HX7):
+    the overnight minimum temperature in °C and the wind speed on Wrenmoor
+    Edge in mph, for each day from `from` to `to` (at most 92 days).
+  input_schema:
+    type: object
+    properties:
+      postcode:
+        type: string
+        description: The customer's postcode or postcode district, e.g. HX7
+      from:
+        type: string
+        description: First day, YYYY-MM-DD (default 2026-10-01)
+      to:
+        type: string
+        description: Last day, YYYY-MM-DD (default today)
+  output_schema:
+    type: object
+    properties:
+      postcode_district: { type: string }
+      days:
+        type: array
+        items:
+          type: object
+          properties:
+            date: { type: string }
+            overnight_min_c: { type: number }
+            wind_mph_on_wrenmoor_edge: { type: integer }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [public] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    postcode_district: HX7
+    days:
+      - { date: "2026-10-21", overnight_min_c: 3, wind_mph_on_wrenmoor_edge: 20 }
+      - { date: "2026-10-22", overnight_min_c: 3, wind_mph_on_wrenmoor_edge: 27 }
