@@ -2,10 +2,12 @@
 The Provider an agent uses: llm.providerRef when it is set, so every demo runs
 on one Provider that already exists in the namespace (a keyless Azure AI
 Foundry Provider, say). Otherwise the demo's own Provider, named by `own`.
-Call with (dict "root" $ "own" "<demo>-llm").
+A demo's own providerRef (`demoRef`) wins over both, so one demo can use a
+Provider tuned for it (longer output, say) while the rest share one.
+Call with (dict "root" $ "own" "<demo>-llm" "demoRef" .Values.<demo>.providerRef).
 */}}
 {{- define "omnia-demo.llmProvider" -}}
-{{- default .own .root.Values.llm.providerRef -}}
+{{- default (default .own .root.Values.llm.providerRef) .demoRef -}}
 {{- end -}}
 
 {{/*

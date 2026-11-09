@@ -122,6 +122,10 @@ galaxy:
 # See demos/mortgage-underwriting/RUNBOOK.md.
 # ---------------------------------------------------------------------------
 mortgageUnderwriting:
+  # -- A Provider in the namespace for this demo alone. Wins over
+  # llm.providerRef; use it for a demo that needs its own tuning (output
+  # length, stream timeout), which a shared Provider does not carry.
+  providerRef: ""
   enabled: false
 
   # Stub standing in for the case systems and the approved third-party
@@ -226,6 +230,10 @@ mortgageUnderwriting:
 # Requires Omnia Enterprise CRDs for the runtime and privacy policy.
 # ---------------------------------------------------------------------------
 piiChat:
+  # -- A Provider in the namespace for this demo alone. Wins over
+  # llm.providerRef; use it for a demo that needs its own tuning (output
+  # length, stream timeout), which a shared Provider does not carry.
+  providerRef: ""
   enabled: false
 
   # The identity-check backend. Same image and same Go binary as the mortgage
@@ -376,6 +384,10 @@ piiChat:
 # Requires Omnia Enterprise CRDs for the runtime and policy.
 # ---------------------------------------------------------------------------
 claimsTriage:
+  # -- A Provider in the namespace for this demo alone. Wins over
+  # llm.providerRef; use it for a demo that needs its own tuning (output
+  # length, stream timeout), which a shared Provider does not carry.
+  providerRef: ""
   enabled: false
 
   # The claims system stub. Same image and same Go binary as the mortgage

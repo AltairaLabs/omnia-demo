@@ -16,7 +16,7 @@ type: Opaque
 stringData:
   ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
 {{- end }}
-{{- if or $ct.deterministic (not .Values.llm.providerRef) }}
+{{- if or $ct.deterministic (not (or $ct.providerRef .Values.llm.providerRef)) }}
 ---
 # The demo's own Provider. Deterministic mode always renders it (as the mock);
 # a live install renders it only when llm.providerRef is empty.
@@ -188,5 +188,5 @@ spec:
     - name: default
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
-        name: {{ if $ct.deterministic }}claims-triage-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "claims-triage-llm") }}{{ end }}
+        name: {{ if $ct.deterministic }}claims-triage-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "claims-triage-llm" "demoRef" $ct.providerRef) }}{{ end }}
 {{- end }}

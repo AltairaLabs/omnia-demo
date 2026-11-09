@@ -16,7 +16,7 @@ type: Opaque
 stringData:
   ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
 {{- end }}
-{{- if or $mu.deterministic (not .Values.llm.providerRef) }}
+{{- if or $mu.deterministic (not (or $mu.providerRef .Values.llm.providerRef)) }}
 ---
 # The demo's own Provider. Deterministic mode always renders it (as the mock);
 # a live install renders it only when llm.providerRef is empty — otherwise the
@@ -261,5 +261,5 @@ spec:
     - name: default
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
-        name: {{ if $mu.deterministic }}mortgage-underwriting-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "mortgage-underwriting-llm") }}{{ end }}
+        name: {{ if $mu.deterministic }}mortgage-underwriting-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "mortgage-underwriting-llm" "demoRef" $mu.providerRef) }}{{ end }}
 {{- end }}

@@ -16,7 +16,7 @@ type: Opaque
 stringData:
   ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
 {{- end }}
-{{- if or $pc.deterministic (not .Values.llm.providerRef) }}
+{{- if or $pc.deterministic (not (or $pc.providerRef .Values.llm.providerRef)) }}
 ---
 # The demo's own Provider. Deterministic mode always renders it (as the mock);
 # a live install renders it only when llm.providerRef is empty.
@@ -224,5 +224,5 @@ spec:
     - name: default
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
-        name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm") }}{{ end }}
+        name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef) }}{{ end }}
 {{- end }}
