@@ -1,0 +1,6 @@
+# Docker build context (publish.yml, make images). No Dockerfile reads these.
+.git
+.github
+.claude
+.images.env
+**/.DS_Store

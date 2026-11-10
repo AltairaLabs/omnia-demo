@@ -32,3 +32,6 @@ notes/
 
 # Compiled PromptPack JSON from markdown sources (generated during Helm chart build)
 **/*.compiled.json
+
+# The last `make images` dev build (Makefile)
+.images.env

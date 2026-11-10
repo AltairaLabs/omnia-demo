@@ -694,3 +694,12 @@ catalogue:
     parentRefs: []
     # The dashboard's host, e.g. [omnia.example.com].
     hostnames: []
+
+# -- Every demo image at once, for dev builds (`make images`). `registry`
+# replaces the registry and organisation of each image's repository (its last
+# path segment is kept: ghcr.io/altairalabs/omnia-demo-sites becomes
+# <registry>/omnia-demo-sites), and `tag` overrides every image's tag. Empty:
+# each image's own repository and tag.
+images:
+  registry: ""
+  tag: ""

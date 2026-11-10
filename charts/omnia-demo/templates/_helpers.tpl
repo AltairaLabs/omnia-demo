@@ -17,7 +17,12 @@ the images built with it.
 Call with (dict "root" $ "image" .Values.<demo>.image).
 */}}
 {{- define "omnia-demo.image" -}}
-{{- .image.repository }}:{{ default .root.Chart.AppVersion .image.tag -}}
+{{- $override := .root.Values.images | default dict -}}
+{{- $repository := .image.repository -}}
+{{- if $override.registry -}}
+{{- $repository = printf "%s/%s" (trimSuffix "/" $override.registry) (base .image.repository) -}}
+{{- end -}}
+{{- $repository }}:{{ coalesce $override.tag .image.tag .root.Chart.AppVersion -}}
 {{- end -}}
 
 {{/* The demo Workspace's name: workspace.name, or the namespace. */}}
