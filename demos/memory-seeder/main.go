@@ -18,7 +18,7 @@ import (
 // observationOwnerUser is the synthetic operations user the observations are
 // attributed to. POST /api/v1/memories writes the user tier only, so every
 // write there names a user; this one stands for the support team.
-const observationOwnerUser = "hawkridge-ops"
+const observationOwnerUser = "demo-ops"
 
 // defaultLeaves is the leaf count fitted for the Galaxy, memory-api's own
 // default for /admin/brain/build-leaves.
@@ -26,6 +26,9 @@ const defaultLeaves = 64
 
 // options are the run's switches beyond the data itself.
 type options struct {
+	// privacyAPI, with --fixture: grant each member the consent categories
+	// their memories need before writing them.
+	privacyAPI  string
 	buildGalaxy bool
 	leaves      int
 	seed        int64
@@ -208,7 +211,7 @@ func run(ctx context.Context, c *Client, g Generated, opt options) (summary, err
 		write      func(i int) (string, error)
 	}{
 		{stepInstitutional, tierInstitutional, institutionalFacts, func(i int) (string, error) {
-			return c.SaveInstitutional(ctx, typePolicy, fmt.Sprintf("Hawkridge policy fact %d", i), 0.9)
+			return c.SaveInstitutional(ctx, typePolicy, fmt.Sprintf("Demo policy fact %d", i), 0.9)
 		}},
 		{stepAgent, tierAgent, len(g.AgentMemories), func(i int) (string, error) {
 			return c.SaveAgentMemory(ctx, g.AgentMemories[i])
@@ -287,7 +290,21 @@ func main() {
 	buildGalaxyFlag := flag.Bool("build-galaxy", true,
 		"after seeding, drain pending embeddings and fit the Galaxy's leaf clusters")
 	leaves := flag.Int("galaxy-leaves", defaultLeaves, "leaf clusters to fit when --build-galaxy is set")
+	fixtureName := flag.String("fixture", "",
+		"replay an embedded generated corpus (fixtures/<name>, from demos/memory-galaxy) instead of the scenario")
+	privacyAPI := flag.String("privacy-api", "",
+		"with --fixture: privacy-api base URL; grants each member the consent categories their memories need")
+	agents := agentFlag{}
+	flag.Var(agents, "agent", "with --fixture: name=AgentRuntime-UID for each agent the corpus writes for (repeatable)")
 	flag.Parse()
+	if *fixtureName != "" {
+		if *wsUID == "" {
+			log.Fatal("--workspace-uid is required")
+		}
+		runFixtureMain(*base, *wsUID, *tokenPath, *fixtureName, agents,
+			options{privacyAPI: *privacyAPI, buildGalaxy: *buildGalaxyFlag, leaves: *leaves, seed: *seed})
+		return
+	}
 	if *wsUID == "" {
 		log.Fatal("--workspace-uid is required " +
 			"(retrieve the workspace metadata.uid from your cluster)")
@@ -334,4 +351,52 @@ func report(sum summary, c *Client) {
 	}
 	fmt.Printf("%d writes refused by consent, %d dropped with privacy-api unreachable\n",
 		c.Suppressed, c.PrivacyUnavailable)
+}
+
+// agentFlag collects repeated --agent name=uid flags.
+type agentFlag map[string]string
+
+func (a agentFlag) String() string { return fmt.Sprint(map[string]string(a)) }
+
+func (a agentFlag) Set(v string) error {
+	name, uid, ok := strings.Cut(v, "=")
+	if !ok || name == "" || uid == "" {
+		return fmt.Errorf("want name=uid, got %q", v)
+	}
+	a[name] = uid
+	return nil
+}
+
+func runFixtureMain(base, wsUID, tokenPath, name string, agents map[string]string, opt options) {
+	f, err := loadFixture(name)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var missing []string
+	for _, n := range f.agentNames() {
+		if agents[n] == "" {
+			missing = append(missing, n)
+		}
+	}
+	if len(missing) > 0 {
+		log.Fatalf("--agent name=uid is needed for: %s", strings.Join(missing, ", "))
+	}
+	pseudo, err := loadPseudonymizer()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Printf("fixture %s: %d memories, %d graph items, %d edges; pseudonym key %s (keyed=%t)",
+		name, len(f.memories), len(f.graph.Items), len(f.graph.Edges), pseudo.Fingerprint(), pseudo.Keyed())
+	c := NewClient(base, wsUID, tokenPath, pseudo)
+	ctx := context.Background()
+	if _, err := c.CheckKeyBinding(ctx); err != nil {
+		fmt.Fprintln(os.Stderr, "seed refused:", err)
+		os.Exit(1)
+	}
+	sum, err := runFixture(ctx, c, f, agents, opt)
+	report(sum, c)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "seed failed:", err)
+		os.Exit(1)
+	}
 }

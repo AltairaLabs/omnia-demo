@@ -1,0 +1,215 @@
+{{- if .Values.galaxy.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $ws := include "omnia-demo.workspaceName" . }}
+{{- $policy := include "omnia-demo.galaxyPolicyName" . }}
+{{- $memSA := printf "memory-%s-%s" $ws .Values.galaxy.serviceGroup }}
+{{- $image := include "omnia-demo.image" (dict "root" $ "image" .Values.galaxy.image) }}
+---
+# The memory Galaxy: a generated corpus (demos/memory-galaxy) of what members
+# talk about and what the society knows, across every tier, replayed by the
+# memory-seeder. This MemoryPolicy is the vocabulary it uses; the Workspace's
+# memory service points at it (policyRef, workspace.yaml).
+#
+# Cluster-scoped, so named after the tenant.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: MemoryPolicy
+metadata:
+  name: {{ $policy }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: galaxy
+spec:
+  schema:
+    version: "{{ $ws }}.v1"
+    types:
+      # Platform types the agents and the document path write.
+      - { name: general, displayName: General, allowedTiers: [institutional, agent, user, user_for_agent] }
+      - { name: fact, displayName: Fact, allowedTiers: [institutional, agent, user, user_for_agent] }
+      - { name: preference, displayName: Preference, allowedTiers: [user, user_for_agent, agent] }
+      - { name: observation, displayName: Observation, allowedTiers: [user, user_for_agent, agent] }
+      - { name: document, displayName: Document, allowedTiers: [institutional] }
+      - { name: section, displayName: Section, allowedTiers: [institutional] }
+      - { name: chunk, displayName: Chunk, allowedTiers: [institutional] }
+      # The society's knowledge graph.
+      - name: product
+        displayName: Product
+        description: Something the society sells — home insurance, a mortgage.
+        allowedTiers: [institutional]
+      - name: claim_type
+        displayName: Claim type
+        description: A peril or claim category, as the policy wording defines it.
+        allowedTiers: [institutional]
+      - name: procedure
+        displayName: Procedure
+        description: An internal procedure staff and agents follow.
+        allowedTiers: [institutional]
+      - name: guidance
+        displayName: Guidance
+        description: An extract of official guidance, procedure or policy wording.
+        allowedTiers: [institutional]
+    relations:
+      - { name: covers, kind: containment, inverse: covered_by, sourceTypes: [product], targetTypes: [claim_type], directed: true }
+      - { name: governs, kind: logical, inverse: governed_by, sourceTypes: [procedure], targetTypes: [claim_type, product], directed: true }
+      - { name: follows, kind: sequence, inverse: precedes, sourceTypes: [procedure], targetTypes: [procedure], directed: true }
+      - { name: about, kind: reference, inverse: subject_of, sourceTypes: [guidance], targetTypes: [claim_type, product, procedure], directed: true }
+      - { name: same_as, kind: equivalence, directed: false }
+      - { name: part_of, kind: containment, inverse: contains, sourceTypes: [section, chunk], targetTypes: [document, section], directed: true }
+      - { name: next, kind: sequence, inverse: previous, sourceTypes: [section, chunk], targetTypes: [section, chunk], directed: true }
+  tiers:
+    institutional: {}
+    agent: {}
+    user: {}
+  {{- with .Values.galaxy.graphExpansion }}
+  # Recall walks the graph: a question about a claim reaches the procedure
+  # that governs its type and the guidance about it.
+  recall:
+    graphExpansion:
+      enabled: true
+      hops: {{ .hops }}
+      maxAdded: {{ .maxAdded }}
+      relationTypes: {{ toJson .relationTypes }}
+  {{- end }}
+---
+# The seed runs as memory-api's own ServiceAccount: with internal service auth
+# on, memory-api lets only its own identity write the shared tiers and name
+# users. These grants let that SA's init container read the UIDs the seeder
+# needs (the Workspace, and each agent the corpus writes for).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $ws }}-galaxy-seed
+rules:
+  - apiGroups: ["omnia.altairalabs.ai"]
+    resources: ["workspaces"]
+    resourceNames: [{{ $ws | quote }}]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $ws }}-galaxy-seed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $ws }}-galaxy-seed
+subjects:
+  - { kind: ServiceAccount, name: {{ $memSA }}, namespace: {{ $ns }} }
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: galaxy-seed
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["omnia.altairalabs.ai"]
+    resources: ["agentruntimes"]
+    verbs: ["get"]
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: galaxy-seed
+  namespace: {{ $ns }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: galaxy-seed
+subjects:
+  - { kind: ServiceAccount, name: {{ $memSA }}, namespace: {{ $ns }} }
+---
+# One Job per seeder image: a new build (or a new fixture) seeds again, and the
+# same build never does. Re-seeding is safe — every memory carries an about key,
+# so a second write supersedes the first instead of adding a copy.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: galaxy-seed-{{ printf "%s|%s" $image .Values.galaxy.fixture | sha256sum | trunc 10 }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: galaxy
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: galaxy
+    spec:
+      restartPolicy: Never
+      serviceAccountName: {{ $memSA }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile: { type: RuntimeDefault }
+      initContainers:
+        - name: resolve
+          image: {{ .Values.galaxy.kubectlImage }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              until kubectl wait --for=condition=Available deployment/{{ $memSA }} -n {{ $ns }} --timeout=60s; do sleep 5; done
+              uid() { kubectl get "$@" -o jsonpath='{.metadata.uid}' 2>/dev/null || true; }
+              until [ -n "$(uid workspace {{ $ws }})" ]; do sleep 5; done
+              uid workspace {{ $ws }} > /shared/workspace-uid
+              : > /shared/agents
+              {{- range .Values.galaxy.agents }}
+              until [ -n "$(uid agentruntime {{ . }} -n {{ $ns }})" ]; do echo "waiting for agent {{ . }}"; sleep 5; done
+              echo "--agent={{ . }}=$(uid agentruntime {{ . }} -n {{ $ns }})" >> /shared/agents
+              {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: shared, mountPath: /shared }
+            # kubectl's in-cluster config, mounted here rather than relying
+            # on automount for memory-api's ServiceAccount.
+            - { name: kube-api-access, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true }
+      containers:
+        - name: seed
+          image: {{ $image }}
+          imagePullPolicy: {{ .Values.galaxy.image.pullPolicy }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              exec /usr/local/bin/memory-seeder \
+                --memory-api=http://{{ $memSA }}.{{ $ns }}:8080 \
+                --workspace-uid="$(cat /shared/workspace-uid)" \
+                --fixture={{ .Values.galaxy.fixture }} \
+                {{- if .Values.workspace.privacy }}
+                --privacy-api=http://privacy-{{ $ws }}.{{ $ns }}:8080 \
+                {{- end }}
+                --galaxy-leaves={{ .Values.galaxy.leaves }} \
+                $(cat /shared/agents)
+          env:
+            - { name: SESSION_API_TOKEN_PATH, value: /var/run/secrets/omnia/memory/token }
+            - name: OMNIA_PSEUDONYM_HMAC_KEY
+              valueFrom: { secretKeyRef: { name: omnia-workspace-pseudonym-key, key: key } }
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: { drop: ["ALL"] }
+          volumeMounts:
+            - { name: shared, mountPath: /shared, readOnly: true }
+            - { name: memory-token, mountPath: /var/run/secrets/omnia/memory, readOnly: true }
+      volumes:
+        - name: shared
+          emptyDir: {}
+        - name: kube-api-access
+          projected:
+            sources:
+              - serviceAccountToken: { path: token, expirationSeconds: 3600 }
+              - configMap: { name: kube-root-ca.crt, items: [{ key: ca.crt, path: ca.crt }] }
+              - downwardAPI: { items: [{ path: namespace, fieldRef: { fieldPath: metadata.namespace } }] }
+        - name: memory-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.galaxy.tokenAudience }}
+                  expirationSeconds: 3600
+{{- end }}

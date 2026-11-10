@@ -1,0 +1,1558 @@
+{
+ "items": [
+  {
+   "key": "guidance-verifying-identity-on-the-phone-0-1",
+   "kind": "guidance",
+   "title": "verifying identity on the phone",
+   "content": "When you call Larkmere Mutual, we will first confirm that we are speaking with the correct person before discussing any account or policy details. We may ask you to confirm selected personal information already held on our records and, where appropriate, answer a security question. If you are unable to pass verification, we will not disclose any confidential information by telephone.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-verifying-identity-on-the-phone-0-2",
+   "kind": "guidance",
+   "title": "verifying identity on the phone",
+   "content": "For your protection, our advisers must not rely on caller display, voice recognition alone, or any information provided without challenge. We may ask for more than one item of evidence to satisfy ourselves as to identity. This helps us reduce the risk of fraud and unauthorised access to member information.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-verifying-identity-on-the-phone-0-3",
+   "kind": "guidance",
+   "title": "verifying identity on the phone",
+   "content": "Where a member has appointed an authorised representative, we will still complete our standard telephone security checks before dealing with the call. The representative may be asked to provide evidence of authority if that is not already recorded on the account. We will only speak to the extent permitted by that authority.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-forgotten-security-answers-0-1",
+   "kind": "guidance",
+   "title": "forgotten security answers",
+   "content": "If you have forgotten your security answer, we will not reveal or hint at the answer under any circumstances. For your protection, we may ask you to complete additional identity checks before we discuss your account.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-forgotten-security-answers-0-2",
+   "kind": "guidance",
+   "title": "forgotten security answers",
+   "content": "You should not share your security answer with anyone, including a member of Larkmere Mutual staff. We will only use the answer, together with other verification checks, to confirm that we are speaking to the correct person.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-identity-documents-for-a-new-account-0-1",
+   "kind": "guidance",
+   "title": "identity documents for a new account",
+   "content": "When opening a new account, we must confirm your identity and address before we can proceed. We will normally ask for one document from our approved list of identity documents and one document showing your current address.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-registering-a-lasting-power-of-attorney-0-1",
+   "kind": "guidance",
+   "title": "registering a lasting power of attorney",
+   "content": "Where an account holder wishes a lasting power of attorney to be used, we must first receive a certified copy of the registered document or a sealed office copy. We cannot act on an unregistered lasting power of attorney unless the law permits us to do so.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-registering-a-lasting-power-of-attorney-0-2",
+   "kind": "guidance",
+   "title": "registering a lasting power of attorney",
+   "content": "We will check the attorney’s authority before allowing them to manage a member’s mortgage, savings or current account. If the lasting power of attorney is not valid, not registered where registration is required, or appears incomplete, we may be unable to accept instructions.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-an-attorney-managing-a-parent-s-account-0-1",
+   "kind": "guidance",
+   "title": "an attorney managing a parent's account",
+   "content": "If you have authority to act as an attorney for a member, you may manage the account only within the scope of the power granted. We will need sight of the original or a certified copy of the lasting power of attorney, or equivalent legal authority, before we can register the arrangement. Until registration is complete, we may be unable to accept instructions from you.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-an-attorney-managing-a-parent-s-account-0-2",
+   "kind": "guidance",
+   "title": "an attorney managing a parent's account",
+   "content": "An attorney must satisfy our identification and verification checks before access is granted. We may ask for evidence of your name, address and authority to act, and we may carry out additional checks where required by law. These checks are designed to protect the member and the account.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-adding-a-partner-to-a-home-policy-0-1",
+   "kind": "guidance",
+   "title": "adding a partner to a home policy",
+   "content": "If you wish to add a partner to your home policy, please contact us so we can update the policyholder details. We will need to confirm that your partner has an insurable interest in the home and that they normally live there. Any change may affect the premium or the terms of cover.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-adding-a-partner-to-a-home-policy-0-2",
+   "kind": "guidance",
+   "title": "adding a partner to a home policy",
+   "content": "A partner may be added to the policy as a joint policyholder where both adults share responsibility for the insurance contract. This means both policyholders are entitled to make changes and receive correspondence about the policy. We may ask for proof that you live together at the insured address.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-joint-mortgage-applicants-0-1",
+   "kind": "guidance",
+   "title": "joint mortgage applicants",
+   "content": "Where a mortgage is held jointly, each applicant is jointly and severally liable for the whole of the borrowing. This means we may seek repayment from either applicant for any amount outstanding under the mortgage terms.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-joint-mortgage-applicants-0-2",
+   "kind": "guidance",
+   "title": "joint mortgage applicants",
+   "content": "All joint mortgage applicants must complete the full application process and provide evidence of identity, address and income where requested. We assess the application as a whole and do not rely on one applicant’s information alone.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-separating-joint-policyholders-after-a-break-up-0-1",
+   "kind": "guidance",
+   "title": "separating joint policyholders after a break-up",
+   "content": "Where a joint policy is held by two policyholders who separate, the policy continues unless both parties agree an amendment or cancellation in writing, or one party can demonstrate authority to act for the other. We may require confirmation of the preferred arrangements before making any change to cover, payments or correspondence. Any alteration takes effect only from the date we process it.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-changing-a-name-after-marriage-0-1",
+   "kind": "guidance",
+   "title": "changing a name after marriage",
+   "content": "If you have changed your name following marriage, you may ask us to update your records once you have the relevant supporting documents. We will normally need evidence of the new name and a document showing the link to your previous name. Any change will apply to your policy records and correspondence once we have processed your request.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-changing-a-name-after-marriage-0-2",
+   "kind": "guidance",
+   "title": "changing a name after marriage",
+   "content": "For security, we can only amend a name after marriage when we are satisfied that the request is genuine. Please provide your marriage certificate or equivalent legal evidence together with identification in your new name if available. Where identification is not yet available, we may still update your record on production of sufficient documentary proof.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-a-name-that-doesn-t-match-the-card-0-1",
+   "kind": "guidance",
+   "title": "a name that doesn't match the card",
+   "content": "If the name on the payment card does not match the name on the policy or account, we may ask for additional verification before we can process the payment. This is to protect members against unauthorised use of card details. We may also decline the payment where we cannot satisfy ourselves that the cardholder has given permission.",
+   "category": "identity"
+  },
+  {
+   "key": "guidance-telling-the-society-a-policyholder-has-died-0-1",
+   "kind": "guidance",
+   "title": "telling the society a policyholder has died",
+   "content": "If a policyholder dies, the personal representative or next of kin should tell Larkmere Mutual as soon as reasonably practicable. We will then make the necessary changes to the account, policy or claim record in line with our bereavement procedures.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-telling-the-society-a-policyholder-has-died-0-2",
+   "kind": "guidance",
+   "title": "telling the society a policyholder has died",
+   "content": "We may ask for a copy of the death certificate or an interim official record before we can discuss the policy in detail. Where probate has been granted, we may also require confirmation of the executor’s authority.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-a-claim-made-by-the-executor-of-an-estate-0-1",
+   "kind": "guidance",
+   "title": "a claim made by the executor of an estate",
+   "content": "Where the policyholder has died, a claim may be made by the executor or personal representative of the estate, provided we are satisfied they are acting lawfully. We may ask for a sealed copy of the grant of probate or letters of administration before we discuss the claim in detail. Until we have seen evidence of authority, we will only communicate with the appointed representative about the claim.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-hearing-loss-and-phone-calls-0-1",
+   "kind": "guidance",
+   "title": "hearing loss and phone calls",
+   "content": "If a member has difficulty hearing over the telephone, our colleagues will offer to continue the conversation in writing, by secure message or by another suitable channel. Where needed, we may also arrange a call back at a quieter time or ask the member to use relay support. We will not treat a hearing difficulty as a reason to delay urgent assistance.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-hearing-loss-and-phone-calls-0-2",
+   "kind": "guidance",
+   "title": "hearing loss and phone calls",
+   "content": "When a member advises us that they have hearing loss, we will make a note on the account so that future contact is handled appropriately. This may include speaking more slowly, confirming key details in writing, and checking that the member has understood the information given. We will always seek the member's preferred way of communicating.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-needing-large-print-or-braille-documents-0-1",
+   "kind": "guidance",
+   "title": "needing large-print or braille documents",
+   "content": "If you need documents in large print or braille, we will provide them at no extra cost. Please tell us your preference when you contact us so we can arrange the format that best suits your needs.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-sight-loss-and-reading-card-numbers-0-1",
+   "kind": "guidance",
+   "title": "sight loss and reading card numbers",
+   "content": "If a member cannot read a card number because of sight loss, staff must not ask them to guess or rely on an unverified third party. Verify identity using the society's approved alternative checks and then continue the request in the member's preferred format.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-a-carer-speaking-for-a-member-0-1",
+   "kind": "guidance",
+   "title": "a carer speaking for a member",
+   "content": "If a member asks a carer to speak on their behalf, we may discuss the account or policy only where we are satisfied that the member has given their clear consent. We may ask the carer to confirm the member’s name, policy number and the nature of the authority given. Where appropriate, we may record that authority on the member’s file.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-a-carer-speaking-for-a-member-0-2",
+   "kind": "guidance",
+   "title": "a carer speaking for a member",
+   "content": "A carer who is not the member cannot make decisions for the member unless they hold a valid power of attorney or other recognised authority. If such authority is in place, we will normally need to see evidence before we discuss sensitive information or make changes. Until then, we will treat the carer as a representative only for communication purposes.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-a-member-in-hospital-during-a-claim-0-1",
+   "kind": "guidance",
+   "title": "a member in hospital during a claim",
+   "content": "If a member is admitted to hospital during the progress of a claim, we will note the claim file and pause any time-limited request for information where it is reasonable to do so. We may contact the member later, or their nominated representative, once they are able to respond.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-struggling-to-pay-the-mortgage-0-1",
+   "kind": "guidance",
+   "title": "struggling to pay the mortgage",
+   "content": "If you are struggling to keep up with your mortgage payments, please contact us as soon as possible. The earlier you speak to us, the more options we may have to help you manage the situation.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-struggling-to-pay-the-mortgage-0-2",
+   "kind": "guidance",
+   "title": "struggling to pay the mortgage",
+   "content": "We will always treat customers in financial difficulty with fairness and understanding. Our first step is to review your circumstances and discuss whether a temporary arrangement may be suitable.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-struggling-to-pay-the-mortgage-0-3",
+   "kind": "guidance",
+   "title": "struggling to pay the mortgage",
+   "content": "You may be able to reduce your monthly payments by changing the way your mortgage is repaid, extending the term, or moving to a different payment arrangement. Any change will depend on your individual circumstances and the terms of your mortgage.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-asking-to-pay-a-premium-monthly-instead-0-1",
+   "kind": "guidance",
+   "title": "asking to pay a premium monthly instead",
+   "content": "If you ask to pay your premium monthly, we may be able to change your payment plan subject to affordability checks and our underwriting criteria. Monthly payment is an alternative to paying the full premium upfront and may increase the total amount you pay over the year.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-asking-to-pay-a-premium-monthly-instead-0-2",
+   "kind": "guidance",
+   "title": "asking to pay a premium monthly instead",
+   "content": "Where monthly instalments are available, we will confirm the amount of each payment and the dates on which they will be taken. You must keep enough money in your account for each collection to avoid a missed payment.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-illness-affecting-income-0-1",
+   "kind": "guidance",
+   "title": "illness affecting income",
+   "content": "If illness reduces your household income, you should contact us as soon as possible so we can discuss the support available. We may ask for evidence of the change in circumstances, such as medical or employment documentation. Any arrangement we agree will depend on your individual circumstances and our assessment at the time.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-illness-affecting-income-0-2",
+   "kind": "guidance",
+   "title": "illness affecting income",
+   "content": "Where an illness means you cannot maintain your mortgage payments in full, we will consider options to help you avoid arrears. These may include a temporary payment arrangement, a change to the payment date or a review of the term. We will explain any consequences before agreeing a change.",
+   "category": "health"
+  },
+  {
+   "key": "guidance-moving-home-mid-policy-0-1",
+   "kind": "guidance",
+   "title": "moving home mid-policy",
+   "content": "If you move home during the policy term, you must tell us as soon as reasonably possible. We will update your records and confirm whether the cover can continue at your new address or whether a change to the terms is needed.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-moving-home-mid-policy-0-2",
+   "kind": "guidance",
+   "title": "moving home mid-policy",
+   "content": "Your insurance is arranged for the home shown on your schedule. Cover may not automatically transfer to a different property, even where the move is within the United Kingdom.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-moving-home-mid-policy-0-3",
+   "kind": "guidance",
+   "title": "moving home mid-policy",
+   "content": "Before completion of your move, you must tell us the date you expect to leave your current home and the date you expect to occupy the new one. This helps us make sure the correct property is insured at the correct time.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-porting-a-mortgage-to-a-new-property-0-1",
+   "kind": "guidance",
+   "title": "porting a mortgage to a new property",
+   "content": "If you wish to move your mortgage to a new property, you must first make a formal porting application and provide details of the property you intend to buy. Porting is subject to affordability, underwriting and the property meeting our lending criteria. We may need to review the term, loan amount or repayment basis before giving approval.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-porting-a-mortgage-to-a-new-property-0-2",
+   "kind": "guidance",
+   "title": "porting a mortgage to a new property",
+   "content": "A mortgage may only be ported where the existing account is up to date and no material breach of the mortgage conditions has occurred. Any arrears or unresolved account issues may prevent the transfer from proceeding. We will confirm in writing whether the mortgage can be ported to the new property.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-a-gap-between-selling-and-buying-0-1",
+   "kind": "guidance",
+   "title": "a gap between selling and buying",
+   "content": "Where a member sells a property and is temporarily without another home to insure, cover may continue only if the policy terms permit an unoccupied period. Members must tell us at once if the home becomes empty, as different terms, conditions and security requirements may apply.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-rebuild-cost-after-an-extension-0-1",
+   "kind": "guidance",
+   "title": "rebuild cost after an extension",
+   "content": "If you add an extension, you must tell us as soon as the work is complete or sooner if the rebuild cost may change materially. We may ask for an updated rebuilding valuation so that your buildings sum insured remains adequate.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-rebuild-cost-after-an-extension-0-2",
+   "kind": "guidance",
+   "title": "rebuild cost after an extension",
+   "content": "The rebuild cost must reflect the full cost of reinstating the home to the same standard, including the extension, not the market value. It should allow for professional fees, labour, materials and site clearance where applicable.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-a-listed-or-older-building-0-1",
+   "kind": "guidance",
+   "title": "a listed or older building",
+   "content": "If your home is a listed building, you must tell us before we issue or renew cover. We will only insure it on the basis that any repair, reinstatement or alteration complies with all statutory consents and conservation requirements.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-insuring-a-holiday-cottage-0-1",
+   "kind": "guidance",
+   "title": "insuring a holiday cottage",
+   "content": "A holiday cottage must be disclosed to us as a property used for short-stay letting or occasional guest occupation. Standard home insurance may not provide the cover required where the property is let, unoccupied for extended periods, or managed by third parties.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-a-buy-to-let-flat-0-1",
+   "kind": "guidance",
+   "title": "a buy-to-let flat",
+   "content": "A buy-to-let flat may be insured under a landlord arrangement provided it is occupied under a formal tenancy agreement. The policyholder must tell us if the property is let to family, friends or a company, as different terms may apply.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-a-buy-to-let-flat-0-2",
+   "kind": "guidance",
+   "title": "a buy-to-let flat",
+   "content": "Where a flat is held on a leasehold basis, the policyholder remains responsible for checking that the lease permits letting. We may ask to see evidence of consent from the freeholder or managing agent if this is required by the lease.",
+   "category": "location"
+  },
+  {
+   "key": "guidance-going-paperless-0-1",
+   "kind": "guidance",
+   "title": "going paperless",
+   "content": "You may choose to receive most account, policy and servicing documents electronically instead of by post. When you go paperless, we will send notices to your registered email address and make documents available through your online account where applicable.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-going-paperless-0-2",
+   "kind": "guidance",
+   "title": "going paperless",
+   "content": "Paperless delivery helps us reduce printing and postage, and it supports our wider commitments to efficiency and environmental responsibility. Some documents may still be sent in paper form where the law, regulation or the nature of the document requires it.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-still-wanting-paper-statements-0-1",
+   "kind": "guidance",
+   "title": "still wanting paper statements",
+   "content": "If you still want paper statements, you may keep receiving them by post instead of by email or online message. This can be set on your account where available, subject to any other terms that apply to the product you hold.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-moving-the-direct-debit-date-to-payday-0-1",
+   "kind": "guidance",
+   "title": "moving the direct debit date to payday",
+   "content": "If you need your direct debit collected on or just after payday, you may request a change to your collection date. We will review the request against the payment schedule for your policy or account and confirm the earliest available date.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-moving-the-direct-debit-date-to-payday-0-2",
+   "kind": "guidance",
+   "title": "moving the direct debit date to payday",
+   "content": "A direct debit date can usually be moved to suit your payday, provided the instruction remains within the collection window for that billing period. Any change will take effect from the next eligible collection, not retrospectively.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-paying-the-premium-annually-for-the-discount-0-1",
+   "kind": "guidance",
+   "title": "paying the premium annually for the discount",
+   "content": "If you choose to pay your premium annually, we will apply the annual payment discount shown on your quote or renewal notice. The discount is only available where the full premium is paid in one instalment before the due date.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-preferring-email-to-phone-calls-0-1",
+   "kind": "guidance",
+   "title": "preferring email to phone calls",
+   "content": "Where possible, members should use email rather than telephoning us, as this gives us a written record of the request and helps us respond more efficiently. Email is especially useful for non-urgent enquiries, document submissions and status updates.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-preferring-email-to-phone-calls-0-2",
+   "kind": "guidance",
+   "title": "preferring email to phone calls",
+   "content": "For routine servicing of accounts and policies, email is our preferred contact method. It enables us to route your message to the correct team and reduces delays caused by call waiting times.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-calls-only-after-work-hours-0-1",
+   "kind": "guidance",
+   "title": "calls only after work hours",
+   "content": "We will only make outbound calls to members after normal working hours where there is a clear operational need and the contact is permitted by the member's recorded preferences. Such calls must be made courteously and kept as brief as possible.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-no-marketing-please-0-1",
+   "kind": "guidance",
+   "title": "no marketing please",
+   "content": "If a claim is settled on a cash basis, we will pay a fair amount to reflect the cost of repair, replacement or reinstatement, less any deductions stated in the policy. We may ask for evidence of ownership, age, condition or value before making payment. Where appropriate, we may appoint suppliers or loss adjusters to assess the claim.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-no-marketing-please-0-2",
+   "kind": "guidance",
+   "title": "no marketing please",
+   "content": "You must take reasonable steps to prevent further damage after an insured event. This includes making the property safe, protecting it from the weather and arranging temporary repairs where necessary. We will expect any emergency costs to be reasonable and supported by receipts where available.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-how-the-member-dividend-is-paid-0-1",
+   "kind": "guidance",
+   "title": "how the member dividend is paid",
+   "content": "The member dividend is declared by the Board when the Society has made a surplus and retained sufficient capital to meet regulatory requirements. It is not guaranteed and may vary from year to year.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-how-the-member-dividend-is-paid-0-2",
+   "kind": "guidance",
+   "title": "how the member dividend is paid",
+   "content": "Where a dividend is declared, it is ordinarily paid to eligible members by bank transfer to the current account or nominated account held on the Society’s records. Members should ensure their payment details are kept up to date.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-reinvesting-the-dividend-into-savings-0-1",
+   "kind": "guidance",
+   "title": "reinvesting the dividend into savings",
+   "content": "Members may choose to reinvest any dividend credited to their account into an eligible Larkmere savings account. Where this option is selected, the dividend is applied in accordance with the account terms then in force. The reinvested amount will form part of the cleared balance of the receiving account.",
+   "category": "preferences"
+  },
+  {
+   "key": "guidance-roof-tiles-blown-off-in-a-storm-0-1",
+   "kind": "guidance",
+   "title": "roof tiles blown off in a storm",
+   "content": "If storm conditions have lifted and roof tiles have been blown off, you should make the area safe as soon as it is practicable to do so. Do not put yourself at risk by climbing onto a damaged roof or handling loose tiles that may fall.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-roof-tiles-blown-off-in-a-storm-0-2",
+   "kind": "guidance",
+   "title": "roof tiles blown off in a storm",
+   "content": "Where roof tiles have been displaced by storm, we will normally ask you to take reasonable emergency steps to prevent further damage. This may include covering exposed areas temporarily and arranging for urgent attendance by a qualified contractor.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-roof-tiles-blown-off-in-a-storm-0-3",
+   "kind": "guidance",
+   "title": "roof tiles blown off in a storm",
+   "content": "Storm damage to roof tiles is considered under the buildings section of the policy, subject to the terms, exclusions and excess that apply. We will assess the claim against the weather conditions and the condition of the roof at the time of loss.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-roof-tiles-blown-off-in-a-storm-0-4",
+   "kind": "guidance",
+   "title": "roof tiles blown off in a storm",
+   "content": "You must tell us about roof tiles blown off in a storm as soon as reasonably possible after the event. Early notification helps us to record the cause of loss and advise you on any immediate protective action.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-roof-tiles-blown-off-in-a-storm-0-5",
+   "kind": "guidance",
+   "title": "roof tiles blown off in a storm",
+   "content": "If wind has lifted or removed roof tiles, we may request photographs of the damage and any debris on the ground. Where safe to do so, please retain any broken tiles that may assist with our assessment or repairs.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-fence-blown-down-0-1",
+   "kind": "guidance",
+   "title": "a fence blown down",
+   "content": "If a fence is blown down in a storm, we will consider whether the damage was caused by an insured event under your buildings or home insurance. Damage that is solely due to wear, decay, lack of maintenance or gradual deterioration is not covered.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-fence-blown-down-0-2",
+   "kind": "guidance",
+   "title": "a fence blown down",
+   "content": "You should make the area safe as soon as possible after the loss. Where a fence has become unstable or fallen into a public area, arrange temporary securing or warning measures without delay.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-fence-blown-down-0-3",
+   "kind": "guidance",
+   "title": "a fence blown down",
+   "content": "Please retain any damaged sections, photographs and any receipts for emergency repairs. We may ask for these to help us assess the cause and extent of the damage.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-fence-blown-down-0-4",
+   "kind": "guidance",
+   "title": "a fence blown down",
+   "content": "Where fencing forms part of the insured buildings, we will normally look to repair or replace it on a like-for-like basis, subject to the terms, limits and excess of your policy. We do not provide betterment for pre-existing deterioration.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-damaged-shed-or-outbuilding-0-1",
+   "kind": "guidance",
+   "title": "a damaged shed or outbuilding",
+   "content": "If a shed, garage or other outbuilding is damaged by an insured event, we will assess the damage in line with your buildings cover, provided it forms part of the premises insured and is not excluded. We may ask for photographs, receipts or other evidence to confirm the age, construction and condition of the structure. Any repair or replacement will be based on the terms and limits of your policy.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-damaged-shed-or-outbuilding-0-2",
+   "kind": "guidance",
+   "title": "a damaged shed or outbuilding",
+   "content": "Damage to a detached outbuilding caused by storm will only be covered where the building is soundly constructed and properly maintained. We do not pay for wear and tear, rot, gradual deterioration or damage arising from defective workmanship or poor maintenance. Where the structure has not been kept in reasonable repair, we may reduce or decline a claim.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-damaged-shed-or-outbuilding-0-3",
+   "kind": "guidance",
+   "title": "a damaged shed or outbuilding",
+   "content": "Contents kept in a shed or outbuilding are only covered if your policy includes the relevant contents cover and the item is not subject to any special limit or exclusion. High-value items may be subject to a lower limit when stored away from the main home. You should check your schedule for any restrictions applying to garden equipment, bicycles or tools.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-burst-pipe-in-winter-0-1",
+   "kind": "guidance",
+   "title": "a burst pipe in winter",
+   "content": "Where freezing temperatures are forecast, you must take reasonable steps to protect your home from escape of water. This includes keeping the heating on low, insulating exposed pipes and ensuring the property is checked regularly if left unoccupied.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-burst-pipe-in-winter-0-2",
+   "kind": "guidance",
+   "title": "a burst pipe in winter",
+   "content": "If a pipe bursts, turn off the water at the stopcock without delay and, where safe to do so, switch off the relevant electricity supply in affected areas. You should then take immediate action to limit further damage and arrange temporary drying or repairs.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-burst-pipe-in-winter-0-3",
+   "kind": "guidance",
+   "title": "a burst pipe in winter",
+   "content": "Claims arising from burst pipes in winter are considered under the escape of water section of the home policy. Cover applies subject to the terms, conditions, limits and exclusions shown in the schedule and wording.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-burst-pipe-in-winter-0-4",
+   "kind": "guidance",
+   "title": "a burst pipe in winter",
+   "content": "We expect members to maintain their homes in a good state of repair and to act promptly when signs of frost risk or leakage appear. Failure to take reasonable precautions may affect the outcome of a claim.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-leaking-washing-machine-damaging-the-floor-0-1",
+   "kind": "guidance",
+   "title": "a leaking washing machine damaging the floor",
+   "content": "If a washing machine leaks and water damages the floor, we will normally treat this as escape of water, provided the loss was sudden and accidental. Cover depends on the terms of the policy, including the cause of the leak and whether the property was adequately maintained. You should take reasonable steps to stop further damage as soon as it is safe to do so.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-leaking-washing-machine-damaging-the-floor-0-2",
+   "kind": "guidance",
+   "title": "a leaking washing machine damaging the floor",
+   "content": "Where water from a leaking appliance has affected flooring, we may consider the age, type and condition of the floor when deciding the claim. Wear and tear, gradual seepage and lack of maintenance are not covered causes. We may also ask for photographs and evidence of the source of the leak.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-leak-from-the-flat-upstairs-0-1",
+   "kind": "guidance",
+   "title": "a leak from the flat upstairs",
+   "content": "Where water has leaked from a flat above yours, you should take immediate steps to protect the property and prevent further damage. This includes moving items away from the affected area, containing the leak where possible, and reporting the incident as soon as reasonably practicable.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-leak-from-the-flat-upstairs-0-2",
+   "kind": "guidance",
+   "title": "a leak from the flat upstairs",
+   "content": "A leak from an upstairs flat may be the responsibility of the person in occupation or of the freeholder, depending on the cause of the escape of water. We may ask you to provide details of the source of the leak and any managing agent or landlord involvement before we can assess the claim.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-break-in-while-on-holiday-0-1",
+   "kind": "guidance",
+   "title": "a break-in while on holiday",
+   "content": "If your home is broken into while you are away on holiday, you must report the matter to the police as soon as reasonably practicable and obtain a crime reference number. You should also tell us promptly and give us full details of what was taken, how entry was gained, and when the loss was discovered.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-break-in-while-on-holiday-0-2",
+   "kind": "guidance",
+   "title": "a break-in while on holiday",
+   "content": "For theft claims following a break-in, we may ask for evidence of ownership, purchase, or value for the items claimed. Where available, please provide photographs, receipts, serial numbers, or warranty documents to help us assess the claim.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-bike-stolen-from-the-garden-0-1",
+   "kind": "guidance",
+   "title": "a bike stolen from the garden",
+   "content": "If a bicycle is stolen from your garden, you must tell us as soon as reasonably possible and report the theft to the police. We may ask for the crime reference number, proof of ownership and photographs or purchase records, where available.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-bike-stolen-from-the-garden-0-2",
+   "kind": "guidance",
+   "title": "a bike stolen from the garden",
+   "content": "Cover for theft from a garden only applies where the bicycle was secured in accordance with the policy conditions. If the bicycle was left unsecured, or the security requirements were not met, we may not be able to pay the claim.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-stolen-card-used-abroad-0-1",
+   "kind": "guidance",
+   "title": "a stolen card used abroad",
+   "content": "If your card is lost or stolen and then used abroad, you must tell us as soon as you can by calling the number shown in your account documents. We may ask you to confirm the date and circumstances of the loss or theft, and to cancel the card immediately to reduce the risk of further misuse.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-stolen-card-used-abroad-0-2",
+   "kind": "guidance",
+   "title": "a stolen card used abroad",
+   "content": "We will review unauthorised transactions on a stolen card used outside the UK in line with our cardholder terms. Where you have taken reasonable care of the card and PIN, you will not usually be liable for losses after you have notified us, except where the law allows otherwise.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-cracks-appearing-in-the-walls-0-1",
+   "kind": "guidance",
+   "title": "cracks appearing in the walls",
+   "content": "If cracks appear in external or internal walls, members should report them to Larkmere Mutual without delay and take photographs showing their location and extent. Small cracks caused by minor settlement may be monitored, but any widening, diagonal or stepped cracking, or cracking that appears suddenly should be assessed promptly by a suitable professional. We may ask for further evidence before deciding whether the damage is covered.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-remortgaging-at-the-end-of-a-fixed-rate-0-1",
+   "kind": "guidance",
+   "title": "remortgaging at the end of a fixed rate",
+   "content": "At the end of a fixed rate period, the account will automatically revert to our variable reversion rate unless you have agreed a new product in advance. Members are responsible for making sure any remortgage application is submitted in good time if they wish to avoid moving onto the reversion rate. We will write to you before the fixed rate ends to explain your options.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-remortgaging-at-the-end-of-a-fixed-rate-0-2",
+   "kind": "guidance",
+   "title": "remortgaging at the end of a fixed rate",
+   "content": "Where a member wishes to remortgage into a new Larkmere Mutual product, the application must be completed and approved before the existing fixed rate expires. If completion takes place after the end date, the account may move onto the standard variable rate for the intervening period. Any new interest rate will apply only from the date agreed in the offer.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-remortgaging-at-the-end-of-a-fixed-rate-0-3",
+   "kind": "guidance",
+   "title": "remortgaging at the end of a fixed rate",
+   "content": "We may require an updated valuation, income evidence and a review of your current mortgage conduct before approving a remortgage at the end of a fixed rate. The amount you can borrow will depend on our lending criteria at the time of application. Borrowing terms may differ from those that applied when the original mortgage was taken out.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-overpaying-the-mortgage-0-1",
+   "kind": "guidance",
+   "title": "overpaying the mortgage",
+   "content": "You may make overpayments to reduce the balance of your mortgage, subject to the terms of your mortgage offer and any applicable limits. Overpayments will ordinarily be applied first to outstanding interest and then to capital, unless your mortgage conditions state otherwise.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-overpaying-the-mortgage-0-2",
+   "kind": "guidance",
+   "title": "overpaying the mortgage",
+   "content": "If you wish to make a lump-sum overpayment, you must ensure that cleared funds are available before the payment date. Any overpayment received after the contractual payment date may not reduce the next monthly instalment.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-complaint-about-a-slow-claim-0-1",
+   "kind": "guidance",
+   "title": "a complaint about a slow claim",
+   "content": "If you are unhappy with the time taken to progress your claim, you may raise a complaint at any stage. We will acknowledge it promptly and set out the next steps for review. Your complaint will be handled separately from the claim itself where appropriate.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-complaint-about-a-slow-claim-0-2",
+   "kind": "guidance",
+   "title": "a complaint about a slow claim",
+   "content": "We will provide a clear update on the status of your claim when a delay has occurred. Where further investigation is needed, we will explain what is outstanding and the likely timescale for completion. We aim to keep you informed until the matter is resolved.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-declined-claim-the-member-disputes-0-1",
+   "kind": "guidance",
+   "title": "a declined claim the member disputes",
+   "content": "If we decline a claim, we will explain our reasons in writing and refer you to the relevant terms and conditions of your policy. You may ask us to review the decision if you believe we have misunderstood the facts or applied the policy incorrectly. Any request for review should be made as soon as reasonably possible after you receive our decision.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-a-declined-claim-the-member-disputes-0-2",
+   "kind": "guidance",
+   "title": "a declined claim the member disputes",
+   "content": "When you dispute a declined claim, we will re-examine the claim file, including the information you supplied, any expert reports, and the policy wording in force at the time of the loss. If further information may affect the outcome, we may ask you to provide it before we complete the review. Our decision on review will be confirmed in writing.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-going-to-the-financial-ombudsman-0-1",
+   "kind": "guidance",
+   "title": "going to the Financial Ombudsman",
+   "content": "If you remain dissatisfied after we have sent our final response, you may be entitled to refer your complaint to the Financial Ombudsman Service. You must usually do so within six months of the date of our final response. The Ombudsman service is free to use.",
+   "category": "history"
+  },
+  {
+   "key": "guidance-whether-the-home-policy-covers-flooding-0-1",
+   "kind": "guidance",
+   "title": "whether the home policy covers flooding",
+   "content": "Flood damage is covered under the home policy unless a specific exclusion or endorsement says otherwise. We will assess each claim against the terms, limits and conditions that apply to the policy in force at the time of the loss.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-waiting-for-the-loss-adjuster-0-1",
+   "kind": "guidance",
+   "title": "waiting for the loss adjuster",
+   "content": "If we appoint a loss adjuster, you must wait for their visit before carrying out permanent repairs, unless urgent action is needed to make the home safe or prevent further damage. We may ask you to preserve any damaged items and keep them available for inspection. Temporary protective measures are allowed where they are reasonably necessary.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-waiting-for-the-loss-adjuster-0-2",
+   "kind": "guidance",
+   "title": "waiting for the loss adjuster",
+   "content": "Please do not dispose of damaged property until we or our loss adjuster have had the opportunity to inspect it. Photographs, receipts and any contractor quotations should be retained for our review. Where items must be discarded for safety reasons, please keep a clear record of what was removed.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-waiting-for-the-loss-adjuster-0-3",
+   "kind": "guidance",
+   "title": "waiting for the loss adjuster",
+   "content": "If a loss adjuster is instructed, they will contact you to arrange an appointment. You should be ready to provide access to the affected rooms, loft, outbuildings and any other areas relevant to the claim. Delays in arranging access may slow our assessment and settlement of the claim.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-chasing-a-contractor-for-repairs-0-1",
+   "kind": "guidance",
+   "title": "chasing a contractor for repairs",
+   "content": "Where repairs are arranged by Larkmere Mutual, the appointed contractor will be chased by our claims team on the member’s behalf if work is not progressing within the agreed timescale. We will record each contact attempt and seek a revised completion date where appropriate. If delay continues, we may review whether an alternative repair route is required.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-chasing-a-contractor-for-repairs-0-2",
+   "kind": "guidance",
+   "title": "chasing a contractor for repairs",
+   "content": "Members should not repeatedly contact the contractor directly unless asked to do so by our claims handler. We will make the formal request for progress and remind the contractor of any agreed appointments. This helps us keep one clear record of the repair position.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-temporary-accommodation-during-repairs-0-1",
+   "kind": "guidance",
+   "title": "temporary accommodation during repairs",
+   "content": "Where a claim for insured damage makes your home unfit to live in, we may arrange temporary accommodation for you and your household while essential repairs are carried out. The accommodation must be reasonably similar to your normal standard of living and suitable for your immediate needs.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-a-mortgage-application-waiting-on-payslips-0-1",
+   "kind": "guidance",
+   "title": "a mortgage application waiting on payslips",
+   "content": "Where a mortgage application is awaiting recent payslips, the application shall remain in a pending status until the documents are received and checked. We may be unable to issue a final decision or proceed to offer stage without satisfactory evidence of income.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-a-mortgage-application-waiting-on-payslips-0-2",
+   "kind": "guidance",
+   "title": "a mortgage application waiting on payslips",
+   "content": "Applicants who are paid monthly must provide their most recent payslips, and in some cases we may request additional payslips to confirm continuity of income. Any gap in submission may delay underwriting and completion timescales.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-a-mortgage-application-waiting-on-payslips-0-3",
+   "kind": "guidance",
+   "title": "a mortgage application waiting on payslips",
+   "content": "If payslips are outstanding, we will contact the applicant or their broker to request the missing items. The case will not progress to final assessment until the requested documents have been supplied in full.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-self-employed-income-evidence-0-1",
+   "kind": "guidance",
+   "title": "self-employed income evidence",
+   "content": "Where an applicant is self-employed, Larkmere Mutual will normally require the most recent two years’ evidence of income. Acceptable evidence includes HMRC tax calculations, tax year overviews, and corresponding business accounts or SA302 summaries.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-self-employed-income-evidence-0-2",
+   "kind": "guidance",
+   "title": "self-employed income evidence",
+   "content": "If trading has been established for less than two years, we may accept the available period of accounts together with supporting bank statements. We will assess the continuity of earnings and the sustainability of the business before making a lending decision.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-a-valuation-came-in-low-0-1",
+   "kind": "guidance",
+   "title": "a valuation came in low",
+   "content": "If the valuer’s report comes in below the agreed purchase price, we may be unable to lend the full amount originally requested. The advance will normally be based on the lower of the purchase price and the valuation figure, subject to the product criteria and your affordability assessment.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-a-valuation-came-in-low-0-2",
+   "kind": "guidance",
+   "title": "a valuation came in low",
+   "content": "Where a property is valued below the amount being borrowed, we will notify you of the revised lending position as soon as practicable. You may choose to proceed with a reduced loan, renegotiate the purchase price, or withdraw from the application.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-falling-behind-on-mortgage-payments-0-1",
+   "kind": "guidance",
+   "title": "falling behind on mortgage payments",
+   "content": "If you think you may miss a mortgage payment, contact us as soon as possible. The earlier we speak to you, the more likely it is that we can help you agree a suitable arrangement.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-falling-behind-on-mortgage-payments-0-2",
+   "kind": "guidance",
+   "title": "falling behind on mortgage payments",
+   "content": "When a payment is missed, we will review your account and may contact you to understand your circumstances. We will consider whether a temporary arrangement, payment plan or other forbearance is appropriate.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-falling-behind-on-mortgage-payments-0-3",
+   "kind": "guidance",
+   "title": "falling behind on mortgage payments",
+   "content": "You should continue to make any payment you can reasonably afford, even if you cannot pay the full amount due. Any part payment will usually reduce the balance on which interest is charged.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-falling-behind-on-mortgage-payments-0-4",
+   "kind": "guidance",
+   "title": "falling behind on mortgage payments",
+   "content": "We will treat customers in payment difficulty fairly and will take account of individual circumstances, including changes in income, illness, redundancy or separation. We will not press for repayment in a way that is unreasonable or unhelpful.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-falling-behind-on-mortgage-payments-0-5",
+   "kind": "guidance",
+   "title": "falling behind on mortgage payments",
+   "content": "If you do not keep to an agreed arrangement, your account may fall further into arrears. We may then ask you for updated information so that we can review the options available.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-an-arrears-payment-plan-0-1",
+   "kind": "guidance",
+   "title": "an arrears payment plan",
+   "content": "If your mortgage account falls into arrears, we will contact you promptly to understand the circumstances and to discuss the options available. We will always try to agree a payment plan that is affordable and sustainable for you, taking account of your income and essential outgoings.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-an-arrears-payment-plan-0-2",
+   "kind": "guidance",
+   "title": "an arrears payment plan",
+   "content": "An arrears payment plan is a formal arrangement for repaying missed mortgage payments over an agreed period. It does not remove the arrears, and you must continue to make your normal monthly payment as well as any agreed additional amount.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-an-arrears-payment-plan-0-3",
+   "kind": "guidance",
+   "title": "an arrears payment plan",
+   "content": "Before we can set up an arrears payment plan, we may ask you for evidence of your income, spending and any changes to your circumstances. This helps us assess what repayment amount is realistic and avoids creating further arrears.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-an-arrears-payment-plan-0-4",
+   "kind": "guidance",
+   "title": "an arrears payment plan",
+   "content": "We will not agree to a repayment amount that would leave you unable to meet your priority household bills. Where appropriate, we may reduce or pause the arrears payment plan if your financial circumstances change and you tell us straight away.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-energy-bills-squeezing-the-budget-0-1",
+   "kind": "guidance",
+   "title": "energy bills squeezing the budget",
+   "content": "If energy bills are placing pressure on your household budget, you should contact us as early as possible. We may be able to agree temporary arrangements to help you remain on track with your payments while your circumstances are considered.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-energy-bills-squeezing-the-budget-0-2",
+   "kind": "guidance",
+   "title": "energy bills squeezing the budget",
+   "content": "Where increased utility costs are affecting your finances, we will treat your request for support sympathetically and without prejudice. We may ask for brief details of your current income and essential outgoings so that we can assess the most appropriate option.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-energy-bills-squeezing-the-budget-0-3",
+   "kind": "guidance",
+   "title": "energy bills squeezing the budget",
+   "content": "Our payment support arrangements are intended to help members who are experiencing a short-term squeeze on their budget, including higher gas and electricity costs. Any arrangement we offer will depend on your individual circumstances and the information you provide.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-energy-bills-squeezing-the-budget-0-4",
+   "kind": "guidance",
+   "title": "energy bills squeezing the budget",
+   "content": "If you are struggling to meet commitments because energy bills have risen, please do not wait until a payment is missed. Early contact gives us the best chance of agreeing a manageable solution and avoiding further difficulty.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-cancelling-cover-to-save-money-0-1",
+   "kind": "guidance",
+   "title": "cancelling cover to save money",
+   "content": "If you no longer need your cover, you may cancel it at any time by contacting us. We will confirm the cancellation date and explain whether any return premium is due. A cancellation fee may apply where shown in your policy schedule.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-cancelling-cover-to-save-money-0-2",
+   "kind": "guidance",
+   "title": "cancelling cover to save money",
+   "content": "Reducing your cover can lower your premium, but it may also leave you without protection for future claims. Before you cancel, please check whether your mortgage lender or other interested party requires the cover to remain in force. We recommend reviewing the full consequences of cancellation before you decide.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-cancelling-cover-to-save-money-0-3",
+   "kind": "guidance",
+   "title": "cancelling cover to save money",
+   "content": "Where you cancel a policy after the start date, we will normally charge for the time you have been insured. Any remaining balance will be returned to you, less any applicable fees and charges. If you have made a claim, we may not be able to refund any premium.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-shopping-around-at-renewal-0-1",
+   "kind": "guidance",
+   "title": "shopping around at renewal",
+   "content": "At renewal, we will send you your renewal invitation and the premium we are offering for the next period of cover. You should check the details carefully and compare our offer with alternatives before deciding whether to renew.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-shopping-around-at-renewal-0-2",
+   "kind": "guidance",
+   "title": "shopping around at renewal",
+   "content": "We encourage members to shop around at renewal to make sure the cover remains suitable and competitively priced. If you choose not to renew, please ensure you have arranged alternative insurance so there is no break in cover.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-shopping-around-at-renewal-0-3",
+   "kind": "guidance",
+   "title": "shopping around at renewal",
+   "content": "Your renewal price may change each year based on our underwriting criteria, claims experience and other relevant factors. This does not necessarily mean your circumstances have changed, and we recommend comparing cover as well as price.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-the-renewal-price-went-up-0-1",
+   "kind": "guidance",
+   "title": "the renewal price went up",
+   "content": "If your renewal price has increased, this may reflect changes in the level of risk we assess, including claims costs, repair inflation and the wider cost of providing cover. Your renewal invitation will show the premium due and any material changes to your policy terms.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-the-renewal-price-went-up-0-2",
+   "kind": "guidance",
+   "title": "the renewal price went up",
+   "content": "We may revise renewal premiums at each annual renewal. A change in price does not mean your cover has reduced, but you should review your documents carefully before deciding whether to continue.",
+   "category": "context"
+  },
+  {
+   "key": "guidance-the-renewal-price-went-up-0-3",
+   "kind": "guidance",
+   "title": "the renewal price went up",
+   "content": "Where a renewal price has gone up, the increase may be due to factors affecting the whole market as well as those specific to your policy. These factors can include weather-related claims, parts and labour costs, and changes in underwriting appetite.",
+   "category": "context"
+  },
+  {
+   "key": "home-insurance",
+   "kind": "product",
+   "title": "Larkmere Home Insurance",
+   "content": "Larkmere Home Insurance is designed to help you protect your home and the things you keep in it. You can choose buildings cover, contents cover, or both. Buildings cover helps with the structure of your home, including fixtures and fittings, garages and other permanent outbuildings. Contents cover helps protect your household items such as furniture, appliances, clothing and personal belongings against insured events like fire, storm, theft and escape of water.\n\nWe also provide cover for common extras such as temporary accommodation, alternative accommodation for pets where available, accidental damage on selected options, and garden items up to the limits in your policy.\n\nLike all insurance, there are some exclusions and limits. We do not cover wear and tear, gradual deterioration, lack of maintenance, damage caused by poor workmanship or defective materials, deliberate damage, or loss not reported promptly to the police where required. Flood and storm are covered only where the damage is sudden and meets the policy definition. Subsidence, landslip and heave are covered only if shown on your schedule. Certain valuables, bicycles, and high-risk items may have separate limits. Please read your policy booklet and schedule carefully so you know exactly what is included."
+  },
+  {
+   "key": "motor-insurance",
+   "kind": "product",
+   "title": "Larkmere Motor Insurance",
+   "content": "Larkmere Motor Insurance is designed to give you straightforward cover for everyday driving. It helps protect you against the costs of accidental damage, fire and theft, and liability if you injure someone or damage their property while using your car. You can choose the level of cover that suits your needs, with optional extras available for features such as breakdown assistance and protected no-claims discount. Our policy is intended for private cars used for social, domestic and commuting purposes, and certain business use may be accepted depending on your circumstances.\n\nIf your car is stolen, damaged in an accident, or written off, we will assess the claim fairly and explain what happens next. We also provide cover for windscreen repair or replacement, subject to the policy terms. Like all insurance, this policy has exclusions, limits and excesses, so please read the full wording carefully before you buy. If you make a claim, we will ask for the information needed to assess it and may use approved repairers where appropriate. Larkmere Mutual is here to help you get back on the road as quickly as we can."
+  },
+  {
+   "key": "residential-mortgage",
+   "kind": "product",
+   "title": "Larkmere Residential Mortgage",
+   "content": "Larkmere Residential Mortgage is designed for members buying or remortgaging a home to live in. We offer fixed and tracker rate options, so you can choose the type of certainty or flexibility that suits your circumstances. Fixed rates give you the security of knowing your monthly payment will stay the same for the agreed deal period. Tracker rates move in line with the Bank of England base rate, which may mean your payments go up or down.\n\nYou can make overpayments, subject to the terms of your mortgage, which may help you reduce the balance faster or pay less interest over time. If you move home, you may be able to port your mortgage to your new property, again subject to lending criteria and the terms of your deal. This can help you keep your existing rate when you move.\n\nAs with all mortgages, the property is security for the loan and you should make sure the product is suitable for your needs before you apply. Our team can explain the features, risks and costs in plain language so you can make an informed choice."
+  },
+  {
+   "key": "storm",
+   "kind": "claim_type",
+   "title": "Storm damage",
+   "content": "Storm damage means direct physical damage to your buildings or contents caused by violent weather, such as strong winds, heavy rain, hail, sleet, snow or the weight of snow and ice. We will usually look at the weather conditions at or near the time of loss, together with the condition of the property and the likely cause of the damage. We do not cover damage that happens gradually, or because of poor maintenance, wear and tear, lack of repair, defective design, faulty workmanship or settlement, shrinkage or expansion. We also do not cover damage caused by water entering through open windows, doors or other openings, unless those openings were made by the storm. We will not pay for damage to fences, gates, hedges, paths, patios, drives, garden ornaments or other outside items unless your policy says otherwise. If the damage is caused by flood, escape of water, subsidence or ground heave rather than storm, the storm cover will not apply. Storm damage must be sudden and unforeseen, and not something that could reasonably have been prevented by normal care and maintenance."
+  },
+  {
+   "key": "escape-of-water",
+   "kind": "claim_type",
+   "title": "Escape of water",
+   "content": "We cover loss or damage caused by water escaping from fixed water or heating systems, including pipes, tanks, radiators, cylinders, taps, toilets, showers, washing machines and dishwashers, as well as water leaking from underground supply or drainage pipes that serve the home. This includes damage to the buildings and, if shown on your schedule, your contents. We may also cover the cost of finding the source of the leak and making good any damage that is necessary to reach it, up to the limits shown in your policy.\n\nWe do not cover wear and tear, gradual seepage, poor workmanship, corrosion, lack of maintenance, or damage caused by water entering the home from outside. We also do not cover loss caused by a leak you knew about and did not deal with promptly. If the home has been left unoccupied for more than 30 days, different conditions may apply, and you must take reasonable steps to protect it from frost and burst pipes.\n\nYou must turn off the water supply, where possible, and tell us as soon as you can after discovering a leak."
+  },
+  {
+   "key": "theft",
+   "kind": "claim_type",
+   "title": "Theft",
+   "content": "We cover loss or damage caused by theft or attempted theft from your home, including items stolen from garages and outbuildings if they form part of the insured address. We also cover damage to the buildings that happens during a theft or attempted theft, such as forced entry, broken locks or smashed windows.\n\nYou must tell the police as soon as reasonably possible and give us the crime reference number. You should also take reasonable steps to protect your home and possessions, for example by locking doors and windows and using any alarms or other security devices you have told us about.\n\nWe do not cover theft by deception, theft by someone who was invited into the home, or theft of contents left outside unless we have agreed otherwise. We also do not cover unexplained loss, where there is no sign of forced entry or other evidence of theft, or theft from unattended vehicles unless the items were hidden out of sight and the vehicle was locked.\n\nIf we ask, you must provide proof of ownership and value, such as receipts, bank records, photographs or other evidence we consider reasonable."
+  },
+  {
+   "key": "subsidence",
+   "kind": "claim_type",
+   "title": "Subsidence",
+   "content": "Subsidence, heave and landslip cover applies to loss or damage caused by the gradual movement of the ground supporting your home, or by the ground settling, sinking, swelling or shrinking. This includes damage to the buildings caused by subsidence, heave or landslip, and the reasonable cost of investigating the cause if we agree the claim is covered.\n\nYou must tell us as soon as you notice signs such as new cracks, doors or windows sticking, or sloping floors. We may ask you to take steps to prevent further damage and to carry out repairs in the order we advise.\n\nWe do not cover damage caused by coastal or river erosion, underground workings, poor design or workmanship, or movement of solid floors unless the movement is linked to subsidence, heave or landslip affecting the foundations. We also do not cover damage that happened before this insurance started.\n\nThe excess that applies to each subsidence, heave or landslip claim is £1,000."
+  },
+  {
+   "key": "flood",
+   "kind": "claim_type",
+   "title": "Flood",
+   "content": "Flood means the sudden or unforeseen escape of water onto the insured property from an external source, including water from rivers, streams, canals, lakes, reservoirs, the sea, surface water, heavy rainfall, run-off from land, tidal action, or overflowing drainage systems where this is caused by exceptional weather or other natural conditions. It does not include damage caused solely by wear and tear, poor maintenance, defective design, gradual seepage, or rising damp. Where flood occurs, we will treat as one event any loss arising from the same weather system or water source over a continuous period, unless there is clear interruption and a separate cause. We may ask for evidence from the Met Office, local authorities, drainage bodies, or other relevant sources to help confirm that a flood has taken place. For the purposes of this policy, flood applies only to water that enters or affects the home from outside; it does not include water released from within the home’s own fixed systems, which is covered separately under escape of water. In any case, cover remains subject to the limits, exclusions and conditions shown elsewhere in this policy."
+  },
+  {
+   "key": "storm-claims-procedure",
+   "kind": "procedure",
+   "title": "Handling a storm claim",
+   "content": "When a member reports storm damage, we should first check that the weather event meets our storm criteria and that the loss is consistent with wind, rain or flying debris. Confirm the date, location and circumstances of the incident, and note any nearby weather reports or local evidence if needed. We must also check whether the damage could have arisen from wear and tear, poor maintenance or an earlier issue, as these are not storm claims.\n\nBefore we settle the claim, we need dated photographs showing the damage after the storm and before any permanent repairs. The photos should clearly show the affected area, the extent of the damage and, where possible, wider context. If the member has already made temporary safety repairs, that is acceptable, but we still need evidence of the original damage. If dated photos are not available, ask the member for any other supporting evidence, such as contractor records, timestamped messages or emergency attendance notes, and escalate the claim if there is doubt.\n\nOnce we are satisfied the loss is covered and the evidence supports the claim, we can agree settlement in line with the policy terms and our repair or cash settlement process."
+  },
+  {
+   "key": "escape-of-water-procedure",
+   "kind": "procedure",
+   "title": "Handling an escape of water claim",
+   "content": "When a member reports an escape of water, we act quickly to limit further damage and support them through the claim. First we confirm the source, whether from a burst pipe, leaking appliance, tank, shower, or hidden pipework, and arrange trace and access where needed. We appoint an approved contractor to locate the leak, isolate the water supply if possible, and make safe the affected area with the least possible disturbance. Once the source is found, we authorise drying works promptly. This may include dehumidifiers, air movers, moisture readings, and regular progress checks until the property is dry to an acceptable standard. We keep the member informed of what is happening and what to expect next. After drying is complete, we review the damage and agree reinstatement. This may involve plaster, flooring, decoration, joinery, and any reasonable matching where available, subject to policy terms and limits. We aim to keep the process clear, practical, and proportionate, with repair quality suitable for the home’s condition before the loss."
+  },
+  {
+   "key": "theft-procedure",
+   "kind": "procedure",
+   "title": "Handling a theft claim",
+   "content": "When a member reports a theft claim, we should first confirm the incident was discovered promptly and that the member has notified the police. A crime reference number is required for all theft claims. If the member does not yet have one, we should ask them to contact the police and return to us as soon as they can. We must explain that we may be unable to progress the claim without it.\n\nWe should also ask for proof of ownership for the items claimed. This may include receipts, bank or card statements, warranty details, photographs, valuation documents, or packaging showing the item was purchased. Where suitable documents are not available, we should consider other reasonable evidence the member can provide.\n\nWe should check the policy cover, note any limits, exclusions or security conditions, and record a clear account of what was stolen, when it happened, and how the loss was discovered. If the theft involved a break-in or signs of forced entry, we should request any supporting evidence available. We should keep the member updated throughout and explain the next steps clearly."
+  },
+  {
+   "key": "subsidence-procedure",
+   "kind": "procedure",
+   "title": "Handling a subsidence claim",
+   "content": "When a subsidence claim is reported, we log the claim promptly and check for immediate safety concerns. If there is any risk of further movement, we arrange temporary mitigation and keep the member informed of next steps. We open a claim diary and monitor all contact, site visits and reports closely, as subsidence can develop over time and often requires patience and consistent oversight.\n\nWe appoint a suitable structural engineer to inspect the property and identify the likely cause of movement. The engineer will assess cracking, ground conditions, drainage and any signs of historical repair, then recommend whether ongoing monitoring is needed. We may ask the member to install crack gauges or other monitoring devices so we can track any change before deciding on repair work.\n\nIf tree roots are suspected, we arrange a tree root investigation to establish whether nearby vegetation is influencing soil moisture and movement. We consider ownership, species, distance from the building and the level of risk before agreeing any remedial action. Throughout the claim, we explain findings clearly, review reports as they come in and only progress repair decisions once the evidence supports it."
+  },
+  {
+   "key": "delegated-authority",
+   "kind": "procedure",
+   "title": "Delegated claims authority",
+   "content": "At Larkmere Mutual, delegated claims authority allows an assessor or agent to settle straightforward claims up to £500 without referral, provided the loss is clearly covered, the amount is within policy terms, and the decision is supported by the evidence on file. This limit exists to help us pay members quickly and consistently while keeping control of claim quality and reserving accuracy. It applies to one-off payments, minor additional costs, and agreed settlements where the total exposure remains within the limit.\n\nBefore using this authority, you must check the policy, confirm identity and cover, review the circumstances of loss, and make sure there are no signs of fraud, dispute, unusual complexity, or wider liability. Any claim involving possible repudiation, legal issues, salvage, injury, subsidence, flood uncertainty, or repeated requests for payment must be referred.\n\nYou must record your rationale, the evidence considered, the payment amount, and any customer contact in full. If you are unsure, refer the claim. Delegated authority is a responsibility, not a target. Where the claim is borderline, refer rather than risk an incorrect settlement."
+  },
+  {
+   "key": "vulnerable-customers",
+   "kind": "procedure",
+   "title": "Supporting customers in vulnerable circumstances",
+   "content": "At Larkmere Mutual, we want every member to be treated with dignity, patience and fairness. A member may be in a vulnerable circumstance because of bereavement, ill health, disability, mental health difficulties, caring responsibilities, language barriers, low confidence, a life event or financial hardship. Vulnerability can be temporary, changing or hidden, and it may affect how someone understands information, makes decisions or manages money and insurance matters.\n\nListen carefully, do not make assumptions and give members time to explain what they need. Where appropriate, offer to repeat information in simpler language, provide written follow-up, arrange a call back, or use an authorised representative. If a member is distressed, unwell or struggling to pay, pause to check what support would help and explain options clearly. Record the circumstances sensitively so colleagues do not need the member to repeat difficult details.\n\nWe should never pressure a member into a decision. Instead, we should make reasonable adjustments, signpost to specialist support where relevant, and keep reviewing the situation. If a vulnerability affects a claim, policy or account decision, make sure the member is treated in line with our duty to act fairly and help them reach the best available outcome."
+  },
+  {
+   "key": "arrears-procedure",
+   "kind": "procedure",
+   "title": "Mortgage arrears and forbearance",
+   "content": "We treat mortgage arrears with prompt contact, fairness and forbearance. If a payment is missed, we make early contact by phone, letter or secure message to understand the reason, check whether the member is in difficulty, and agree the best way forward. We will always encourage the member to contact us as soon as they think they may miss a payment.\n\nOur first step is to review the account, discuss income and essential expenditure, and consider whether the difficulty is temporary or likely to continue. Where appropriate, we may agree a short-term payment plan to clear the arrears at a manageable rate, or to make reduced payments for a limited period while the member recovers.\n\nIf a payment plan is not suitable, we will consider other forbearance options, including capitalising arrears where appropriate, extending the term, switching to interest-only for a time if suitable, or other temporary support consistent with the member’s circumstances. We will not take enforcement action where a realistic and sustainable arrangement can be agreed.\n\nWe keep a clear record of all conversations and decisions, review arrangements regularly, and explain any next steps in plain language."
+  },
+  {
+   "key": "complaints-procedure",
+   "kind": "procedure",
+   "title": "Complaints handling",
+   "content": "At Larkmere Mutual, we are committed to dealing with complaints promptly, fairly and openly. If you are unhappy with any part of our service, please tell us as soon as possible so we can try to put things right. You can raise a complaint by phone, in writing or by any other channel we have agreed with you. We will acknowledge your complaint, investigate what happened and keep you updated where we need to look into more detail.\n\nWe aim to resolve complaints as quickly as we can. If we are unable to give you our final response within eight weeks, we will write to explain the reason for the delay and tell you when you can expect an update. In some cases, you may then be able to refer your complaint to the Financial Ombudsman Service, free of charge.\n\nWhen we send our final response, we will explain our findings, whether we uphold your complaint, and any offer of redress if appropriate. If you are not satisfied with our final response, or if we have not responded within eight weeks, you may be entitled to ask the Financial Ombudsman Service to review your complaint. Details of how to do this will be included in our response."
+  }
+ ],
+ "edges": [
+  {
+   "from": "arrears-procedure",
+   "from_kind": "procedure",
+   "to": "residential-mortgage",
+   "to_kind": "product",
+   "type": "governs"
+  },
+  {
+   "from": "arrears-procedure",
+   "from_kind": "procedure",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "follows"
+  },
+  {
+   "from": "complaints-procedure",
+   "from_kind": "procedure",
+   "to": "delegated-authority",
+   "to_kind": "procedure",
+   "type": "follows"
+  },
+  {
+   "from": "escape-of-water-procedure",
+   "from_kind": "procedure",
+   "to": "delegated-authority",
+   "to_kind": "procedure",
+   "type": "follows"
+  },
+  {
+   "from": "escape-of-water-procedure",
+   "from_kind": "procedure",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "governs"
+  },
+  {
+   "from": "guidance-a-bike-stolen-from-the-garden-0-1",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-bike-stolen-from-the-garden-0-2",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-break-in-while-on-holiday-0-1",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-break-in-while-on-holiday-0-2",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-burst-pipe-in-winter-0-1",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-burst-pipe-in-winter-0-2",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-burst-pipe-in-winter-0-3",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-burst-pipe-in-winter-0-4",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-claim-made-by-the-executor-of-an-estate-0-1",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-complaint-about-a-slow-claim-0-1",
+   "from_kind": "guidance",
+   "to": "complaints-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-complaint-about-a-slow-claim-0-2",
+   "from_kind": "guidance",
+   "to": "complaints-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-damaged-shed-or-outbuilding-0-1",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-damaged-shed-or-outbuilding-0-2",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-damaged-shed-or-outbuilding-0-3",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-declined-claim-the-member-disputes-0-1",
+   "from_kind": "guidance",
+   "to": "complaints-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-declined-claim-the-member-disputes-0-2",
+   "from_kind": "guidance",
+   "to": "complaints-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-fence-blown-down-0-1",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-fence-blown-down-0-2",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-fence-blown-down-0-3",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-fence-blown-down-0-4",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-leak-from-the-flat-upstairs-0-1",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-leak-from-the-flat-upstairs-0-2",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-leaking-washing-machine-damaging-the-floor-0-1",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-leaking-washing-machine-damaging-the-floor-0-2",
+   "from_kind": "guidance",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-stolen-card-used-abroad-0-1",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-a-stolen-card-used-abroad-0-2",
+   "from_kind": "guidance",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-an-arrears-payment-plan-0-1",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-an-arrears-payment-plan-0-2",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-an-arrears-payment-plan-0-3",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-an-arrears-payment-plan-0-4",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-asking-to-pay-a-premium-monthly-instead-0-1",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-asking-to-pay-a-premium-monthly-instead-0-2",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-cancelling-cover-to-save-money-0-1",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-cancelling-cover-to-save-money-0-2",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-cancelling-cover-to-save-money-0-3",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-cracks-appearing-in-the-walls-0-1",
+   "from_kind": "guidance",
+   "to": "subsidence",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-energy-bills-squeezing-the-budget-0-1",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-energy-bills-squeezing-the-budget-0-2",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-energy-bills-squeezing-the-budget-0-3",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-energy-bills-squeezing-the-budget-0-4",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-falling-behind-on-mortgage-payments-0-1",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-falling-behind-on-mortgage-payments-0-2",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-falling-behind-on-mortgage-payments-0-3",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-falling-behind-on-mortgage-payments-0-4",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-falling-behind-on-mortgage-payments-0-5",
+   "from_kind": "guidance",
+   "to": "arrears-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-going-to-the-financial-ombudsman-0-1",
+   "from_kind": "guidance",
+   "to": "complaints-procedure",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-illness-affecting-income-0-1",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-illness-affecting-income-0-2",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-roof-tiles-blown-off-in-a-storm-0-1",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-roof-tiles-blown-off-in-a-storm-0-2",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-roof-tiles-blown-off-in-a-storm-0-3",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-roof-tiles-blown-off-in-a-storm-0-4",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-roof-tiles-blown-off-in-a-storm-0-5",
+   "from_kind": "guidance",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "guidance-struggling-to-pay-the-mortgage-0-1",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-struggling-to-pay-the-mortgage-0-2",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-struggling-to-pay-the-mortgage-0-3",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-telling-the-society-a-policyholder-has-died-0-1",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-telling-the-society-a-policyholder-has-died-0-2",
+   "from_kind": "guidance",
+   "to": "vulnerable-customers",
+   "to_kind": "procedure",
+   "type": "about"
+  },
+  {
+   "from": "guidance-whether-the-home-policy-covers-flooding-0-1",
+   "from_kind": "guidance",
+   "to": "flood",
+   "to_kind": "claim_type",
+   "type": "about"
+  },
+  {
+   "from": "home-insurance",
+   "from_kind": "product",
+   "to": "escape-of-water",
+   "to_kind": "claim_type",
+   "type": "covers"
+  },
+  {
+   "from": "home-insurance",
+   "from_kind": "product",
+   "to": "flood",
+   "to_kind": "claim_type",
+   "type": "covers"
+  },
+  {
+   "from": "home-insurance",
+   "from_kind": "product",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "covers"
+  },
+  {
+   "from": "home-insurance",
+   "from_kind": "product",
+   "to": "subsidence",
+   "to_kind": "claim_type",
+   "type": "covers"
+  },
+  {
+   "from": "home-insurance",
+   "from_kind": "product",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "covers"
+  },
+  {
+   "from": "storm-claims-procedure",
+   "from_kind": "procedure",
+   "to": "delegated-authority",
+   "to_kind": "procedure",
+   "type": "follows"
+  },
+  {
+   "from": "storm-claims-procedure",
+   "from_kind": "procedure",
+   "to": "storm",
+   "to_kind": "claim_type",
+   "type": "governs"
+  },
+  {
+   "from": "subsidence-procedure",
+   "from_kind": "procedure",
+   "to": "subsidence",
+   "to_kind": "claim_type",
+   "type": "governs"
+  },
+  {
+   "from": "theft-procedure",
+   "from_kind": "procedure",
+   "to": "delegated-authority",
+   "to_kind": "procedure",
+   "type": "follows"
+  },
+  {
+   "from": "theft-procedure",
+   "from_kind": "procedure",
+   "to": "theft",
+   "to_kind": "claim_type",
+   "type": "governs"
+  }
+ ]
+}

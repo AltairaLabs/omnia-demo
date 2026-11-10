@@ -94,42 +94,6 @@ memory:
     accessKey: omnia-demo
     secretKey: omnia-demo-s3-secret
 
-galaxy:
-  # Seed the dashboard's Memory Galaxy with synthetic institutional, agent and
-  # user memories. Requires Omnia Enterprise (Galaxy and institutional memory)
-  # and a workspace memory service with an embedding provider.
-  enabled: false
-  workspaceUID: ""
-  agentUID: ""
-  # Namespace of the target Workspace (its spec.namespace.name). The seed Job
-  # runs there: memory-api trusts ServiceAccounts from that namespace only, and
-  # the workspace pseudonym key Secret lives there. Defaults to `namespace`.
-  namespace: ""
-  # The workspace memory-api, e.g. http://memory-<workspace>-<group>.<ns>:8080
-  # (kubectl get workspace <name> -o jsonpath='{.status.services[*].memoryURL}').
-  # Required when galaxy.namespace is set; otherwise defaults to memory.apiURL.
-  memoryAPIURL: ""
-  seed: "1"
-  # After seeding, drain pending embeddings and fit the Galaxy's leaf clusters
-  # so the dashboard shows the cluster tree instead of its flat fallback.
-  buildGalaxy: true
-  # The workspace's pseudonym key, written by the Omnia operator. Read through
-  # a secretKeyRef only; never set the key in values.
-  pseudonymKey:
-    secretName: omnia-workspace-pseudonym-key
-    secretKey: key
-  # Present an audience-bound projected ServiceAccount token, as Omnia's
-  # internalServiceAuth expects. Harmless when that auth is off.
-  serviceAuth:
-    enabled: true
-    audience: omnia-session-api
-    tokenExpirationSeconds: 3600
-  image:
-    repository: ghcr.io/altairalabs/omnia-demo-memory-seeder
-    # Empty: the chart's appVersion.
-    tag: ""
-    pullPolicy: IfNotPresent
-
 # ---------------------------------------------------------------------------
 # mortgageUnderwriting — the egress-control demo (DSA-114)
 #
@@ -694,6 +658,38 @@ catalogue:
     parentRefs: []
     # The dashboard's host, e.g. [omnia.example.com].
     hostnames: []
+
+# ---------------------------------------------------------------------------
+# galaxy — the memory Galaxy (Larkmere Mutual)
+#
+# A generated corpus (demos/memory-galaxy) of what members talk about and what
+# the society knows, across the user, user_for_agent, agent and institutional
+# tiers, with the institutional knowledge graph. The memory-seeder image embeds
+# it; a Job replays it as memory-api's own ServiceAccount, then fits the
+# Galaxy's clusters. The chart also installs the MemoryPolicy that declares its
+# types and relations, and points the Workspace's memory service at it.
+# ---------------------------------------------------------------------------
+galaxy:
+  enabled: false
+  # Directory under demos/memory-seeder/fixtures/.
+  fixture: larkmere-galaxy
+  # AgentRuntimes the corpus writes agent and user_for_agent memories for.
+  agents: [pii-chat, claims-triage, mortgage-underwriting]
+  serviceGroup: default
+  # MemoryPolicy name; empty is <workspace>-memory.
+  policyName: ""
+  leaves: 24
+  graphExpansion:
+    hops: 1
+    maxAdded: 10
+    relationTypes: [governs, about, covers]
+  # memory-api's internal-auth audience for the seeder's token.
+  tokenAudience: omnia-session-api
+  kubectlImage: docker.io/alpine/k8s:1.31.1
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-memory-seeder
+    tag: ""
+    pullPolicy: IfNotPresent
 
 # -- Every demo image at once, for dev builds (`make images`). `registry`
 # replaces the registry and organisation of each image's repository (its last

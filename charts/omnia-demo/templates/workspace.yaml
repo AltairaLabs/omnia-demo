@@ -49,7 +49,17 @@ spec:
   {{- end }}
   {{- with .Values.workspace.services }}
   services:
-    {{- toYaml . | nindent 4 }}
+    {{- /* With the Galaxy on, every memory service takes its MemoryPolicy
+           unless the values already name one. */}}
+    {{- $services := list }}
+    {{- range . }}
+    {{- $s := deepCopy . }}
+    {{- if and $.Values.galaxy.enabled $s.memory (not $s.memory.policyRef) }}
+    {{- $_ := set $s.memory "policyRef" (dict "name" (include "omnia-demo.galaxyPolicyName" $)) }}
+    {{- end }}
+    {{- $services = append $services $s }}
+    {{- end }}
+    {{- toYaml $services | nindent 4 }}
   {{- end }}
   {{- with .Values.workspace.storage }}
   storage:

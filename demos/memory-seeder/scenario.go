@@ -1,6 +1,6 @@
 package main
 
-// Scenario holds the configurable knobs for the "Hawkridge Cloud" seed.
+// Scenario holds the configurable knobs for the generic template seed (no company; --fixture replays a branded corpus).
 type Scenario struct {
 	WorkspaceUID      string
 	AgentUID          string

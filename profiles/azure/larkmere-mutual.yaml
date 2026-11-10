@@ -16,3 +16,7 @@ piiChat:
   enabled: true
   portal:
     enabled: true
+
+# The memory Galaxy: the generated corpus (demos/memory-galaxy) seeded into
+# every tier, with the institutional knowledge graph and its MemoryPolicy.
+galaxy: { enabled: true }

@@ -1,0 +1,250 @@
+# The Larkmere Mutual memory Galaxy: what members talk about, and what the
+# system knows. The generator (main.go) turns this into the corpus the
+# memory-seeder replays; see README.md.
+#
+# Counts are for scale 1 (the ~2k review sample). A subtheme of weight w gets,
+# per tier, round(w × tiers.<tier> × scale) memories, or the subtheme's own
+# override. Every count is drawn in batches of `batch` from one cached prompt
+# per batch, so raising the scale only generates the new batches.
+
+company: Larkmere Mutual
+context: >-
+  Larkmere Mutual is a fictional UK building society and general insurer,
+  owned by its 1.2 million members since 1908. It sells home and motor
+  insurance, mortgages, savings and current accounts, and pays members a
+  dividend from its surplus. Its members are ordinary households across
+  England and Wales; most of its claims are storm damage, then escape of water
+  and theft. Subsidence is rare. Flood is the claim members worry about most.
+
+model: gpt-5.4-mini
+batch: 10
+
+# Memories per unit of weight, per tier.
+tiers:
+  user: 6            # what members told the society
+  user_for_agent: 2  # what one agent learned about one member
+  agent: 1           # patterns an agent learned across cases
+  institutional: 1   # procedures, policy wording, guidance
+
+members: 260         # synthetic members the user-tier memories are spread over
+
+agents:
+  pii-chat: "card support: identity checks, lost and stolen cards, replacements"
+  claims-triage: home and motor claims assessment within delegated authority
+  mortgage-underwriting: residential mortgage applications and remortgages
+
+# Six consent categories (memory:<name>), each with its themes and subthemes.
+# agents: which agents see this subtheme (agent and user_for_agent tiers).
+categories:
+  - name: identity
+    themes:
+      - name: Identity checks
+        subthemes:
+          - { name: verifying identity on the phone, weight: 3, agents: [pii-chat] }
+          - { name: forgotten security answers, weight: 2, agents: [pii-chat] }
+          - { name: identity documents for a new account, weight: 1, agents: [mortgage-underwriting] }
+      - name: Power of attorney
+        subthemes:
+          - { name: registering a lasting power of attorney, weight: 2, agents: [pii-chat] }
+          - { name: an attorney managing a parent's account, weight: 2, agents: [pii-chat, claims-triage] }
+      - name: Joint policyholders
+        subthemes:
+          - { name: adding a partner to a home policy, weight: 2, agents: [claims-triage] }
+          - { name: joint mortgage applicants, weight: 2, agents: [mortgage-underwriting] }
+          - { name: separating joint policyholders after a break-up, weight: 1, agents: [claims-triage, mortgage-underwriting] }
+      - name: Name changes
+        subthemes:
+          - { name: changing a name after marriage, weight: 2, agents: [pii-chat] }
+          - { name: a name that doesn't match the card, weight: 1, agents: [pii-chat] }
+
+  - name: health
+    themes:
+      - name: Bereavement
+        node: vulnerable-customers
+        subthemes:
+          - { name: telling the society a policyholder has died, weight: 2, agents: [pii-chat, claims-triage] }
+          - { name: a claim made by the executor of an estate, weight: 1, agents: [claims-triage] }
+      - name: Accessibility
+        subthemes:
+          - { name: hearing loss and phone calls, weight: 2, agents: [pii-chat] }
+          - { name: needing large-print or braille documents, weight: 1, agents: [pii-chat] }
+          - { name: sight loss and reading card numbers, weight: 1, agents: [pii-chat] }
+      - name: Carers
+        subthemes:
+          - { name: a carer speaking for a member, weight: 2, agents: [pii-chat, claims-triage] }
+          - { name: a member in hospital during a claim, weight: 1, agents: [claims-triage] }
+      - name: Financial hardship
+        node: vulnerable-customers
+        subthemes:
+          - { name: struggling to pay the mortgage, weight: 3, agents: [mortgage-underwriting] }
+          - { name: asking to pay a premium monthly instead, weight: 2, agents: [claims-triage] }
+          - { name: illness affecting income, weight: 2, agents: [mortgage-underwriting] }
+
+  - name: location
+    themes:
+      - name: Moving house
+        subthemes:
+          - { name: moving home mid-policy, weight: 3, agents: [claims-triage] }
+          - { name: porting a mortgage to a new property, weight: 2, agents: [mortgage-underwriting] }
+          - { name: a gap between selling and buying, weight: 1, agents: [mortgage-underwriting, claims-triage] }
+      # Planted finding 1, the knowledge gap: members talk about flood far more
+      # than anything else, and the institutional tier holds almost nothing on
+      # it (institutional: 0 or 1). Where a member lives is location (a
+      # category that needs a grant, and shows only as an anonymous dot in the
+      # Galaxy); their questions about cover are context (see below), so the
+      # gap is readable.
+      - name: Flood risk
+        node: flood
+        subthemes:
+          - { name: worried the house is in a flood zone, weight: 6, agents: [claims-triage], institutional: 0 }
+          - { name: flood and the mortgage valuation, weight: 2, agents: [mortgage-underwriting], institutional: 0 }
+      - name: Rebuild cost
+        subthemes:
+          - { name: rebuild cost after an extension, weight: 2, agents: [claims-triage] }
+          - { name: a listed or older building, weight: 1, agents: [claims-triage, mortgage-underwriting] }
+      - name: Second homes
+        subthemes:
+          - { name: insuring a holiday cottage, weight: 1, agents: [claims-triage] }
+          - { name: a buy-to-let flat, weight: 2, agents: [mortgage-underwriting] }
+
+  - name: preferences
+    themes:
+      - name: Paperless
+        subthemes:
+          - { name: going paperless, weight: 2, agents: [pii-chat] }
+          - { name: still wanting paper statements, weight: 1, agents: [pii-chat] }
+      - name: Payment dates
+        subthemes:
+          - { name: moving the direct debit date to payday, weight: 2, agents: [claims-triage, mortgage-underwriting] }
+          - { name: paying the premium annually for the discount, weight: 1, agents: [claims-triage] }
+      - name: Contact channel
+        subthemes:
+          - { name: preferring email to phone calls, weight: 2, agents: [pii-chat] }
+          - { name: calls only after work hours, weight: 1, agents: [pii-chat, claims-triage] }
+          - { name: no marketing please, weight: 2, agents: [pii-chat] }
+      - name: Dividend
+        subthemes:
+          - { name: how the member dividend is paid, weight: 2, agents: [pii-chat] }
+          - { name: reinvesting the dividend into savings, weight: 1, agents: [pii-chat] }
+
+  - name: history
+    themes:
+      # Planted finding 2, tribal knowledge: the agent tier learns a workaround
+      # for storm claims with no photos (agent_extra), and no institutional
+      # guidance covers it.
+      - name: Storm claims
+        node: storm
+        subthemes:
+          - { name: roof tiles blown off in a storm, weight: 5, agents: [claims-triage] }
+          - { name: a fence blown down, weight: 4, agents: [claims-triage] }
+          - { name: a damaged shed or outbuilding, weight: 3, agents: [claims-triage] }
+          - name: a storm claim with no photos of the damage
+            weight: 3
+            agents: [claims-triage]
+            institutional: 0
+            agent_extra: 12
+            agent_hint: >-
+              Assessors keep accepting the Met Office storm record for the
+              postcode plus a roofer's invoice in place of photos, and settle
+              within authority. It is how they actually work, but no procedure
+              says so.
+      - name: Escape of water
+        node: escape-of-water
+        subthemes:
+          - { name: a burst pipe in winter, weight: 4, agents: [claims-triage] }
+          - { name: a leaking washing machine damaging the floor, weight: 2, agents: [claims-triage] }
+          - { name: a leak from the flat upstairs, weight: 2, agents: [claims-triage] }
+      - name: Theft
+        node: theft
+        subthemes:
+          - { name: a break-in while on holiday, weight: 2, agents: [claims-triage] }
+          - { name: a bike stolen from the garden, weight: 2, agents: [claims-triage] }
+          - { name: a stolen card used abroad, weight: 2, agents: [pii-chat] }
+      - name: Subsidence
+        node: subsidence
+        subthemes:
+          - { name: cracks appearing in the walls, weight: 1, agents: [claims-triage] }
+      - name: Past mortgages
+        subthemes:
+          - { name: remortgaging at the end of a fixed rate, weight: 3, agents: [mortgage-underwriting] }
+          - { name: overpaying the mortgage, weight: 2, agents: [mortgage-underwriting] }
+      - name: Complaints
+        node: complaints-procedure
+        subthemes:
+          - { name: a complaint about a slow claim, weight: 2, agents: [claims-triage] }
+          - { name: a declined claim the member disputes, weight: 2, agents: [claims-triage] }
+          - { name: going to the Financial Ombudsman, weight: 1, agents: [claims-triage] }
+
+  - name: context
+    themes:
+      # The readable half of planted finding 1 (see location: Flood risk).
+      - name: Flood risk
+        node: flood
+        subthemes:
+          - { name: whether the home policy covers flooding, weight: 6, agents: [claims-triage], institutional: 1 }
+          - { name: flood defences and the premium, weight: 3, agents: [claims-triage], institutional: 0 }
+          - { name: a neighbour's house flooded last winter, weight: 3, agents: [claims-triage], institutional: 0 }
+      - name: Claim in progress
+        subthemes:
+          - { name: waiting for the loss adjuster, weight: 3, agents: [claims-triage] }
+          - { name: chasing a contractor for repairs, weight: 2, agents: [claims-triage] }
+          - { name: temporary accommodation during repairs, weight: 1, agents: [claims-triage] }
+      - name: Application in underwriting
+        subthemes:
+          - { name: a mortgage application waiting on payslips, weight: 3, agents: [mortgage-underwriting] }
+          - { name: self-employed income evidence, weight: 2, agents: [mortgage-underwriting] }
+          - { name: a valuation came in low, weight: 2, agents: [mortgage-underwriting] }
+      # Planted finding 3, a rising theme: cost-of-living arrears outweigh
+      # everything else in context. (The memory API takes no write date, so
+      # this shows as volume, not as recency.)
+      - name: Arrears
+        node: arrears-procedure
+        subthemes:
+          - { name: falling behind on mortgage payments, weight: 5, agents: [mortgage-underwriting] }
+          - { name: an arrears payment plan, weight: 4, agents: [mortgage-underwriting] }
+          - { name: energy bills squeezing the budget, weight: 4, agents: [mortgage-underwriting, claims-triage] }
+          - { name: cancelling cover to save money, weight: 3, agents: [claims-triage] }
+      - name: Renewal
+        subthemes:
+          - { name: shopping around at renewal, weight: 3, agents: [claims-triage] }
+          - { name: the renewal price went up, weight: 3, agents: [claims-triage] }
+
+# The institutional knowledge graph, sent through batch ingest as items and
+# edges. A theme's `node` links each of its institutional (guidance) memories
+# to that node with an `about` edge. Each node's text is generated from its prompt. Flood has no governing
+# procedure, and nothing governs storm claims without photos: the two gaps
+# show in the structure as well as in the clusters.
+graph:
+  nodes:
+    - { key: home-insurance, kind: product, title: Larkmere Home Insurance, prompt: "the product summary of the home insurance policy: buildings and contents, what it covers and the main exclusions" }
+    - { key: motor-insurance, kind: product, title: Larkmere Motor Insurance, prompt: "the product summary of the motor insurance policy" }
+    - { key: residential-mortgage, kind: product, title: Larkmere Residential Mortgage, prompt: "the product summary of the residential mortgage: fixed and tracker rates, overpayments, porting" }
+    - { key: storm, kind: claim_type, title: Storm damage, prompt: "the policy wording defining storm damage, and what it excludes" }
+    - { key: escape-of-water, kind: claim_type, title: Escape of water, prompt: "the policy wording defining escape of water" }
+    - { key: theft, kind: claim_type, title: Theft, prompt: "the policy wording for theft from the home" }
+    - { key: subsidence, kind: claim_type, title: Subsidence, prompt: "the policy wording for subsidence, heave and landslip, with the excess" }
+    - { key: flood, kind: claim_type, title: Flood, prompt: "the policy wording defining flood, one short paragraph only" }
+    - { key: storm-claims-procedure, kind: procedure, title: Handling a storm claim, prompt: "the internal procedure for assessing a storm claim, which requires dated photos of the damage before settlement" }
+    - { key: escape-of-water-procedure, kind: procedure, title: Handling an escape of water claim, prompt: "the internal procedure for an escape of water claim: trace and access, drying, reinstatement" }
+    - { key: theft-procedure, kind: procedure, title: Handling a theft claim, prompt: "the internal procedure for a theft claim: crime reference number, proof of ownership" }
+    - { key: subsidence-procedure, kind: procedure, title: Handling a subsidence claim, prompt: "the internal procedure for a subsidence claim: monitoring, structural engineer, tree root investigation" }
+    - { key: delegated-authority, kind: procedure, title: Delegated claims authority, prompt: "the internal guidance setting the £500 limit an assessor or agent may settle without referral" }
+    - { key: vulnerable-customers, kind: procedure, title: Supporting customers in vulnerable circumstances, prompt: "the internal guidance on recognising and supporting members in vulnerable circumstances (bereavement, ill health, financial hardship)" }
+    - { key: arrears-procedure, kind: procedure, title: Mortgage arrears and forbearance, prompt: "the internal procedure for mortgage arrears: early contact, payment plans, forbearance options" }
+    - { key: complaints-procedure, kind: procedure, title: Complaints handling, prompt: "the internal complaints procedure, with the eight-week final response and Financial Ombudsman referral rights" }
+  edges:
+    - { from: home-insurance, to: storm, type: covers }
+    - { from: home-insurance, to: escape-of-water, type: covers }
+    - { from: home-insurance, to: theft, type: covers }
+    - { from: home-insurance, to: subsidence, type: covers }
+    - { from: home-insurance, to: flood, type: covers }
+    - { from: storm-claims-procedure, to: storm, type: governs }
+    - { from: escape-of-water-procedure, to: escape-of-water, type: governs }
+    - { from: theft-procedure, to: theft, type: governs }
+    - { from: subsidence-procedure, to: subsidence, type: governs }
+    - { from: storm-claims-procedure, to: delegated-authority, type: follows }
+    - { from: escape-of-water-procedure, to: delegated-authority, type: follows }
+    - { from: theft-procedure, to: delegated-authority, type: follows }
+    - { from: complaints-procedure, to: delegated-authority, type: follows }
+    - { from: arrears-procedure, to: residential-mortgage, type: governs }
+    - { from: arrears-procedure, to: vulnerable-customers, type: follows }

@@ -42,3 +42,8 @@ memory-<workspace>-<group> in the workspace namespace.
 http://memory-{{ include "omnia-demo.workspaceName" . }}-{{ .Values.workspace.serviceGroup }}.{{ .Values.namespace }}.svc.cluster.local:8080
 {{- end -}}
 {{- end -}}
+
+{{/* The Galaxy's MemoryPolicy (cluster-scoped): galaxy.policyName, or <workspace>-memory. */}}
+{{- define "omnia-demo.galaxyPolicyName" -}}
+{{- default (printf "%s-memory" (include "omnia-demo.workspaceName" .)) .Values.galaxy.policyName -}}
+{{- end -}}
