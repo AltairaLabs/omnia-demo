@@ -23,13 +23,26 @@ spec:
     {{- end }}
   roleBindings:
     {{- toYaml .Values.workspace.roleBindings | nindent 4 }}
-  {{- if .Values.workspace.runtimeServiceAccount.name }}
-  # Every agent in the workspace, including ones deployed through the API with
-  # no pod overrides, runs as this ServiceAccount: workload identity to a
-  # keyless model Provider needs nothing per agent.
+  {{- $rsa := .Values.workspace.runtimeServiceAccount }}
+  {{- $rid := .Values.workspace.runtimeIdentity }}
+  {{- if or $rsa.name $rid.serviceAccountAnnotations $rid.podLabels }}
+  # Workload identity for every agent in the workspace, including ones
+  # deployed through the API with no pod overrides.
+  # - Omnia >= 0.9.0-beta.23 runs each agent as its own <agent>-facade
+  #   ServiceAccount (Omnia #3624): runtimeIdentity.serviceAccountAnnotations
+  #   are set on each of them, and the cloud side federates one credential
+  #   per agent.
+  # - runtimeServiceAccount names a template SA instead: before beta.23 the
+  #   agents ran as it; from beta.23 its annotations are copied onto theirs.
   runtime:
-    serviceAccountName: {{ .Values.workspace.runtimeServiceAccount.name }}
-    {{- with .Values.workspace.runtimeServiceAccount.podLabels }}
+    {{- with $rsa.name }}
+    serviceAccountName: {{ . }}
+    {{- end }}
+    {{- with $rid.serviceAccountAnnotations }}
+    serviceAccountAnnotations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with (merge (dict) ($rid.podLabels | default dict) ($rsa.podLabels | default dict)) }}
     podLabels:
       {{- toYaml . | nindent 6 }}
     {{- end }}

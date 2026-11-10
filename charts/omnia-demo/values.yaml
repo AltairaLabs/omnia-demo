@@ -31,6 +31,14 @@ workspace:
   # The workspace-wide runtime ServiceAccount (spec.runtime). With
   # workload identity, annotate it with the identity's client and tenant ids
   # and label the pods.
+  # The identity every agent runs with (spec.runtime). On Omnia >= beta.23 set
+  # serviceAccountAnnotations: they go on each agent's own <agent>-facade
+  # ServiceAccount, and the cloud side federates one credential per agent.
+  runtimeIdentity:
+    serviceAccountAnnotations: {}
+    podLabels: {}
+  # Before beta.23: a template ServiceAccount every agent runs as (the chart can
+  # create it). From beta.23 its annotations are only copied onto each agent's SA.
   runtimeServiceAccount:
     name: ""
     create: true
