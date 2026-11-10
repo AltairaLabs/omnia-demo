@@ -214,3 +214,25 @@ func TestReceiptsRecordEveryCall(t *testing.T) {
 		t.Fatalf("after=2 should be empty, got %+v", out.Receipts)
 	}
 }
+
+// A tool call through Omnia carries the user's pseudonym, not the account id,
+// in X-Omnia-User-Id; the email identifies the customer.
+func TestUserOfPrefersEmailOverPseudonym(t *testing.T) {
+	for _, tc := range []struct{ email, id, want string }{
+		{"Amira.Saleem@example.com", "01d33840f8be2c00", wrenAccountID},
+		{"", wrenAccountID, wrenAccountID},
+		{"someone@example.com", wrenAccountID, "email:someone@example.com"},
+		{"", "", wrenAccountID},
+	} {
+		r, _ := http.NewRequest(http.MethodPost, "/wren/bill", nil)
+		if tc.email != "" {
+			r.Header.Set("X-Omnia-User-Email", tc.email)
+		}
+		if tc.id != "" {
+			r.Header.Set("X-Omnia-User-Id", tc.id)
+		}
+		if got := userOf(r); got != tc.want {
+			t.Errorf("email %q id %q: %q, want %q", tc.email, tc.id, got, tc.want)
+		}
+	}
+}

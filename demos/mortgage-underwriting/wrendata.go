@@ -25,6 +25,7 @@ const (
 	wrenUsageDays   = 60
 	wrenSwitchDate  = "2026-12-01"
 	wrenAccountID   = "40021187"
+	wrenEmail       = "amira.saleem@example.com"
 	wrenStandingP   = 46.0
 	wrenSteadyRateP = 24.1
 )

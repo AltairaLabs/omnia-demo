@@ -34,6 +34,12 @@ const OPENERS = [
   "What's using the most power?",
 ];
 
+// The model writes **bold** now and then; show it as bold rather than as
+// asterisks. Only that: anything else stays text, and nothing is parsed as HTML.
+function emphasis(text) {
+  return text.split(/\*\*([^*]+)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
+}
+
 function api(path) {
   return new URL("../../api/assistant/" + path, window.location.href);
 }
@@ -246,7 +252,7 @@ export function WrenPanel() {
           }
           return (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-              {m.text ? <p className="agent-text">{m.text}</p> : null}
+              {m.text ? <p className="agent-text">{emphasis(m.text)}</p> : null}
               <AgentReceipt items={m.receipts} />
             </div>
           );

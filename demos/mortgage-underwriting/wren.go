@@ -46,10 +46,17 @@ import (
 // policy — a ToolPolicy sees the call's own arguments, and an argument is
 // something the model writes.
 //
-// The customer is identified by X-Omnia-User-Id, which the runtime sets on
-// every tool call from the edge-asserted identity, and demo-sites sets on the
-// portal routes. A call with no identity (arena, curl) is Amira's: the stub
-// holds one account.
+// The customer is identified by email on a tool call, and by account id on the
+// portal's own routes:
+//
+//   - On a tool call the runtime sends X-Omnia-User-Email as the edge asserted
+//     it, but X-Omnia-User-Id is the workspace PSEUDONYM of the user, not the
+//     account id (Omnia pseudonymises user ids with the install's key). So the
+//     email is what an account system can look a customer up by.
+//   - demo-sites calls the consent and receipt routes directly, not through
+//     Omnia, and sets X-Omnia-User-Id to the account id itself.
+//
+// A call with neither (arena, curl) is Amira's: the stub holds one account.
 
 // wrenReceipt is one tool call the account system served.
 type wrenReceipt struct {
@@ -185,6 +192,12 @@ func (w *wren) tool(name, effect string, fn func(wrenCall) (any, string, int)) h
 }
 
 func userOf(r *http.Request) string {
+	if e := strings.TrimSpace(r.Header.Get("X-Omnia-User-Email")); e != "" {
+		if strings.EqualFold(e, wrenEmail) {
+			return wrenAccountID
+		}
+		return "email:" + e // someone the stub holds no account for
+	}
 	if u := strings.TrimSpace(r.Header.Get("X-Omnia-User-Id")); u != "" {
 		return u
 	}
