@@ -14,17 +14,28 @@ real customer system without adding authentication and security controls.
 ## Layout
 
 ```
-site/shared/            vendored React, ReactDOM, Babel, lucide; kit-loader.js, react-shim.js
+site/shared/            vendored React, ReactDOM, lucide; react-shim.js
 site/larkmere-mutual/   tokens, components, assets, ui_kits/{marketing,portal}
 site/wrenmoor-energy/   tokens, components, assets, ui_kits/{marketing,portal,intranet}
 site/halvern-partners/  tokens, assets, ui_kits/{marketing,practice-desk,design-system}
 ```
 
-A brand's directory is served over `shared/`, so `<site>/vendor/...` and
-`<site>/kit-loader.js` resolve for every brand. The pages are React rendered by
-in-browser Babel from those vendored scripts: the cluster has no egress, so
-nothing is hot-linked. (Larkmere Mutual's fonts still come from Google Fonts,
-as before; Wrenmoor Energy's and Halvern Partners' are vendored woff2 files.)
+A brand's directory is served over `shared/`, so `<site>/vendor/...` resolves
+for every brand. The pages are React: `hack/build-kits.sh` compiles each UI
+kit's `App.jsx` and its imports into one `app.js` beside its `index.html`
+(esbuild; `react` resolves to `shared/react-shim.js`, which hands over the
+vendored UMD global). The Dockerfile runs it before `go build` embeds the
+site; run it yourself before a local `go run`. The bundles are gitignored.
+
+The design exports loaded their JSX in the browser through Babel standalone
+instead: a 2.4 MB download and one round trip per module, which behind the
+catalogue's sign-in proxy kept Larkmere Mutual's page white for 15 seconds.
+
+Text files are served gzipped, each compressed once and cached; the vendored
+scripts, fonts and photos carry a day's Cache-Control. The cluster has no
+egress, so nothing is hot-linked. (Larkmere Mutual's fonts still come from
+Google Fonts, as before; Wrenmoor Energy's and Halvern Partners' are vendored
+woff2 files.)
 
 Halvern Partners' pages are plain HTML with a little script, converted from
 the design handoff's prototypes; they use none of the shared React scripts.

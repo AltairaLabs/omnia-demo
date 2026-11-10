@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"compress/gzip"
 	"embed"
 	"errors"
 	"fmt"
@@ -12,15 +14,17 @@ import (
 	"net/url"
 	"path"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 )
 
 // site holds every brand's design-system export, plus the scripts they share.
 // Embedded rather than mounted so the image runs on distroless/static with no
 // volume and no filesystem assumptions — the same shape as the stub next door.
 //
-//	site/shared/    vendored React, ReactDOM, Babel and lucide; the kit loader
-//	                and the React shim. Served beneath EVERY brand.
+//	site/shared/    vendored React, ReactDOM and lucide, and the React shim
+//	                the compiled kits import. Served beneath EVERY brand.
 //	site/<brand>/   one brand's tokens, components, assets and ui_kits.
 //
 // One binary and one image for every brand: a brand is a directory and a
@@ -121,7 +125,7 @@ func lookupBrand(name string, override member) (brand, error) {
 // layered serves the brand's own tree first and the shared tree beneath it.
 // A brand can override a shared file by shipping its own copy, and every URL a
 // page uses stays relative to that page: the shared scripts appear at
-// <site>/vendor/ and <site>/kit-loader.js exactly as if each brand had its own.
+// <site>/vendor/ exactly as if each brand had its own.
 type layered struct {
 	top, base fs.FS
 }
@@ -179,7 +183,7 @@ const (
 // a redirect from the root to the brand's public site, and a health endpoint.
 // backendURL may be empty, in which case the consent and receipt routes 404.
 func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
-	// The kit loads .jsx over the network and hands the text to Babel. Go's
+	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
 	// page then renders blank with only a console error to say why.
@@ -196,7 +200,7 @@ func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
 	if err != nil {
 		return nil, err
 	}
-	files := http.FileServer(http.FS(root))
+	files := gzipped(root, http.FileServer(http.FS(root)))
 
 	proxy, err := assistantProxy(agentURL, b.who)
 	if err != nil {
@@ -228,6 +232,61 @@ func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
 		files.ServeHTTP(w, r)
 	})
 	return mux, nil
+}
+
+// compressible are the extensions worth gzipping: text. Images and fonts are
+// already compressed.
+var compressible = map[string]bool{
+	".html": true, ".js": true, ".jsx": true, ".css": true, ".svg": true, ".json": true, ".md": true,
+}
+
+// gzipped serves a compressible file gzipped to a client that accepts it, and
+// everything else through next. The site is embedded and never changes, so
+// each file is compressed once, on first request, and kept: the container's
+// CPU limit is a tenth of a core, and compressing the 640 KB icon library on
+// every request would cost more than sending it.
+//
+// A directory (".../") is served by next, uncompressed: its index.html is a
+// few hundred bytes.
+func gzipped(root fs.FS, next http.Handler) http.Handler {
+	var cache sync.Map // path -> []byte
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
+		// Embedded files carry no modification time, so without this the
+		// browser fetches everything again on every visit. The vendored
+		// libraries, fonts and photos change only with a new image.
+		if strings.HasPrefix(name, "vendor/") || strings.HasPrefix(name, "assets/") || strings.HasPrefix(name, "tokens/") {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
+		}
+		if strings.HasSuffix(r.URL.Path, "/") || !compressible[path.Ext(name)] ||
+			!strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		body, ok := cache.Load(name)
+		if !ok {
+			raw, err := fs.ReadFile(root, name)
+			if err != nil {
+				next.ServeHTTP(w, r) // the file server's own 404
+				return
+			}
+			var buf bytes.Buffer
+			zw, _ := gzip.NewWriterLevel(&buf, gzip.BestCompression)
+			_, _ = zw.Write(raw)
+			_ = zw.Close()
+			body, _ = cache.LoadOrStore(name, buf.Bytes())
+		}
+		b := body.([]byte)
+		h := w.Header()
+		h.Set("Content-Type", mime.TypeByExtension(path.Ext(name)))
+		h.Set("Content-Encoding", "gzip")
+		h.Set("Vary", "Accept-Encoding")
+		h.Set("Content-Length", strconv.Itoa(len(b)))
+		if r.Method == http.MethodHead {
+			return
+		}
+		_, _ = w.Write(b)
+	})
 }
 
 // assistantProxy forwards the browser's WebSocket to the agent facade, adding

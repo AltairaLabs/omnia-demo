@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -41,7 +42,7 @@ func TestEveryBrandServesItsPagesAndTheSharedScripts(t *testing.T) {
 		"wrenmoor-energy":  {"/ui_kits/marketing/", "/ui_kits/portal/", "/ui_kits/intranet/"},
 		"halvern-partners": {"/ui_kits/marketing/", "/ui_kits/practice-desk/", "/ui_kits/design-system/", "/tokens/fonts.css", "/assets/larkmere-logo-lockup.svg"},
 	}
-	shared := []string{"/kit-loader.js", "/react-shim.js", "/vendor/react.production.min.js", "/vendor/babel.min.js"}
+	shared := []string{"/react-shim.js", "/vendor/react.production.min.js", "/vendor/react-dom.production.min.js"}
 	for name, paths := range pages {
 		srv := serve(t, name, "http://127.0.0.1:1", "")
 		for _, p := range append(paths, shared...) {
@@ -72,6 +73,40 @@ func TestJSXIsJavaScript(t *testing.T) {
 	resp, _ := get(t, srv.URL+"/ui_kits/portal/App.jsx")
 	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/javascript") {
 		t.Fatalf("App.jsx content type %q", ct)
+	}
+}
+
+func TestTextIsGzipped(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/vendor/react-dom.production.min.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	// A bare Transport, so the client does not ask for and undo gzip itself.
+	resp, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	zr, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatalf("not gzip (encoding %q): %v", resp.Header.Get("Content-Encoding"), err)
+	}
+	body, _ := io.ReadAll(zr)
+	if resp.Header.Get("Content-Encoding") != "gzip" || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/javascript") || len(body) < 100000 {
+		t.Fatalf("encoding %q type %q, %d bytes", resp.Header.Get("Content-Encoding"), resp.Header.Get("Content-Type"), len(body))
+	}
+	if resp.Header.Get("Cache-Control") == "" {
+		t.Fatal("vendored script served without Cache-Control")
+	}
+	// A photo is not recompressed.
+	req, _ = http.NewRequest(http.MethodGet, srv.URL+"/assets/photos/hero-moor.jpg", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	resp2, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp2.Body.Close()
+	if resp2.Header.Get("Content-Encoding") != "" {
+		t.Fatal("a jpeg was gzipped")
 	}
 }
 

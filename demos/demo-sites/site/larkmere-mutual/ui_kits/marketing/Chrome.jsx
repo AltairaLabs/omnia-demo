@@ -61,7 +61,7 @@ export function SiteHeader({ route, onNavigate }) {
             artboard with nowhere to link to. Here both surfaces are served by
             the same binary, so Sign in goes where it says it goes — which is
             also the cut the demo needs: public site, then member area. */}
-        <a href="/ui_kits/portal/" style={{ textDecoration: "none" }}>
+        <a href="../portal/" style={{ textDecoration: "none" }}>
           <Button variant="secondary" size="sm">Sign in</Button>
         </a>
         <Button variant="accent" size="sm" onClick={() => onNavigate("protection")}>Get a quote</Button>

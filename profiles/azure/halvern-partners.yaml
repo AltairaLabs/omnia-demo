@@ -21,13 +21,12 @@ catalogue:
     hostnames:
       - omnia-demo.azure.altairalabs.ai
   # The Larkmere Mutual website and member portal (the customer side of the
-  # card-support demo), at /larkmere-mutual/ behind the same sign-in.
+  # card-support demo), at /larkmere-mutual/ behind the same sign-in. Every
+  # site's paths are relative, so none needs rewrites (which would also turn
+  # off upstream gzip: sub_filter needs the response uncompressed).
   proxies:
     - path: /larkmere-mutual
       upstream: http://larkmere-portal.larkmere-mutual.svc.cluster.local:8080
-      rewrites:
-        - { from: '"/api/assistant/ws"', to: '"/larkmere-mutual/api/assistant/ws"' }
-        - { from: '"/ui_kits/portal/', to: '"/larkmere-mutual/ui_kits/portal/' }
     # Wrenmoor Energy's website, customer portal and intranet. All its paths
     # are relative, so no rewrites.
     - path: /wrenmoor-energy

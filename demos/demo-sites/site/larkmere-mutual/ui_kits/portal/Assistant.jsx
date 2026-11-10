@@ -137,8 +137,11 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
   React.useEffect(() => {
     if (!open) return undefined;
 
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const sock = new WebSocket(proto + "//" + window.location.host + "/api/assistant/ws");
+    // Relative to this page, so it works under a path prefix
+    // (/larkmere-mutual/...) with no rewrites.
+    const url = new URL("../../api/assistant/ws", window.location.href);
+    url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
+    const sock = new WebSocket(url);
     sockRef.current = sock;
 
     sock.onmessage = (ev) => {
