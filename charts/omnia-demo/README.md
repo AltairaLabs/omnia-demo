@@ -82,6 +82,9 @@ Wrenmoor Energy, the wind and solar supplier, has four agents and a website:
 - `wrenmoorSite` — the public website, the customer portal and the Wrenmoor
   Hub intranet (`demos/demo-sites`, `--site wrenmoor-energy`). Serve it
   through the catalogue at `/wrenmoor-energy`; it needs no rewrites.
+- `halvernSite` — Halvern Partners' public website, Practice Desk and
+  design-system reference (`demos/demo-sites`, `--site halvern-partners`).
+  Serve it through the catalogue at `/halvern-partners`; no rewrites.
 
 - `incidentAgent` — the on-call incident agent (chat). It reads alerts, logs
   and deploy history, rolls back and scales. Its ToolPolicy forbids any tool

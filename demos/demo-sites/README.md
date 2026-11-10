@@ -17,13 +17,17 @@ real customer system without adding authentication and security controls.
 site/shared/            vendored React, ReactDOM, Babel, lucide; kit-loader.js, react-shim.js
 site/larkmere-mutual/   tokens, components, assets, ui_kits/{marketing,portal}
 site/wrenmoor-energy/   tokens, components, assets, ui_kits/{marketing,portal,intranet}
+site/halvern-partners/  tokens, assets, ui_kits/{marketing,practice-desk,design-system}
 ```
 
 A brand's directory is served over `shared/`, so `<site>/vendor/...` and
 `<site>/kit-loader.js` resolve for every brand. The pages are React rendered by
 in-browser Babel from those vendored scripts: the cluster has no egress, so
 nothing is hot-linked. (Larkmere Mutual's fonts still come from Google Fonts,
-as before; Wrenmoor Energy's are vendored woff2 files.)
+as before; Wrenmoor Energy's and Halvern Partners' are vendored woff2 files.)
+
+Halvern Partners' pages are plain HTML with a little script, converted from
+the design handoff's prototypes; they use none of the shared React scripts.
 
 ## Routes
 

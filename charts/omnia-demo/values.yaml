@@ -631,6 +631,22 @@ wrenmoorSite:
     tag: ""
     pullPolicy: IfNotPresent
 
+# ---------------------------------------------------------------------------
+# halvernSite — Halvern Partners' websites
+#
+# The public site, the Practice Desk and the design-system reference: the
+# demo-sites image run with --site halvern-partners. Serve it through the
+# catalogue at /halvern-partners (catalogue.proxies); every URL in the site is
+# relative, so it needs no rewrites.
+# ---------------------------------------------------------------------------
+halvernSite:
+  enabled: false
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-sites
+    # Empty: the chart's appVersion.
+    tag: ""
+    pullPolicy: IfNotPresent
+
 sharepoint:
   # Requires Omnia Enterprise memory ingestion and AgentRuntime CRDs.
   enabled: false

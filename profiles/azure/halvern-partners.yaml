@@ -1,9 +1,13 @@
-# Halvern Partners: the partner consultancy that builds agents for Larkmere
+# Halvern Partners: a legaltech systems integrator that works only in law. It
+# builds agents for law firms and for the in-house legal teams at Larkmere
 # Mutual and Wrenmoor Energy. Its workspace is the build side: the Arena
-# builder (`make builder`) runs here. Templates and its bid assistant come later.
+# builder (`make builder`) runs here. Its legal agents come later.
 workspace:
   displayName: Halvern Partners
-  description: Partner consultancy. Builds, evaluates and hands over client agents.
+  description: Legaltech systems integrator. Builds, evaluates and hands over legal agents for law firms and in-house legal teams.
+
+# The public website, the Practice Desk and the design-system reference.
+halvernSite: { enabled: true }
 
 # The demo catalogue (every tenant's demos), at
 # https://omnia-demo.azure.altairalabs.ai/demo-catalog/ behind the dashboard
@@ -28,3 +32,7 @@ catalogue:
     # are relative, so no rewrites.
     - path: /wrenmoor-energy
       upstream: http://wrenmoor-site.wrenmoor-energy.svc.cluster.local:8080
+    # Halvern Partners' website, Practice Desk and design system. Relative
+    # paths too.
+    - path: /halvern-partners
+      upstream: http://halvern-site.halvern-partners.svc.cluster.local:8080

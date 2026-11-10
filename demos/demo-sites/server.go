@@ -80,6 +80,13 @@ var brands = map[string]brand{
 		// shows.
 		who: member{id: "40021187", email: "amira.saleem@example.com", roles: "customer"},
 	},
+	"halvern-partners": {
+		dir:   "halvern-partners",
+		index: "ui_kits/marketing/",
+		// The Practice Desk's signed-in delivery partner. No Halvern page
+		// talks to an agent yet; this is who it will be.
+		who: member{id: "hp-0042", email: "rhiannon.vale@example.com", roles: "staff"},
+	},
 }
 
 // brandNames lists the valid --site values, sorted, for error messages.

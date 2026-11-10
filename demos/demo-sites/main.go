@@ -5,6 +5,9 @@
 //	                  customer-facing surface for the synthetic privacy demo.
 //	wrenmoor-energy   Wrenmoor Energy's public site, its customer portal with
 //	                  the Wren assistant, and its staff intranet.
+//	halvern-partners  Halvern Partners' public site, its Practice Desk (the
+//	                  internal view of client engagements and agents) and its
+//	                  design-system reference.
 //
 // Why a site at all rather than driving a demo from the dashboard Console: the
 // Console is an OPERATOR surface. Filming a customer typing into admin tooling

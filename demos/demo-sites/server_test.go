@@ -37,8 +37,9 @@ func get(t *testing.T, url string) (*http.Response, string) {
 
 func TestEveryBrandServesItsPagesAndTheSharedScripts(t *testing.T) {
 	pages := map[string][]string{
-		"larkmere-mutual": {"/ui_kits/marketing/", "/ui_kits/portal/"},
-		"wrenmoor-energy": {"/ui_kits/marketing/", "/ui_kits/portal/", "/ui_kits/intranet/"},
+		"larkmere-mutual":  {"/ui_kits/marketing/", "/ui_kits/portal/"},
+		"wrenmoor-energy":  {"/ui_kits/marketing/", "/ui_kits/portal/", "/ui_kits/intranet/"},
+		"halvern-partners": {"/ui_kits/marketing/", "/ui_kits/practice-desk/", "/ui_kits/design-system/", "/tokens/fonts.css", "/assets/larkmere-logo-lockup.svg"},
 	}
 	shared := []string{"/kit-loader.js", "/react-shim.js", "/vendor/react.production.min.js", "/vendor/babel.min.js"}
 	for name, paths := range pages {
