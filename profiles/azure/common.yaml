@@ -56,18 +56,18 @@ workspace:
 # Off by default; a tenant that ingests fixtures turns it on.
 memory:
   enabled: false
-  image: { tag: sha-02d1775 }
+  image: { tag: sha-b86bd8e }
 
 # The chart's images default to its appVersion, which only exists once that
 # omnia-demo release is tagged. Until then (chart from a sibling checkout), pin
 # the images the publish workflow built from that checkout's commit
 # (workflow_dispatch on the branch tags them sha-<short>). Remove when
 # installing a released chart.
-mortgageUnderwriting: { image: { tag: sha-02d1775 } }
-claimsTriage: { image: { tag: sha-02d1775 } }
-piiChat: { image: { tag: sha-02d1775 }, portal: { image: { tag: sha-02d1775 } } }
-incidentAgent: { image: { tag: sha-02d1775 } }
-dataAnalyst: { image: { tag: sha-02d1775 } }
-wren: { image: { tag: sha-02d1775 } }
-wrenmoorSite: { image: { tag: sha-02d1775 } }
-halvernSite: { image: { tag: sha-02d1775 } }
+mortgageUnderwriting: { image: { tag: sha-b86bd8e } }
+claimsTriage: { image: { tag: sha-b86bd8e } }
+piiChat: { image: { tag: sha-b86bd8e }, portal: { image: { tag: sha-b86bd8e } } }
+incidentAgent: { image: { tag: sha-b86bd8e } }
+dataAnalyst: { image: { tag: sha-b86bd8e } }
+wren: { image: { tag: sha-b86bd8e } }
+wrenmoorSite: { image: { tag: sha-b86bd8e } }
+halvernSite: { image: { tag: sha-b86bd8e } }
