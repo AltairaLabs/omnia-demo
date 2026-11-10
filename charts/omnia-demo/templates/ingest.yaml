@@ -31,7 +31,15 @@ spec:
               s3() { aws --endpoint-url http://memory-s3:9000 "$@"; }
               until s3 s3 ls >/dev/null 2>&1; do sleep 2; done
               s3 s3 mb s3://{{ .Values.memory.s3.bucket }} 2>/dev/null || true
-              s3 s3 cp /fixtures/ s3://{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }} --recursive --exclude '*' --include '*.md'
+              # Mirror, not copy: --delete drops files that left the fixture
+              # set, so the connector's manifest forgets them. A mounted
+              # ConfigMap also holds every file again under ..data/ and a
+              # timestamped ..<date>/ directory; excluding '..*' keeps those
+              # out, or each upgrade would add another copy of every file.
+              # sync never deletes what it excludes, so first clear any such
+              # copies an earlier `cp --recursive` left.
+              s3 s3 rm s3://{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }} --recursive --exclude '*' --include '..*'
+              s3 s3 sync /fixtures/ s3://{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }} --delete --exclude '*' --include '*.md' --exclude '..*'
           env:
             - { name: AWS_DEFAULT_REGION, value: {{ .Values.memory.s3.region | quote }} }
             - name: AWS_ACCESS_KEY_ID

@@ -148,6 +148,9 @@ func sync(ctx context.Context, store objectStore, cfg config, client *http.Clien
 		}
 		for _, object := range page.Contents {
 			key := aws.ToString(object.Key)
+			if hidden(strings.TrimPrefix(key, cfg.prefix)) {
+				continue // not part of the source; see hidden
+			}
 			url := "s3://" + cfg.bucket + "/" + key
 			present.Keys = append(present.Keys, url)
 			doc, err := read(ctx, store, cfg.bucket, key, object.LastModified)
@@ -304,6 +307,20 @@ func post(ctx context.Context, client *http.Client, cfg config, docs []document,
 		}
 		time.Sleep(time.Duration(attempt) * 2 * time.Second)
 	}
+}
+
+// hidden reports whether any segment of a key's path starts with ".". Such
+// objects are skipped, and left out of the manifest: a directory uploaded from
+// a mounted ConfigMap carries every file again under ..data/ and a timestamped
+// ..<date>/ directory, and ingesting those would store each document twice
+// or more.
+func hidden(key string) bool {
+	for _, segment := range strings.Split(key, "/") {
+		if strings.HasPrefix(segment, ".") {
+			return true
+		}
+	}
+	return false
 }
 
 func textLike(key string) bool {

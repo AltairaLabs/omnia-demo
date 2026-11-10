@@ -27,3 +27,14 @@ func TestLoadConfigRequiresCoreSettings(t *testing.T) {
 		t.Fatal("loadConfig() succeeded without required settings")
 	}
 }
+
+func TestHiddenSkipsDotSegments(t *testing.T) {
+	for key, want := range map[string]bool{
+		"switching.md": false, "manuals/switching.md": false,
+		"..data/switching.md": true, "..2026_11_10_10_54_16.553700652/switching.md": true, ".hidden.md": true,
+	} {
+		if got := hidden(key); got != want {
+			t.Errorf("hidden(%q) = %v, want %v", key, got, want)
+		}
+	}
+}
