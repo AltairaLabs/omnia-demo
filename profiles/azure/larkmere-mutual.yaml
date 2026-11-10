@@ -1,0 +1,18 @@
+# Larkmere Mutual: a mutual insurer and lender, and the default tenant in
+# console captures. Governance and privacy for a regulated buyer.
+workspace:
+  displayName: Larkmere Mutual
+  description: Mutual insurer and lender. Mortgage underwriting, claims triage and member card support.
+
+mortgageUnderwriting:
+  enabled: true
+  # A full triage note needs ~3.4k output tokens and a long first token.
+  providerRef: azure-foundry-gpt-4o-long
+
+claimsTriage:
+  enabled: true
+
+piiChat:
+  enabled: true
+  portal:
+    enabled: true

@@ -1,0 +1,38 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: list_sites
+spec:
+  name: list_sites
+  description: >-
+    List Wrenmoor Energy's generation sites: id, name, kind (wind, solar or
+    battery), capacity in MW, storage in MWh for the battery, units, location,
+    year commissioned and the export meter's head-end.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      sites:
+        type: array
+        items:
+          type: object
+          properties:
+            site_id: { type: string }
+            name: { type: string }
+            kind: { type: string }
+            capacity_mw: { type: number }
+            storage_mwh: { type: number }
+            units: { type: string }
+            location: { type: string }
+            commissioned: { type: integer }
+            export_meter: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [grid-operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    sites:
+      - { site_id: WM-EDGE, name: Wrenmoor Edge, kind: wind, capacity_mw: 29, units: 14 turbines, location: Calderdale, commissioned: 2019, export_meter: HE-EDGE-2 }
+      - { site_id: WM-CRAGG, name: Cragg Vale Solar, kind: solar, capacity_mw: 18, units: "42,000 panels", location: Calderdale, commissioned: 2022, export_meter: HE-EDGE-2 }
+      - { site_id: WM-HEPT, name: Heptonstall Store, kind: battery, capacity_mw: 20, storage_mwh: 40, units: battery, location: Calderdale, commissioned: 2024, export_meter: HE-HEPT-1 }

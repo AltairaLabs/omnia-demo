@@ -1,0 +1,145 @@
+/* Wrenmoor Energy design system: tokens and the component classes the three
+   UI kits share. Every URL here is relative, so the site holds under a path
+   prefix. */
+@import url("tokens/fonts.css");
+@import url("tokens/colors.css");
+
+:root {
+  --r-pill: 999px;
+  --r-receipt: 10px;
+  --r-input: 12px;
+  --r-tile: 16px;
+  --r-card: 20px;
+  --r-card-lg: 24px;
+  --r-hero: 28px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--paper);
+  color: var(--peat);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+a { color: var(--moor); text-decoration: none; }
+a:hover { color: var(--peat); }
+:focus-visible { outline: 2px solid var(--moor); outline-offset: 2px; }
+button { font: inherit; cursor: pointer; }
+.mono { font-family: var(--font-mono); }
+.serif { font-family: var(--font-serif); }
+.muted { color: var(--peat-muted); }
+.body-copy { color: var(--peat-body); }
+.dot { display: inline-block; flex: none; width: 8px; height: 8px; border-radius: 50%; }
+
+/* Type */
+.display {
+  font-family: var(--font-serif); font-weight: 400; margin: 0;
+  font-size: clamp(44px, 6.4vw, 84px); line-height: 0.98; letter-spacing: -0.025em;
+  text-wrap: balance;
+}
+.h1 {
+  font-family: var(--font-serif); font-weight: 400; margin: 0;
+  font-size: clamp(34px, 4vw, 48px); line-height: 1.05; letter-spacing: -0.015em;
+}
+.h2 {
+  font-family: var(--font-serif); font-weight: 400; margin: 0;
+  font-size: clamp(34px, 4vw, 52px); line-height: 1.05; letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.big { font-family: var(--font-serif); font-weight: 400; line-height: 1; }
+
+/* Nav links: underline on hover */
+.navlink { color: var(--peat); }
+.navlink:hover { color: var(--peat); text-decoration: underline; text-underline-offset: 4px; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 15px; font-weight: 500; line-height: 1.2; padding: 12px 22px;
+  border-radius: var(--r-pill); border: 1px solid transparent; white-space: nowrap;
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+.btn-sm { font-size: 14px; padding: 9px 18px; }
+.btn-primary { background: var(--moor); color: var(--card-ink); border-color: var(--moor); }
+.btn-primary:hover { background: var(--moor-hover); border-color: var(--moor-hover); color: var(--card-ink); }
+.btn-outline { background: transparent; color: var(--peat); border-color: var(--input-line); }
+.btn-outline:hover { border-color: var(--moor); color: var(--peat); }
+.btn-soft { background: var(--moor-tint); color: var(--moor-tint-ink); }
+.btn-card { background: var(--card); color: var(--peat); }
+.btn-card:hover { color: var(--moor); }
+.btn-link { padding: 0; border: 0; background: none; color: var(--moor); text-decoration: underline; text-underline-offset: 4px; }
+.btn:disabled { opacity: 0.55; cursor: default; }
+
+/* Badges */
+.badge {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  font-size: 13px; font-weight: 500; line-height: 1.2; padding: 6px 12px;
+  border-radius: var(--r-pill); white-space: nowrap;
+}
+.badge-paid { background: var(--moor-tint); color: var(--moor-tint-ink); }
+.badge-due { background: var(--sun-tint); color: var(--sun-ink); }
+.badge-overdue { background: var(--clay-tint); color: var(--clay-ink); }
+.badge-neutral { background: var(--neutral-tint); color: var(--neutral-ink); }
+.badge-wind { background: var(--wind-tint); color: var(--wind-ink); }
+.badge-solar { background: var(--sun-tint); color: var(--sun-ink); }
+
+/* Surfaces */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-card); }
+.card-lg { border-radius: var(--r-card-lg); }
+.float { box-shadow: var(--float), 0 0 0 1px var(--line); }
+
+/* Inputs */
+.input {
+  font: inherit; font-size: 16px; color: inherit; background: var(--card);
+  border: 1px solid var(--input-line); border-radius: var(--r-input); padding: 12px 14px;
+}
+.input-pill { border-radius: var(--r-pill); padding: 14px 18px; }
+.input::placeholder { color: var(--placeholder); }
+
+/* Energy mix */
+.mix-bar { display: flex; border-radius: var(--r-pill); overflow: hidden; gap: 3px; }
+.mix-legend { display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; }
+.mix-legend span { display: inline-flex; gap: 7px; align-items: center; }
+
+/* Usage bars */
+.usage { display: flex; align-items: flex-end; gap: 5px; height: 150px; }
+.usage > div { flex: 1; border-radius: 5px 5px 2px 2px; background: var(--moor-bar); }
+.usage > div.on { background: var(--moor); }
+.usage > div.partial {
+  background: repeating-linear-gradient(135deg, var(--moor-bar) 0 4px, var(--moor-hatch) 4px 8px);
+}
+
+/* Agent pattern */
+.agent-avatar {
+  flex: none; width: 28px; height: 28px; border-radius: 50%; background: var(--moor-tint);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-serif); font-size: 15px; color: var(--moor);
+}
+.agent-avatar.lg { width: 34px; height: 34px; font-size: 18px; }
+.user-bubble {
+  align-self: flex-end; max-width: 85%; padding: 11px 15px; border-radius: 18px 18px 4px 18px;
+  background: var(--moor); color: var(--card-ink); font-size: 15px; line-height: 1.45;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+.agent-text { margin: 0; font-size: 15px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.receipt {
+  display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--r-receipt);
+  background: var(--receipt-bg); font-family: var(--font-mono); font-size: 11px; color: var(--peat-muted);
+}
+.confirm {
+  display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 14px;
+  border: 1px solid var(--sun); background: var(--confirm-bg);
+}
+.chip {
+  font-size: 13px; padding: 7px 12px; border-radius: var(--r-pill); border: 1px solid var(--chip-line);
+  color: var(--peat-body); background: transparent;
+}
+.chip:hover { border-color: var(--moor); color: var(--moor); }
+
+/* The demo disclaimer: on every page, word for word. */
+.disclaimer {
+  padding: 14px 28px; background: var(--disclaimer-bg); color: var(--disclaimer-ink);
+  font-size: 13px; line-height: 1.5; text-align: center;
+}
+.disclaimer a { color: var(--footer-head); text-decoration: underline; text-underline-offset: 3px; }

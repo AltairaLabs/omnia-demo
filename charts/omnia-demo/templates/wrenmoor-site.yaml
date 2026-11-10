@@ -1,0 +1,94 @@
+{{- if .Values.wrenmoorSite.enabled }}
+{{- $ns := .Values.namespace }}
+---
+# Wrenmoor Energy's websites: the public site, the customer portal with the
+# Wren panel, and the Wrenmoor Hub intranet. The demo-sites binary
+# (demos/demo-sites) with --site wrenmoor-energy; every brand's site is
+# embedded in the one image, so there is no ConfigMap and no volume.
+#
+# Serve it through the catalogue's proxy (catalogue.proxies) at
+# /wrenmoor-energy. Every URL the site uses is relative, so it needs no
+# rewrites; the intranet's links to /agents and /sessions are root-relative on
+# purpose and land on the dashboard.
+#
+# With wren on, the portal's panel talks to it: the site proxies the socket to
+# the agent's facade and the consent and receipt routes to its account system,
+# asserting Amira's identity on both. Without wren the pages still render and
+# the panel says it cannot connect.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wrenmoor-site
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: customer-site
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wrenmoor-site
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wrenmoor-site
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot".
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: site
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.wrenmoorSite.image) }}
+          imagePullPolicy: {{ .Values.wrenmoorSite.image.pullPolicy }}
+          args:
+            - --site
+            - wrenmoor-energy
+{{- if .Values.wren.enabled }}
+            # Wren's facade (edgeTrust opens it to the site's identity
+            # headers) and its account system (consent and receipts).
+            - --agent-url
+            - http://wren.{{ $ns }}:8080
+            - --backend-url
+            - http://wren-account.{{ $ns }}:8080
+{{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wrenmoor-site
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: wrenmoor-site
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}

@@ -17,7 +17,7 @@
       "name": "triage",
       "description": "Backend triage for residential mortgage applications: gathers the case file, credit, valuation, affordability and AML checks, verifies income with the approved supplier, and files an underwriter case note with a recommendation.",
       "version": "v1.1.0",
-      "system_template": "You triage residential mortgage applications for a human underwriter.\n\nWork the case in this order, calling one tool at a time and using what each\nreturns to inform the next:\n\n1. case_fetch — pull the application file for the supplied case reference.\n2. credit_report — retrieve the applicant's bureau report.\n3. property_valuation — value the security property and obtain the LTV.\n4. affordability_assess — run the stressed affordability assessment.\n5. aml_screen — screen the applicant for sanctions and PEP matches.\n6. income_verify — verify the declared income with the approved\n   third-party verification supplier.\n7. case_note_write — file your case note and recommendation.\n\nYour case note must state what you checked, what each check returned, and\nanything you could NOT establish. A check that failed or was refused is a\nmaterial fact: record it plainly rather than working around it.\n\nIf a tool call is refused by policy, read the refusal message — it tells you\nwhat was wrong with the request. Where you can comply with it and still get\nthe job done, re-submit the call in a form that complies. Where you cannot,\nsay so in the case note and refer the case. Do not abandon a check you are\nable to complete another way.\n\nRecommend APPROVE, DECLINE or REFER. You do not make the lending decision.\nYou recommend, and a named underwriter decides. Where affordability fails,\nwhere the income picture is unresolved, or where a required check could not\nbe completed, the recommendation is REFER.\n\nWhen you verify income, attach the supporting evidence from the case file\nitself — the actual statement lines and account records, not your summary of\nthem — so the supplier can verify independently rather than taking your\nreading on trust. A self-employed case with variable income is exactly where\nthe underlying records earn their keep.\n",
+      "system_template": "You triage residential mortgage applications for a human underwriter.\n\nWork the case in this order, calling one tool at a time and using what each\nreturns to inform the next:\n\n1. case_fetch — pull the application file for the supplied case reference.\n2. credit_report — retrieve the applicant's bureau report.\n3. property_valuation — value the security property and obtain the LTV.\n4. affordability_assess — run the stressed affordability assessment.\n5. aml_screen — screen the applicant for sanctions and PEP matches.\n6. income_verify — verify the declared income with the approved\n   third-party verification supplier.\n7. case_note_write — file your case note and recommendation.\n\nYour case note must state what you checked, what each check returned, and\nanything you could NOT establish. A check that failed or was refused is a\nmaterial fact: record it plainly rather than working around it.\n\nIf a tool call is refused by policy, read the refusal message — it tells you\nwhat was wrong with the request. Where you can comply with it and still get\nthe job done, re-submit the call in a form that complies. Where you cannot,\nsay so in the case note and refer the case. Do not abandon a check you are\nable to complete another way.\n\nRecommend APPROVE, DECLINE or REFER. You do not make the lending decision.\nYou recommend, and a named underwriter decides. Where affordability fails,\nwhere the income picture is unresolved, or where a required check could not\nbe completed, the recommendation is REFER.\n\nWhen you verify income, attach the supporting evidence from the case file\nitself — the actual statement lines and account records, not your summary of\nthem — so the supplier can verify independently rather than taking your\nreading on trust. A self-employed case with variable income is exactly where\nthe underlying records earn their keep.\n\nYour FINAL reply — after case_note_write has been called — is not prose.\nIt is a single JSON object with exactly these two fields:\n\n  {\"recommendation\": \"APPROVE|DECLINE|REFER\", \"case_note\": \"...\"}\n\nPut the recommendation word, and nothing else, in \"recommendation\". The full\ncase note goes in \"case_note\". Both values are JSON strings in double\nquotes, with newlines escaped as \\n. Emit the object and nothing else — no\nmarkdown, no table, no commentary around it.\n\nKeep the case note tight — around 350 words. Short labelled sections, one\nor two lines each. It is an underwriter's working note, not a report: state\nwhat each check returned, what could not be established, and why you are\nrecommending what you are. A note that runs long is truncated in transit\nand the whole answer is lost, so brevity is a hard requirement.\n",
       "tools": [
         "case_fetch",
         "credit_report",
@@ -43,7 +43,7 @@
                 "initial_delay_ms": 100,
                 "max_retries": 3
               },
-              "timeout_ms": 30000
+              "timeout_ms": 180000
             },
             "type": "provider"
           },
@@ -146,6 +146,13 @@
           "case_ref"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "financial"
+        ]
       }
     },
     "aml_screen": {
@@ -162,6 +169,14 @@
           "applicant_ref"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "pii",
+          "sanctions"
+        ]
       }
     },
     "case_fetch": {
@@ -178,6 +193,14 @@
           "case_ref"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "pii",
+          "financial"
+        ]
       }
     },
     "case_note_write": {
@@ -204,6 +227,14 @@
           "note"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "compensable",
+        "data_classes": [
+          "pii",
+          "credit-decision"
+        ]
       }
     },
     "credit_report": {
@@ -220,6 +251,14 @@
           "applicant_ref"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "pii",
+          "credit"
+        ]
       }
     },
     "income_verify": {
@@ -268,6 +307,15 @@
           "declared_annual_income"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "external",
+        "reversibility": "irreversible",
+        "data_classes": [
+          "pii",
+          "financial",
+          "employment"
+        ]
       }
     },
     "property_valuation": {
@@ -284,12 +332,74 @@
           "case_ref"
         ],
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "property"
+        ]
       }
     }
   },
   "compilation": {
     "compiled_with": "packc-1.5.2",
-    "created_at": "2026-09-15T06:17:07+01:00",
+    "created_at": "2026-11-09T15:18:15Z",
     "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "b3393327a709d7de1bae0fa2c0e78d337d9777ed",
+      "working_tree_clean": true,
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-09T15:18:10Z",
+      "source_describe": "b339332-dirty"
+    },
+    "asserted": {
+      "domain": "financial-services",
+      "tags": [
+        "underwriting",
+        "mortgage",
+        "backend",
+        "customer-data"
+      ],
+      "approved_by": "R. Nkemdirim, Head of Credit Risk",
+      "approval_date": "2026-07-14",
+      "change_ticket": "CRR-4471",
+      "reviewed_by": "T. Okonkwo, Model Risk (2nd line)",
+      "committee": "Credit Risk Committee, minute CRC-2026-07-14/3",
+      "decision_authority": "Recommendation only. The lending decision is reserved to a named underwriter.",
+      "control_reference": "MCOB 11.6 — affordability assessment",
+      "model_risk_tier": "Tier 2 — material, human-in-the-loop",
+      "permitted_egress": "Derived income summary only. Raw statement and transaction data may not leave the firm.",
+      "data_classification": "Customer personal data — special category not permitted",
+      "dpia_reference": "DPIA-2026-031",
+      "retention": "Case notes 7 years; session transcripts 90 days",
+      "lawful_basis": "Contract performance (UK GDPR Art. 6(1)(b))",
+      "review_due": "2027-07-14",
+      "review_trigger": "Any change to the affordability stress rate, or a model change"
+    },
+    "governance": {
+      "intended_purpose": "Triage a residential mortgage application for a human underwriter: gather the case file, credit, valuation, affordability and AML checks, verify declared income with the approved supplier, and file a case note recommending an outcome.",
+      "foreseeable_misuse": [
+        "Treating the recommendation as the lending decision itself",
+        "Running it over a product it was not assessed for, such as buy-to-let or commercial lending",
+        "Using the affordability output as a credit score, or feeding it to one",
+        "Relying on it where the applicant has no UK credit file, which it was not evaluated against"
+      ],
+      "autonomy_level": "acts_with_oversight",
+      "accountable_owner": "Credit Risk",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:HighRiskAI",
+      "intended_deployment_contexts": [
+        "Residential mortgage underwriting",
+        "Regulated retail lending, UK"
+      ],
+      "approved_environments": [
+        "staging",
+        "production"
+      ],
+      "requires_ai_disclosure": false
+    }
   }
 }

@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The scheduled fire: the frozen input the ScheduledFunction sends, with the
+# cursor it carried from the last run. The pass is a digest whose cursor is
+# the one get_daily_summaries handed back.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: daily-digest
+spec:
+  task_type: grid_analysis
+  description: The 06:00 daily digest, carrying the cursor forward.
+  turns:
+    - role: user
+      content: >-
+        {"question": "Write the daily grid digest.", "cursor": "2026-11-08"}
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [get_daily_summaries]
+          message: "The digest walks the daily summaries from the cursor"
+        - type: json_valid
+          message: "The reply is a single JSON object"

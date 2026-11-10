@@ -1,0 +1,69 @@
+{{- if .Values.piiChat.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: pii-chat-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: pii-chat-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: pii-chat-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena kit at demos/pii-chat/arena — which is also what the dashboard can
+# serve from its arena project files API, so the same files a person edits are
+# the ones shown on the build surface.
+#
+# Regenerate with:
+#   hack/build-packs.sh pii-chat
+#
+# Two things about that kit are worth knowing before editing it.
+#
+# The prompt ASKS for the SSN, and asks for a case note. Both are deliberate — a
+# prompt that avoided collecting sensitive data would be obeyed, nothing
+# sensitive would be written, and the policy would have nothing to redact.
+# Prompt is guidance, policy is control, and you only see the control work when
+# the guidance does not prevent the thing. The case-note instruction is what
+# makes the memory beat true on the LIVE path: nothing in Omnia extracts
+# memories from a conversation on its own, so without it a real model has no
+# reason to write one.
+#
+# And the pack carries an RFC 0013 governance block, merged in by the build from
+# arena/governance-declarations.yaml because packc cannot carry it. Its
+# requires_ai_disclosure: true is what the facade advertises as
+# `connected.ai_disclosure`, and what the member portal renders. Unlike the
+# mortgage pack there is no observed/asserted provenance split: that demo's
+# subject is provenance, this one's is redaction and disclosure.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pii-chat-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/pii-chat-pack.json" | indent 4 }}
+{{- if .Values.piiChat.deterministic }}
+---
+# The scripted model turns, mounted at the path the mock-provider annotation
+# names. Present ONLY in deterministic mode, so a normal install carries no
+# script at all and cannot accidentally run one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pii-chat-script
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  mock-responses.yaml: |
+{{ .Files.Get "files/pii-chat-script.yaml" | indent 4 }}
+{{- end }}
+{{- end }}

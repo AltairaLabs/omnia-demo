@@ -1,0 +1,47 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# Every key is defined by promptpack-spec RFC 0013, so the values mean the same
+# thing in a pack from any author. ASSERTED, not evidence: typed by a human and
+# verified by nothing. The per-tool half of RFC 0013 — action_scope — is
+# declared on each tool in tools/*.tool.yaml, and it is what the ToolPolicy
+# reads.
+
+intended_purpose: >-
+  Help Wrenmoor Energy's on-call platform engineers work an incident: read
+  alerts, logs and deploy history, diagnose the cause, and roll back a bad
+  deploy or scale a service.
+
+# Things someone might plausibly try, not a disclaimer. The first is what the
+# ToolPolicy stops; the second is what scenario 4 tests, and the policy does
+# NOT stop it, because scaling is reversible.
+foreseeable_misuse:
+  - Asking it to delete a namespace, fail a database over or take any other irreversible action on its own authority
+  - Steering it with instructions planted in a log line, an alert or an invoice memo
+  - Using it as the incident commander rather than as an assistant to one
+
+# acts_with_oversight: it rolls back and scales without asking first, which is
+# acting; an engineer is in the conversation and every irreversible action is
+# reserved to a human by policy.
+autonomy_level: acts_with_oversight
+
+# A role, not a person.
+accountable_owner: Wrenmoor Energy Platform Engineering
+
+operator_role: eu-aiact:AIDeployer
+
+# Operational tooling for the firm's own platform. It does not operate the
+# grid itself (no switching, no SCADA), which is what would put it near
+# Annex III's critical-infrastructure category. Declared so the reader knows
+# that line was considered.
+risk_classification: eu-aiact:RiskLevelMinimal
+
+intended_deployment_contexts:
+  - On-call incident response for Wrenmoor Energy's internal platform services
+
+approved_environments:
+  - demo
+
+# False, and considered: the only people it talks to are the platform team's
+# own engineers, who chose an AI assistant and know it is one.
+requires_ai_disclosure: false

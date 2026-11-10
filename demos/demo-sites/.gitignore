@@ -1,0 +1,2 @@
+# UI-kit bundles, built by hack/build-kits.sh (and the Dockerfile).
+site/*/ui_kits/*/app.js

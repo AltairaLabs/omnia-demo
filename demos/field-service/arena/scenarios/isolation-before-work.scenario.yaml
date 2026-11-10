@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: isolation-before-work
+spec:
+  task_type: field_service
+  description: A jointer asks for the isolation steps before working on an 11kV cable.
+  turns:
+    - role: user
+      content: >-
+        I'm about to joint a section of 11kV cable on the Hartwell Road feeder.
+        Remind me of the isolation steps before I start.
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["Permit to Work", "permit to work"]
+          message: "Work on HV cable starts only under a Permit to Work"
+        - type: contains_any
+          params:
+            patterns: ["prove dead", "Prove dead", "proved dead"]
+          message: "The steps include proving dead"

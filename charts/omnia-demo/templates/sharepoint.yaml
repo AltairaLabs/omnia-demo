@@ -1,6 +1,6 @@
 {{- if .Values.sharepoint.enabled }}
 {{- $ns := .Values.namespace }}
-{{- $memoryURL := .Values.memory.apiURL }}
+{{- $memoryURL := include "omnia-demo.memoryURL" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: adapter
-          image: {{ .Values.sharepoint.adapter.image.repository }}:{{ .Values.sharepoint.adapter.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.sharepoint.adapter.image) }}
           imagePullPolicy: {{ .Values.sharepoint.adapter.image.pullPolicy }}
           args: ["serve"]
           env:
@@ -52,7 +52,7 @@ spec:
       restartPolicy: OnFailure
       containers:
         - name: seed
-          image: {{ .Values.sharepoint.adapter.image.repository }}:{{ .Values.sharepoint.adapter.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.sharepoint.adapter.image) }}
           imagePullPolicy: {{ .Values.sharepoint.adapter.image.pullPolicy }}
           args: ["seed"]
           env:
@@ -73,6 +73,7 @@ spec:
               - key: {{ .Values.memory.auth.secretKey }}
                 path: token
 ---
+{{- if not $.Values.llm.providerRef }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: Provider
 metadata:
@@ -85,6 +86,7 @@ spec:
   credential:
     secretRef: { name: {{ .Values.sharepoint.provider.secretRef }} }
 ---
+{{- end }}
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolRegistry
 metadata:
@@ -150,7 +152,7 @@ spec:
   toolRegistryRef: { name: sharepoint-tools }
   providers:
     - name: default
-      providerRef: { name: sharepoint-llm }
+      providerRef: { name: {{ include "omnia-demo.llmProvider" (dict "root" $ "own" "sharepoint-llm") }} }
   memory:
     enabled: true
     retrieval:

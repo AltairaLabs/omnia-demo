@@ -1,4 +1,11 @@
 {{- if .Values.memory.enabled }}
+{{- $tokenDir := "/var/run/secrets/omnia/session-api" }}
+{{- $s3 := .Values.memory.objectStore.enabled }}
+# Ingests the fixture documents as institutional memory. With
+# memory.objectStore.enabled (the default) it shows the S3 path: the AWS CLI
+# uploads the fixtures to the in-cluster S3 gateway and the ingestion service
+# reads them back out of the bucket. Without it, the service reads the fixtures
+# straight from their ConfigMap (SOURCE_DIR).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -13,51 +20,81 @@ spec:
   template:
     spec:
       restartPolicy: OnFailure
+      {{- if $s3 }}
       initContainers:
         - name: upload-fixtures
-          image: quay.io/minio/mc:RELEASE.2024-06-13T17-11-24Z
+          image: {{ .Values.memory.objectStore.uploaderImage }}
           command: ["/bin/sh", "-c"]
           args:
             - |
               set -eu
-              until mc alias set local http://memory-s3:9000 {{ .Values.memory.minio.accessKey }} {{ .Values.memory.minio.secretKey }}; do sleep 2; done
-              mc mb --ignore-existing local/{{ .Values.memory.s3.bucket }}
-              mc cp /fixtures/*.md local/{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }}
+              s3() { aws --endpoint-url http://memory-s3:9000 "$@"; }
+              until s3 s3 ls >/dev/null 2>&1; do sleep 2; done
+              s3 s3 mb s3://{{ .Values.memory.s3.bucket }} 2>/dev/null || true
+              s3 s3 cp /fixtures/ s3://{{ .Values.memory.s3.bucket }}/{{ .Values.memory.s3.prefix }} --recursive --exclude '*' --include '*.md'
+          env:
+            - { name: AWS_DEFAULT_REGION, value: {{ .Values.memory.s3.region | quote }} }
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: accessKey } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: secretKey } }
           volumeMounts:
             - { name: fixtures, mountPath: /fixtures }
+      {{- end }}
       containers:
         - name: ingest
-          image: {{ .Values.memory.image.repository }}:{{ .Values.memory.image.tag }}
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.memory.image) }}
           imagePullPolicy: {{ .Values.memory.image.pullPolicy }}
           env:
-            - { name: MEMORY_API_URL, value: {{ .Values.memory.apiURL | quote }} }
-            - { name: WORKSPACE_ID, value: {{ .Values.memory.workspaceID | quote }} }
+            - { name: MEMORY_API_URL, value: {{ include "omnia-demo.memoryURL" . | quote }} }
+            - { name: WORKSPACE_ID, value: {{ default (include "omnia-demo.workspaceName" .) .Values.memory.workspaceID | quote }} }
             - { name: MEMORY_SOURCE, value: {{ .Values.memory.source | quote }} }
+            {{- if $s3 }}
             - { name: S3_BUCKET, value: {{ .Values.memory.s3.bucket | quote }} }
             - { name: S3_PREFIX, value: {{ .Values.memory.s3.prefix | quote }} }
             - { name: S3_REGION, value: {{ .Values.memory.s3.region | quote }} }
             - { name: S3_ENDPOINT, value: {{ .Values.memory.s3.endpoint | quote }} }
             - { name: S3_FORCE_PATH_STYLE, value: {{ .Values.memory.s3.forcePathStyle | quote }} }
-            - { name: AWS_ACCESS_KEY_ID, value: {{ .Values.memory.minio.accessKey | quote }} }
-            - { name: AWS_SECRET_ACCESS_KEY, value: {{ .Values.memory.minio.secretKey | quote }} }
-{{- if .Values.memory.auth.secretName }}
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: accessKey } }
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom: { secretKeyRef: { name: memory-s3-credentials, key: secretKey } }
+            {{- else }}
+            - { name: SOURCE_DIR, value: /fixtures }
+            {{- end }}
+            {{- if .Values.memory.auth.secretName }}
             - { name: MEMORY_TOKEN_PATH, value: /var/run/omnia/memory-token/token }
-{{- end }}
-{{- if .Values.memory.auth.secretName }}
+            {{- else if .Values.memory.serviceAuth.enabled }}
+            - { name: MEMORY_TOKEN_PATH, value: {{ $tokenDir }}/token }
+            {{- end }}
           volumeMounts:
-            - name: memory-token
-              mountPath: /var/run/omnia/memory-token
-              readOnly: true
-{{- end }}
+            {{- if not $s3 }}
+            - { name: fixtures, mountPath: /fixtures, readOnly: true }
+            {{- end }}
+            {{- if .Values.memory.auth.secretName }}
+            - { name: memory-token, mountPath: /var/run/omnia/memory-token, readOnly: true }
+            {{- else if .Values.memory.serviceAuth.enabled }}
+            - { name: session-api-token, mountPath: {{ $tokenDir }}, readOnly: true }
+            {{- end }}
       volumes:
         - name: fixtures
           configMap: { name: omnia-demo-memory-fixtures }
-{{- if .Values.memory.auth.secretName }}
+        {{- if .Values.memory.auth.secretName }}
         - name: memory-token
           secret:
             secretName: {{ .Values.memory.auth.secretName }}
             items:
               - key: {{ .Values.memory.auth.secretKey }}
                 path: token
-{{- end }}
+        {{- else if .Values.memory.serviceAuth.enabled }}
+        # Omnia's internal service auth: a ServiceAccount token bound to the
+        # audience memory-api enforces.
+        - name: session-api-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  audience: {{ .Values.memory.serviceAuth.audience }}
+                  expirationSeconds: {{ .Values.memory.serviceAuth.tokenExpirationSeconds }}
+        {{- end }}
 {{- end }}

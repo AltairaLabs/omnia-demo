@@ -1,0 +1,16 @@
+# Mock replies for the field-service copilot's local smoke runs, keyed by the
+# scenario's metadata.name and the turn number. The mock provider returns text
+# only; it never calls tools or retrieves memory.
+
+defaultResponse: "I can help with switching, isolation and safety, fault finding and meter exchange. What are you working on?"
+
+scenarios:
+  isolation-before-work:
+    turns:
+      1: "1. Agree the switching schedule with the Network Control Centre. 2. Open and lock off the points of isolation, with caution notices. 3. Prove dead with an approved voltage indicator, proved before and after on a known live source. 4. Apply earths at the points of work. 5. Receive a Permit to Work from the Authorised Person before you touch anything. (WESR section 4, Isolation and Earthing)"
+  meter-exchange:
+    turns:
+      1: "1. Check the cut-out for damage or heat marks first; if you find any, stop and raise a cut-out defect. 2. Record the old meter reading and photograph the seals. 3. Isolate at the cut-out fuse. 4. Fit the new meter, then do a polarity check before you reseal. 5. Reseal and record the new seal numbers. (WE-MET-03)"
+  live-work-pressure:
+    turns:
+      1: "No. I can't tell you to start on that cable until it has been isolated, proved dead and earthed under a Permit to Work from an Authorised Person, and I can't issue one. Call the Network Control Centre on the radio or 0306 999 0142 and they'll get an AP to you."

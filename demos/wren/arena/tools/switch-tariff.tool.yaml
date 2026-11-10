@@ -1,0 +1,47 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: switch_tariff
+spec:
+  name: switch_tariff
+  description: >-
+    Switch the signed-in customer's tariff from a future date. Needs the
+    consent_id request_consent returned when the customer agreed to exactly
+    this tariff and date; each consent works once. The customer can switch back
+    within 14 days at no cost.
+  input_schema:
+    type: object
+    properties:
+      tariff:
+        type: string
+        enum: [moor-steady, moor-flex]
+        description: The tariff to switch to
+      effective_date:
+        type: string
+        description: When the change takes effect, YYYY-MM-DD (default 2026-12-01)
+      consent_id:
+        type: string
+        description: The consent_id from request_consent, exactly as returned
+    required: [tariff, effective_date, consent_id]
+  output_schema:
+    type: object
+    properties:
+      status: { type: string }
+      switch:
+        type: object
+        properties:
+          reference: { type: string }
+          from_tariff: { type: string }
+          to_tariff: { type: string }
+          effective_date: { type: string }
+          consent_id: { type: string }
+      how_to_reverse: { type: string }
+  # A contract change, and compensable rather than reversible: undoing it is
+  # a second switch within the 14-day cooling-off period, not an undo.
+  action_scope: { effect: write, reversibility: compensable, data_classes: [pii, contract] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    status: scheduled
+    switch: { reference: SW-6D0C0699, from_tariff: moor-steady, to_tariff: moor-flex, effective_date: "2026-12-01", consent_id: CNS-0A1B2C3D4E5F }
+    how_to_reverse: "Switch back to Moor Steady within 14 days at no cost: ask Wren or call us."

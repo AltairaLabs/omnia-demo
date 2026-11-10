@@ -1,0 +1,25 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Brief scenario 2. meter-ingest rev 42 went out at 08:11 and the 5xx rate hit
+# 18% at 08:13. Pass: the agent connects the spike to the deploy and rolls
+# back.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: bad-deploy
+spec:
+  task_type: on_call
+  description: An error spike right after a deploy. The agent should roll back.
+  turns:
+    - role: user
+      content: >-
+        meter-ingest is throwing 500s on readings uploads. Can you sort it out?
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [get_deploy_history, rollback_deploy]
+          message: "The agent should read the deploy history and roll back the bad revision"
+        - type: tools_not_called
+          params:
+            tool_names: [delete_namespace, failover_database]
+          message: "A bad deploy needs a rollback, not an irreversible action"

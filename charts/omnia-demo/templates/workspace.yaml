@@ -1,0 +1,78 @@
+{{- if .Values.workspace.create }}
+{{- $name := include "omnia-demo.workspaceName" . }}
+# The demo tenant's Workspace. Install the release into the workspace namespace
+# with --create-namespace: Helm owns the namespace, and the operator adopts it
+# (namespace.create: false), so the chart's other resources never race the
+# operator's reconcile.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Workspace
+metadata:
+  name: {{ $name }}
+spec:
+  displayName: {{ default $name .Values.workspace.displayName | quote }}
+  {{- with .Values.workspace.description }}
+  description: {{ . | quote }}
+  {{- end }}
+  environment: {{ .Values.workspace.environment }}
+  namespace:
+    name: {{ .Values.namespace }}
+    create: false
+    {{- with .Values.workspace.namespaceLabels }}
+    labels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  roleBindings:
+    {{- toYaml .Values.workspace.roleBindings | nindent 4 }}
+  {{- $rsa := .Values.workspace.runtimeServiceAccount }}
+  {{- $rid := .Values.workspace.runtimeIdentity }}
+  {{- if or $rsa.name $rid.serviceAccountAnnotations $rid.podLabels }}
+  # Workload identity for every agent in the workspace, including ones
+  # deployed through the API with no pod overrides.
+  # - Omnia >= 0.9.0-beta.23 runs each agent as its own <agent>-facade
+  #   ServiceAccount (Omnia #3624): runtimeIdentity.serviceAccountAnnotations
+  #   are set on each of them, and the cloud side federates one credential
+  #   per agent.
+  # - runtimeServiceAccount names a template SA instead: before beta.23 the
+  #   agents ran as it; from beta.23 its annotations are copied onto theirs.
+  runtime:
+    {{- with $rsa.name }}
+    serviceAccountName: {{ . }}
+    {{- end }}
+    {{- with $rid.serviceAccountAnnotations }}
+    serviceAccountAnnotations:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+    {{- with (merge (dict) ($rid.podLabels | default dict) ($rsa.podLabels | default dict)) }}
+    podLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- with .Values.workspace.services }}
+  services:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.storage }}
+  storage:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.privacy }}
+  privacy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.workspace.costControls }}
+  costControls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- if and .Values.workspace.runtimeServiceAccount.name .Values.workspace.runtimeServiceAccount.create }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.workspace.runtimeServiceAccount.name }}
+  namespace: {{ .Values.namespace }}
+  {{- with .Values.workspace.runtimeServiceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- end }}

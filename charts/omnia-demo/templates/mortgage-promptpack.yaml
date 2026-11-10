@@ -1,0 +1,64 @@
+{{- if .Values.mortgageUnderwriting.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: mortgage-underwriting-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: mortgage-underwriting-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: mortgage-underwriting-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/mortgage-underwriting/arena.
+#
+# Regenerate with:
+#   hack/build-packs.sh mortgage-underwriting
+#
+# The metadata block is split deliberately:
+#
+#   metadata.observed   — derived from git by the build. Cannot be typed.
+#   metadata.asserted   — read from arena/governance.yaml. Typed by a human,
+#                         and labelled as such so nobody reads it as evidence.
+#   metadata.governance — read from arena/governance-declarations.yaml, in the
+#                         RFC 0013 vocabulary. Also typed by a human.
+#
+# None of it is proof. Nothing is signed and nothing verifies the author; the
+# content digest makes this block tamper-EVIDENT, not attested.
+#
+# packc cannot carry governance or the per-tool action_scope on its own, so the
+# build merges them in after compiling. The action_scope matters beyond
+# display: the ToolPolicy's leavesTheFirm producer reads tool.effect from it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mortgage-underwriting-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/mortgage-underwriting-pack.json" | indent 4 }}
+{{- if .Values.mortgageUnderwriting.deterministic }}
+---
+# The scripted model turns, mounted at the path the mock-provider annotation
+# names. Present ONLY in deterministic mode, so a normal install carries no
+# script at all and cannot accidentally run one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mortgage-underwriting-script
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  mock-responses.yaml: |
+{{ .Files.Get "files/mortgage-underwriting-script.yaml" | indent 4 }}
+{{- end }}
+{{- end }}

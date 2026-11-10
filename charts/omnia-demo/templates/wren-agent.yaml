@@ -1,0 +1,138 @@
+{{- if .Values.wren.enabled }}
+{{- $w := .Values.wren }}
+{{- if not (or $w.providerRef .Values.llm.providerRef) }}
+---
+# The demo's own Provider, rendered only when no shared one is named.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: wren-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: {{ $w.provider.type }}
+  role: llm
+  model: {{ $w.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $w.provider.secretRef }}
+  defaults:
+    maxTokens: {{ $w.provider.maxTokens }}
+{{- end }}
+---
+# Wrenmoor Energy's account system, as Wren and the customer portal see it:
+# Amira's bills, half-hourly usage, local weather, tariff quotes and switches,
+# plus the consent and receipt routes the portal calls through demo-sites.
+# Same image as the mortgage stubs (demos/mortgage-underwriting, wren.go).
+#
+# ONE replica, and it must stay one: consents, receipts and the account's
+# tariff are in memory, so a consent recorded on one pod would be unknown to
+# the switch_tariff call that lands on another.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wren-account
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: account-stub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wren-account
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wren-account
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot".
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $w.image) }}
+          imagePullPolicy: {{ $w.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wren-account
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: wren-account
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# Wren, the customer assistant in the portal's side panel. A CHAT agent behind
+# a websocket facade: the portal (wrenmoorSite) proxies the browser's socket to
+# it and asserts the signed-in customer's identity.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: wren
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: customer-assistant
+spec:
+  promptPackRef:
+    name: wren-pack
+  toolRegistryRef:
+    name: wren-tools
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+      # How long a request_consent card may wait for the customer's click.
+      # The default 60s is too short for a person reading a contract change;
+      # when it runs out the call is denied and nothing is switched.
+      clientToolTimeout: {{ $w.consentTimeout }}
+{{- if .Values.wrenmoorSite.enabled }}
+  # Trust the Wrenmoor Energy site as the edge. The facade's external listener
+  # rejects an unauthenticated browser, so the site proxies the conversation
+  # server-side and asserts who is asking in headers the browser cannot set
+  # (demos/demo-sites/server.go). edgeTrust reads them as-is, as a real
+  # deployment does behind an API gateway. The defaults are what the site
+  # sends (x-user-id, x-user-email, x-user-roles).
+  externalAuth:
+    edgeTrust: {}
+{{- end }}
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ include "omnia-demo.llmProvider" (dict "root" $ "own" "wren-llm" "demoRef" $w.providerRef) }}
+{{- end }}

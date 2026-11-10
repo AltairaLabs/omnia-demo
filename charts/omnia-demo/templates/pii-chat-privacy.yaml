@@ -1,0 +1,42 @@
+{{- if .Values.piiChat.enabled }}
+---
+# The policy under demonstration.
+#
+# It gets its own file, and its patterns and strategy come from values, because
+# it is the artefact the video is about: flipping strategy from replace to mask
+# or hash
+# is a `helm upgrade --set`, on camera, rather than a raw kubectl patch nobody
+# watching can place in the system.
+#
+# What this actually governs is the WRITE path into session-api. The facade
+# streams the conversation to the browser untouched and the runtime sends the
+# user's text to the model untouched — there is no inbound redaction anywhere in
+# Omnia. What changes is what gets STORED: the message content, and the tool
+# call's arguments and result, are rewritten at session-api's HTTP ingress
+# before the storage handler ever sees them (Omnia's ee/pkg/privacy/redact_body.go).
+#
+# Say "stripped before storage", never "the model never sees it". The second is
+# false and the transcript on screen does not support it.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: SessionPrivacyPolicy
+metadata:
+  name: pii-chat-privacy
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: card-support
+spec:
+  # Since Omnia #3003 (0.9.0-beta.22) the spec is recording.pii and encryption
+  # only: recording.enabled and auditLog were removed because nothing read
+  # them. Both sides of the conversation are recorded; redaction is the
+  # mechanism here, not omission.
+  recording:
+    pii:
+      redact: {{ .Values.piiChat.privacy.redact }}
+      # replace -> [REDACTED_SSN]; mask -> *******6789; hash -> [HASH_SSN:...].
+      # replace reads best: the token names the KIND of value that was removed,
+      # so the record alone says an SSN was here and the policy took it. mask
+      # shows that something went, but not what.
+      strategy: {{ .Values.piiChat.privacy.strategy }}
+      patterns: {{ .Values.piiChat.privacy.patterns | toJson }}
+{{- end }}

@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The portal's opener. Pass: Wren reads before it explains, and a question
+# about the bill changes nothing.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: explain-bill
+spec:
+  task_type: wren
+  description: Why is October higher? Wren reads the bill and usage and explains.
+  turns:
+    - role: user
+      content: Why is my October bill higher?
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_bill, read_usage]
+          message: "Wren should read the bill and the usage before explaining"
+        - type: tools_not_called
+          params:
+            tool_names: [switch_tariff]
+          message: "A question about a bill changes nothing"

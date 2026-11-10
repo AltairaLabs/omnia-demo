@@ -87,7 +87,27 @@
   },
   "compilation": {
     "compiled_with": "packc-1.5.2",
-    "created_at": "2026-09-15T06:24:54+01:00",
+    "created_at": "2026-11-09T15:18:16Z",
     "schema": "v1"
+  },
+  "metadata": {
+    "governance": {
+      "intended_purpose": "Handle inbound retail card-support conversations: verify the caller's identity, answer questions about the card on file, and record a case note for the next agent.",
+      "foreseeable_misuse": [
+        "Obtaining another person's account details by talking past identity verification.",
+        "Treating the agent's identity check as sufficient authorisation for a payment or transfer. It confirms who is calling; it authorises nothing."
+      ],
+      "autonomy_level": "acts_with_oversight",
+      "accountable_owner": "Card Operations",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:LimitedRiskAI",
+      "intended_deployment_contexts": [
+        "Inbound retail card support, authenticated caller."
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": true
+    }
   }
 }

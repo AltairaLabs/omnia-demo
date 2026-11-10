@@ -9,7 +9,7 @@ on:
       - demos/memory-seeder/**
       - demos/mortgage-underwriting/**
       - demos/sharepoint-adapter/**
-      - demos/larkmere-portal/**
+      - demos/demo-sites/**
       - .github/workflows/publish.yml
   workflow_dispatch:
 
@@ -39,10 +39,12 @@ jobs:
             context: .
             file: demos/sharepoint-adapter/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-sharepoint-adapter
-          - name: larkmere-portal
+          # Every demo company's customer-facing site in one image; the
+          # chart picks the brand with --site.
+          - name: demo-sites
             context: .
-            file: demos/larkmere-portal/Dockerfile
-            image: ghcr.io/altairalabs/omnia-demo-larkmere-portal
+            file: demos/demo-sites/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-sites
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -55,8 +57,11 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ matrix.image }}
+          # A v* tag also tags every image with its version, which is the
+          # chart's appVersion: a chart release pulls the images built with it.
           tags: |
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=semver,pattern={{version}}
             type=sha
       - uses: docker/build-push-action@v6
         with:

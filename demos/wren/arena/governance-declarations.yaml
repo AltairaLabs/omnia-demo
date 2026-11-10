@@ -1,0 +1,37 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. The
+# per-tool half of RFC 0013, action_scope, is declared on each tool in
+# tools/*.tool.yaml.
+
+intended_purpose: >-
+  Help Wrenmoor Energy's signed-in customers understand their bills and usage,
+  compare tariffs against their own usage, and switch tariff when they
+  explicitly agree to it.
+
+foreseeable_misuse:
+  - Asking it to switch, pay or cancel without the account holder's agreement
+  - Asking about another customer's account
+  - Relying on it for advice about energy debt or vulnerability, which needs a person
+
+# acts_with_oversight: it reads and quotes on its own, and its one write is
+# gated on the customer's explicit, recorded consent.
+autonomy_level: acts_with_oversight
+
+# A role, not a person.
+accountable_owner: Wrenmoor Energy Customer Operations
+
+operator_role: eu-aiact:AIDeployer
+
+risk_classification: eu-aiact:RiskLevelLimited
+
+intended_deployment_contexts:
+  - Wrenmoor Energy's customer portal, for signed-in customers
+
+approved_environments:
+  - demo
+
+# True: it talks to members of the public, who must be told they are talking
+# to an AI. The portal says so in the panel footer.
+requires_ai_disclosure: true

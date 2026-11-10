@@ -1,0 +1,144 @@
+{{- if .Values.incidentAgent.enabled }}
+{{- $ia := .Values.incidentAgent }}
+{{- if not (or $ia.providerRef .Values.llm.providerRef) }}
+---
+# The demo's own Provider, rendered only when no shared one is named.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: incident-agent-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: {{ $ia.provider.type }}
+  role: llm
+  model: {{ $ia.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $ia.provider.secretRef }}
+  defaults:
+    maxTokens: {{ $ia.provider.maxTokens }}
+{{- end }}
+---
+# Wrenmoor Energy's platform, as the on-call agent sees it: alerts, logs,
+# deploy history, and the actions on them. Same image as the mortgage stubs.
+#
+# ONE replica, and it must stay one: the state (which revision is current,
+# which alerts are firing) is in memory, so a second replica would answer
+# "has the rollback landed?" differently depending on which pod you hit.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wrenmoor-ops
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: ops-stub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wrenmoor-ops
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wrenmoor-ops
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot".
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $ia.image) }}
+          imagePullPolicy: {{ $ia.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wrenmoor-ops
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: wrenmoor-ops
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# The on-call incident agent. A CHAT agent: an engineer works the incident
+# with it in the console, which is where the refusal of an irreversible action
+# is seen, and where the agent offers the reversible path instead.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: incident-agent
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: on-call
+spec:
+  promptPackRef:
+    name: incident-agent-pack
+  toolRegistryRef:
+    name: incident-agent-tools
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+{{- if and $ia.a2a.enabled .Values.dataAnalyst.enabled .Values.dataAnalyst.a2a.enabled }}
+  # The grid analyst, called over A2A when an alert names affected generation
+  # sites.
+  #
+  # The target is data-analyst-a2a, the analyst's pack behind an A2A facade,
+  # not the data-analyst function itself: a function-mode AgentRuntime serves
+  # only rest and mcp facades, and the controller reports an agentRuntimeRef
+  # with no a2a facade as unresolved.
+  #
+  # exposeAsTools turns each skill on the analyst's agent card into a tool
+  # named a2a__<card name>__<skill id>: a2a__grid_analyst__site_output. It is
+  # an implicit PromptKit capability, so the pack's allow-list need not name
+  # it — and it is not in the ToolRegistry, so the ToolPolicy below does not
+  # govern it. That is right for a read; the analyst's own registry is
+  # governed by its own policy.
+  a2aClients:
+    - name: grid-analyst
+      agentRuntimeRef:
+        name: data-analyst-a2a
+      exposeAsTools: true
+      timeout: {{ $ia.a2a.timeout }}
+{{- end }}
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ include "omnia-demo.llmProvider" (dict "root" $ "own" "incident-agent-llm" "demoRef" $ia.providerRef) }}
+{{- end }}

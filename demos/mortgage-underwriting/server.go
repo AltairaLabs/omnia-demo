@@ -10,6 +10,10 @@
 // call — and a second image to build, publish and keep alive would buy nothing
 // but a tidier path. The directory name is the cost; see PII_CHAT.md.
 //
+// Wrenmoor Energy: the on-call incident agent's operations back end
+// (wrenmoor.go), the grid analyst's generation dataset (wrenmoorgrid.go) and
+// Wren's account system (wren.go), for the same reason.
+//
 // Why any of this is a real HTTP service rather than canned data inside the
 // runtime: a ToolRegistry handler is one of http/openapi/grpc/mcp/client.
 // There is no "mock" handler type, so a server-executed tool needs something
@@ -31,6 +35,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 // toolRequest is the union of the fields the tools send. One struct rather
@@ -69,6 +74,21 @@ type toolRequest struct {
 	ClaimRef    string `json:"claim_ref"`
 	AmountPence int    `json:"amount_pence"`
 	Reason      string `json:"reason"`
+
+	// The rest belong to Wrenmoor Energy: the on-call incident agent's
+	// operations tools and the data analyst's grid tools.
+	Service    string `json:"service"`
+	Status     string `json:"status"`
+	Limit      int    `json:"limit"`
+	ToRevision int    `json:"to_revision"`
+	// Replicas is a pointer because zero is a real request — and the one the
+	// prompt-injection scenario tries to provoke — not an omitted field.
+	Replicas  *int   `json:"replicas"`
+	Namespace string `json:"namespace"`
+	Cluster   string `json:"cluster"`
+	SiteID    string `json:"site_id"`
+	Date      string `json:"date"`
+	Cursor    string `json:"cursor"`
 }
 
 type evidenceItem struct {
@@ -80,10 +100,20 @@ type evidenceItem struct {
 // spelling so a tool that thinks in applicants and one that thinks in cases
 // can both be answered.
 func (r toolRequest) ref() string {
-	if r.CaseRef != "" {
+	switch {
+	case r.CaseRef != "":
 		return r.CaseRef
+	case r.ApplicantRef != "":
+		return r.ApplicantRef
+	case r.Service != "":
+		return r.Service
+	case r.Namespace != "":
+		return r.Namespace
+	case r.Cluster != "":
+		return r.Cluster
+	default:
+		return r.SiteID
 	}
-	return r.ApplicantRef
 }
 
 // verifyResponse is the income supplier's verdict.
@@ -118,6 +148,13 @@ func newServer() http.Handler {
 	mux.HandleFunc("/claim-policy", jsonTool("claim_policy_fetch", fetchSettlementPolicy))
 	mux.HandleFunc("/claim-settle", jsonTool("claim_settle", settleClaim))
 	mux.HandleFunc("/claim-refer", jsonTool("claim_refer", referClaim))
+	// Wrenmoor Energy: on-call operations and grid data. Fresh in-memory state
+	// per server, so a rollback in one test or one pod never leaks into
+	// another.
+	newWrenmoor(time.Now).register(mux)
+	// Wren, Wrenmoor Energy's customer assistant: Amira's account, and the
+	// consent and receipt routes the customer portal uses (wren.go).
+	newWren(time.Now).register(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})

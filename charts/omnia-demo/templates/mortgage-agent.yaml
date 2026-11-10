@@ -1,0 +1,265 @@
+{{- if .Values.mortgageUnderwriting.enabled }}
+{{- $mu := .Values.mortgageUnderwriting }}
+{{- if $mu.deterministic }}
+---
+# Deterministic mode needs no API key, so it brings its own placeholder
+# credential rather than making you create one. The Provider CRD requires a
+# secretRef; the runtime's mock branch never resolves it.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mortgage-underwriting-mock-credential
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  ANTHROPIC_API_KEY: "not-a-real-key-deterministic-mode-uses-no-model"
+{{- end }}
+{{- if or $mu.deterministic (not (or $mu.providerRef .Values.llm.providerRef)) }}
+---
+# The demo's own Provider. Deterministic mode always renders it (as the mock);
+# a live install renders it only when llm.providerRef is empty — otherwise the
+# agent runs on that shared Provider instead.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mortgage-underwriting-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+{{- if $mu.deterministic }}
+  # type: mock is a second, independent trigger for the mock provider (Omnia's
+  # runtime auto-enables it when the resolved Provider is type mock). Set
+  # alongside the annotation so the two agree — a runtime that took one signal
+  # and not the other would try to reach Anthropic with a placeholder key and
+  # crashloop.
+  type: mock
+  role: llm
+  credential:
+    secretRef:
+      name: mortgage-underwriting-mock-credential
+{{- else }}
+  type: {{ $mu.provider.type }}
+  role: llm
+  model: {{ $mu.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $mu.provider.secretRef }}
+  defaults:
+    # A full triage note across all seven checks is long — APP-2026-00417 runs
+    # to ~3.4k output tokens. Under this the model is cut off mid-string, and
+    # because the answer is JSON the caller sees "unexpected end of JSON input"
+    # rather than anything naming a token limit. Raise this before assuming the
+    # model has produced malformed output.
+    maxTokens: {{ $mu.provider.maxTokens }}
+    # Without this the stream is cut at the 30s default mid-answer. See the
+    # field's doc comment in values.yaml before lowering it.
+    streamIdleTimeout: {{ $mu.provider.streamIdleTimeout | quote }}
+{{- with $mu.provider.thinkingBudgetTokens }}
+    # Extended thinking. The model's reasoning arrives on a channel separate
+    # from content and is recorded on the session, so this also decides whether
+    # the agent's reasoning about a customer's case is written down. See the
+    # field's doc comment before enabling it for anything but a synthetic case.
+    thinkingBudgetTokens: {{ . }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- /*
+Two stub services from one image, because the demo turns on a boundary.
+
+  mortgage-case-systems   INSIDE the firm  — case file, bureau, AVM,
+                          affordability, AML screen, case notes.
+  mortgage-income-verify  OUTSIDE it       — the approved third-party income
+                          verification supplier.
+
+Six tools reach the first. One reaches the second. Splitting them costs one
+Deployment and buys a trust boundary a viewer can see in the topology rather
+than take on trust — and it is the boundary the ToolPolicy exists to defend.
+
+The DENIED call never reaches the supplier: that is the demo. The permitted
+call does, which is what makes the refusal legible as a decision about one
+call rather than a broken integration.
+*/}}
+{{- range $stub := list (dict "name" "mortgage-case-systems" "component" "case-systems") (dict "name" "mortgage-income-verify" "component" "income-verify-stub") }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $stub.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    app.kubernetes.io/component: {{ $stub.component }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $stub.name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ $stub.name }}
+        app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot" — kubelet refuses
+        # to start the container rather than guess. 65532 is that user's uid.
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $mu.image) }}
+          imagePullPolicy: {{ $mu.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $stub.name }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: {{ $stub.name }}
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}
+---
+# Backend processing, not chat. A case arrives as a typed function invocation;
+# there is no chat window anywhere in this demo, because the use cases these
+# partners actually described are backend rather than interactive.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: mortgage-underwriting
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: underwriting
+{{- if $mu.deterministic }}
+  # The runtime reads these from the AgentRuntime, not from an env var: the
+  # operator does stamp OMNIA_MOCK_PROVIDER onto the container, but nothing
+  # reads it. The annotation is the switch.
+  annotations:
+    omnia.altairalabs.ai/mock-provider: "true"
+    omnia.altairalabs.ai/mock-config-path: "/etc/omnia/mock/mock-responses.yaml"
+{{- end }}
+spec:
+  mode: function
+  promptPackRef:
+    name: mortgage-underwriting-pack
+  toolRegistryRef:
+    name: mortgage-underwriting-tools
+  facades:
+    - type: rest
+      port: 8080
+      # This function is 50-90s: seven tool calls, a policy refusal and a
+      # re-submission. That is well past the 30s synchronous limit, and it
+      # should be — a caller must not hold a connection open for a minute and a
+      # half while an underwriting chain runs.
+      #
+      # So it is invoked with ?mode=async: the request returns an invocation id
+      # immediately and the work runs on the queue, surviving the pod that
+      # accepted it. Requires a queue backend; without one the operator reports
+      # AsyncInvocationReady=False and the async routes answer 501 rather than
+      # quietly running it synchronously.
+      async:
+        enabled: {{ $mu.async.enabled }}
+        workers: {{ $mu.async.workers }}
+  inputSchema:
+    type: object
+    required:
+      - case_ref
+    properties:
+      case_ref:
+        type: string
+        description: "Underwriting case reference."
+  # json_schema, and outputSchema STAYS.
+  #
+  # This was "json" for a while, to stop the model satisfying the schema on the
+  # first turn and returning a recommendation having called NOTHING — no case
+  # file, no bureau, no affordability, no AML. HTTP 200 with no underwriting
+  # behind it. That was real, and it is why the field was pinned.
+  #
+  # It no longer reproduces. Re-measured on PromptKit v1.9.0 against
+  # claude-sonnet-4-6: json_schema ran the full seven-tool chain on both cases,
+  # twice, and returned schema-conforming JSON. PromptKit #1848 says the same
+  # thing — sending tools and output_config together was verified live, the
+  # model calls tools normally on tool-using rounds, and only the final round
+  # is constrained.
+  #
+  # "json" is not a safe fallback, which is the other half of the measurement.
+  # It sends no output_config at all (a bare json_object, no schema), so nothing
+  # asks the model for JSON but the prompt — and it answers in markdown. The
+  # facade then rejects its own agent's work with "payload is not valid JSON",
+  # 502, after a full 75s of correct tool calls. Three runs, three rejections.
+  #
+  # So: if the one-turn short-circuit returns, fix it with the prompt or by
+  # constraining the final turn only. Do not go back to "json" — that trades a
+  # visible failure for a silent one.
+  outputFormat: json_schema
+  outputSchema:
+    type: object
+    # Anthropic's structured-output API requires this on every object and
+    # rejects the request without it. Live now that outputFormat is
+    # json_schema: the schema is sent on every request, so this line is
+    # load-bearing rather than aspirational.
+    additionalProperties: false
+    required:
+      # Both, deliberately. With case_note optional the model answered with
+      # recommendation alone and folded the entire note into it — schema-valid,
+      # and useless: the note is the demo. Requiring it is what actually splits
+      # the two fields, the prompt's output contract on its own did not.
+      - recommendation
+      - case_note
+    properties:
+      recommendation:
+        type: string
+        description: "APPROVE, DECLINE or REFER. A recommendation only — the lending decision is reserved to a named underwriter."
+      case_note:
+        type: string
+        description: "The underwriter case note."
+  runtime:
+    replicas: 1
+{{- if $mu.deterministic }}
+    volumes:
+      - name: mock-script
+        configMap:
+          name: mortgage-underwriting-script
+    volumeMounts:
+      - name: mock-script
+        mountPath: /etc/omnia/mock
+{{- end }}
+  providers:
+    - name: default
+      providerRef:
+        # Deterministic mode always runs on the demo's own mock Provider.
+        name: {{ if $mu.deterministic }}mortgage-underwriting-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "mortgage-underwriting-llm" "demoRef" $mu.providerRef) }}{{ end }}
+{{- end }}

@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Omnia demo catalogue</title>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #ffffff; --ink: #1b1d21; --muted: #5d636e;
+    --line: #e2e3e0; --accent: #3b5bdb; --live: #2f7d4f; --soon: #8a6d1d;
+    --chip: #eef0f3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417; --panel: #1a1d21; --ink: #e8eaed; --muted: #9aa1ab;
+      --line: #2b3036; --accent: #8ea8ff; --live: #6cc493; --soon: #d9b85c;
+      --chip: #23272d;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 16px 64px; }
+  header p { color: var(--muted); max-width: 70ch; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 20px; margin: 0; }
+  section.tenant {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; margin-top: 24px;
+  }
+  .tenant-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: baseline; }
+  .tenant-head .role { color: var(--muted); }
+  .tenant-head a { margin-left: auto; }
+  .story { color: var(--muted); margin: 6px 0 14px; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-top: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 600; }
+  td.name { font-weight: 600; white-space: nowrap; }
+  .status { font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .live { color: var(--live); }
+  .soon { color: var(--soon); }
+  .cap { display: inline-block; background: var(--chip); border-radius: 4px; padding: 0 6px; margin: 2px 2px 0 0; font-size: 12px; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+  @media (max-width: 640px) {
+    thead { display: none; }
+    tr { display: block; border-top: 1px solid var(--line); padding: 8px 0; }
+    td { display: block; border: 0; padding: 2px 0; }
+    .tenant-head a { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Omnia demo catalogue</h1>
+  <p>Every demo on this install, by tenant. Each tenant is its own Omnia workspace, so the same person has different pseudonyms in each, nothing is shared between them, and each has its own budget. Links open the dashboard scoped to that workspace.</p>
+</header>
+
+<section class="tenant" id="larkmere-mutual">
+  <div class="tenant-head">
+    <h2>Larkmere Mutual</h2>
+    <span class="role">Mutual insurer and lender</span>
+    <a href="/agents?workspace=larkmere-mutual">Open workspace &rarr;</a>
+  </div>
+  <p class="story">Governance and privacy for a regulated buyer: controls that hold whatever the model decides, and a record that shows it.</p>
+  <p class="story"><a href="/larkmere-mutual/">Open the Larkmere Mutual website &rarr;</a> the customer side: the public site and the member portal, where a member talks to the card-support assistant.</p>
+  <table>
+    <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name"><a href="/functions?workspace=larkmere-mutual">Mortgage underwriting</a></td>
+        <td>A function agent works a residential mortgage case through seven checks and files an underwriter note. A ToolPolicy stops raw bank statements and transaction rows leaving the firm, whatever the model asks for.</td>
+        <td><span class="cap">Functions</span><span class="cap">Async invocation</span><span class="cap">Per-call ToolPolicy</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/functions?workspace=larkmere-mutual">Claims triage</a></td>
+        <td>A claims assessor may settle up to £500 on its own. Above that, the policy broker refuses the settlement before it reaches the claims system, and the refusal is on the record.</td>
+        <td><span class="cap">Delegated authority</span><span class="cap">Cedar + CEL policy</span><span class="cap">Decisions on the record</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/console?workspace=larkmere-mutual&amp;agent=pii-chat">Card support</a></td>
+        <td>A member verifies their identity with a card-support agent through the <a href="/larkmere-mutual/ui_kits/portal/">Larkmere member portal</a>. SSNs, card numbers and emails are redacted in the stored session, the stored tool call and long-term memory.</td>
+        <td><span class="cap">PII redaction</span><span class="cap">Edge-trust identity</span><span class="cap">Art. 50 disclosure</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name">Consent and erasure</td>
+        <td>A member opts out of a consent category and its memories go at once; an erasure request runs and the audit hub shows the trail.</td>
+        <td><span class="cap">Consent</span><span class="cap">DSAR</span><span class="cap">Audit hub</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr>
+        <td class="name">Eval-gated canary</td>
+        <td>Claims triage v2 rolls out in steps; an Arena evaluation decides promotion or rollback, and members mid-conversation stay on their version.</td>
+        <td><span class="cap">Progressive rollout</span><span class="cap">arenaEval analysis</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/memories?workspace=larkmere-mutual">Memory Galaxy</a></td>
+        <td>Member, agent and institutional memories at scale, clustered by topic.</td>
+        <td><span class="cap">Tiered memory</span><span class="cap">Galaxy</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="tenant" id="wrenmoor-energy">
+  <div class="tenant-head">
+    <h2>Wrenmoor Energy</h2>
+    <span class="role">Wind and solar supplier</span>
+    <a href="/agents?workspace=wrenmoor-energy">Open workspace &rarr;</a>
+  </div>
+  <p class="story">Operations, quality and cost: agents that act on live systems, evaluated across models, inside a budget that holds. See it as a customer on the <a href="/wrenmoor-energy/">Wrenmoor Energy website</a>.</p>
+  <table>
+    <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name"><a href="/wrenmoor-energy/ui_kits/portal/">Wren, the customer assistant</a></td>
+        <td>A customer asks why their bill went up in the <a href="/wrenmoor-energy/ui_kits/portal/">Wrenmoor Energy portal</a>. Wren reads the bill, the half-hourly usage and the weather, shows what it checked, and finds a cheaper tariff. Switching needs the customer's "Switch me": without the consent that click creates, the policy and the account system both refuse it. Staff see the same agents in the <a href="/wrenmoor-energy/ui_kits/intranet/">Wrenmoor Hub intranet</a>.</td>
+        <td><span class="cap">Client tools</span><span class="cap">Consent before a write</span><span class="cap">Edge-trust identity</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">On-call incident agent</a></td>
+        <td>Reads alerts, logs and deploy history, diagnoses an incident, and can roll back or scale. Reversible actions go through; irreversible ones are refused by policy, and a human must take them.</td>
+        <td><span class="cap">Policy on consequence</span><span class="cap">action_scope</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=field-service">Field-service copilot</a></td>
+        <td>Engineers in vans ask about procedures; answers come from field manuals held as institutional memory.</td>
+        <td><span class="cap">Institutional memory</span><span class="cap">Document ingestion</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name"><a href="/functions?workspace=wrenmoor-energy">Grid analyst and daily digest</a></td>
+        <td>Questions about Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store and the live energy mix as a function, plus a 06:00 scheduled digest that carries its position between runs. The incident agent asks it about an affected site over A2A.</td>
+        <td><span class="cap">Scheduled functions</span><span class="cap">A2A</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name">Multi-provider evaluation</td>
+        <td>One Arena project across gpt-4o, gpt-5.4-mini and gpt-4o-mini as a scenario-by-provider grid, plus a load test with percentile gates.</td>
+        <td><span class="cap">Arena</span><span class="cap">Load testing</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr>
+        <td class="name">Enforced cost budget</td>
+        <td>A small daily budget with <code>block</code>: once spent, new conversations and runs are refused, and cost analytics says why.</td>
+        <td><span class="cap">Cost controls</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="tenant" id="halvern-partners">
+  <div class="tenant-head">
+    <h2>Halvern Partners</h2>
+    <span class="role">Legaltech systems integrator</span>
+    <a href="/projects?workspace=halvern-partners">Open workspace &rarr;</a>
+  </div>
+  <p class="story">The build side: a systems integrator that works only in law. It builds, evaluates and hands over agents for law firms and for the in-house legal teams at Larkmere Mutual and Wrenmoor Energy.</p>
+  <p class="story"><a href="/halvern-partners/">Open the Halvern Partners website &rarr;</a> and its <a href="/halvern-partners/ui_kits/practice-desk/">Practice Desk</a>, the internal view of client engagements and the agents deployed at each client.</p>
+  <table>
+    <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name"><a href="/projects?workspace=halvern-partners">Arena builder</a></td>
+        <td>Describe an agent and the builder agrees a brief, writes the PromptArena project in a sandbox, validates it and runs it on real models.</td>
+        <td><span class="cap">Arena builder</span><span class="cap">Sandboxes</span><span class="cap">Projects as git</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr>
+        <td class="name">Starter templates</td>
+        <td>Halvern's reusable templates (claims, field service, incident) in the template gallery.</td>
+        <td><span class="cap">Template sources</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr>
+        <td class="name">Legal agents for in-house teams</td>
+        <td>A contracts agent for Wrenmoor's legal team and a complaints and disputes agent for Larkmere's, each working from its matters and a shared clause library. Clearing a conflict, accepting instructions and anything sent to a client stay with a named lawyer.</td>
+        <td><span class="cap">Memory per matter</span><span class="cap">Held decisions</span><span class="cap">Eval gate</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<footer>
+  Larkmere Mutual, Wrenmoor Energy and Halvern Partners are fictional companies used in Altaira demos. All data in these demos is synthetic.
+</footer>
+</main>
+</body>
+</html>

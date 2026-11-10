@@ -1,0 +1,21 @@
+# Governance metadata merged into the compiled pack under metadata.asserted by
+# hack/build-packs.sh. ASSERTED: typed by a human and verified by nothing. The
+# keys are Wrenmoor Energy's own schema.
+
+domain: energy-utilities
+tags:
+  - grid-analytics
+  - reporting
+  - scheduled
+
+approved_by: "Head of Generation Analytics, Wrenmoor Energy"
+approval_date: "2026-10-02"
+change_ticket: "WE-CHG-2294"
+
+decision_authority: "Reporting only. It takes no action on the sites, the battery or the platform."
+data_classification: "Aggregate site generation and export-meter data. No customer-level data."
+schedule: "Daily digest at 06:00 Europe/London"
+retention: "Digests and session transcripts 90 days"
+
+review_due: "2027-04-02"
+review_trigger: "A new data source, or any tool that writes"

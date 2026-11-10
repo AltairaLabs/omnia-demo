@@ -1,0 +1,203 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "data-analyst",
+  "name": "data-analyst",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "grid_analysis": {
+      "id": "grid_analysis",
+      "name": "grid-analyst",
+      "description": "Answers questions about Wrenmoor Energy's generation sites and energy mix, and writes the daily generation digest.",
+      "version": "2.0.0",
+      "system_template": "You are the grid analyst for Wrenmoor Energy, a renewable energy supplier\nthat generates its own power. You answer questions about its three\ngeneration sites and its energy mix from the data your tools return, and\nnothing else:\n\n  WM-EDGE   Wrenmoor Edge, wind, 14 turbines, 29 MW\n  WM-CRAGG  Cragg Vale Solar, 18 MW\n  WM-HEPT   Heptonstall Store, a 40 MWh battery\n\nA request is usually a JSON object with a \"question\" and, for the daily\ndigest, a \"cursor\". A plain-text request is the question itself.\n\nAnswering a question:\n- Use list_sites for site ids, get_site_output for one site's day, and\n  get_energy_mix for the live mix or a day's energy by source.\n- Quote figures with units (MW, MWh, % capacity factor, % of the mix) and\n  the date or time they are for. Do not estimate a figure a tool did not\n  return.\n- A missing reading means no data arrived from the export meter. Say how\n  many are missing, when, and from which site; never report a gap as lost\n  generation or a site going offline.\n- Wind is weather, not a fault: a still day is low output, not an outage.\n\nThe daily digest (the question asks for it, or a cursor is given):\n- Call get_daily_summaries with the cursor exactly as given, empty if none.\n- Summarise each day returned: total generation, the mix by source, wind\n  and solar capacity factors, what the battery stored, and any missing\n  readings and the sites they are from.\n- If no days are returned, say there is nothing new since the cursor.\n\nYour FINAL reply is a single JSON object and nothing else:\n\n  {\"answer\": \"...\", \"findings\": [\"...\", \"...\"], \"cursor\": \"...\"}\n\n\"answer\" is two to four sentences. \"findings\" lists the specific figures\nbehind it, one per item. \"cursor\" is next_cursor from get_daily_summaries\nwhen you called it; otherwise the cursor you were given, or \"\" if none.\nNo markdown and no text around the object.\n",
+      "tools": [
+        "list_sites",
+        "get_site_output",
+        "get_energy_mix",
+        "get_daily_summaries"
+      ],
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.1
+      }
+    }
+  },
+  "tools": {
+    "get_daily_summaries": {
+      "name": "get_daily_summaries",
+      "description": "Generation summaries for every complete day after the cursor, up to yesterday, at most seven days per call: total generation, energy and mix by source, wind and solar capacity factors, what the battery charged, and missing readings with the sites they are from. Returns next_cursor, the last day covered; pass it as the cursor next time to carry on from there. An empty cursor returns yesterday only.",
+      "parameters": {
+        "properties": {
+          "cursor": {
+            "description": "The last day already digested, YYYY-MM-DD, or empty",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cursor"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "get_energy_mix": {
+      "name": "get_energy_mix",
+      "description": "Wrenmoor Energy's energy mix by source (wind, solar, battery). Without a date, the live mix in MW and percent, as the website shows it. With a date, that day's energy by source in MWh and percent.",
+      "parameters": {
+        "properties": {
+          "date": {
+            "description": "The day, YYYY-MM-DD; omit for the live mix",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "get_site_output": {
+      "name": "get_site_output",
+      "description": "Half-hourly output of one generation site for one day: 48 readings in MW, the peak and when it fell, energy exported in MWh, capacity factor over the half-hours read, and how many readings are missing (null, not zero). For the battery, positive is discharge and negative is charging, and charged_mwh is what it took in. Without a date, returns 2026-11-09.",
+      "parameters": {
+        "properties": {
+          "date": {
+            "description": "The day, YYYY-MM-DD",
+            "type": "string"
+          },
+          "site_id": {
+            "description": "Site id, e.g. WM-EDGE",
+            "type": "string"
+          }
+        },
+        "required": [
+          "site_id"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    },
+    "list_sites": {
+      "name": "list_sites",
+      "description": "List Wrenmoor Energy's generation sites: id, name, kind (wind, solar or battery), capacity in MW, storage in MWh for the battery, units, location, year commissioned and the export meter's head-end.",
+      "parameters": {
+        "properties": {},
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "grid-operational"
+        ]
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-1.5.2",
+    "created_at": "2026-11-09T17:19:28Z",
+    "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "93e59a77e50185ba72347130b566330892e4f92c",
+      "working_tree_clean": true,
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-09T17:19:24Z",
+      "source_describe": "93e59a7-dirty"
+    },
+    "asserted": {
+      "domain": "energy-utilities",
+      "tags": [
+        "grid-analytics",
+        "reporting",
+        "scheduled"
+      ],
+      "approved_by": "Head of Generation Analytics, Wrenmoor Energy",
+      "approval_date": "2026-10-02",
+      "change_ticket": "WE-CHG-2294",
+      "decision_authority": "Reporting only. It takes no action on the sites, the battery or the platform.",
+      "data_classification": "Aggregate site generation and export-meter data. No customer-level data.",
+      "schedule": "Daily digest at 06:00 Europe/London",
+      "retention": "Digests and session transcripts 90 days",
+      "review_due": "2027-04-02",
+      "review_trigger": "A new data source, or any tool that writes"
+    },
+    "governance": {
+      "intended_purpose": "Answer questions about Wrenmoor Energy's generation sites and energy mix, and write a daily generation digest for the operations team.",
+      "foreseeable_misuse": [
+        "Treating a gap in export readings as lost generation, or a still day as a fault",
+        "Using its figures for settlement or billing, which run from metered data it does not see",
+        "Asking it to forecast, or to dispatch the sites or the battery; it reports what the data shows"
+      ],
+      "autonomy_level": "suggests",
+      "accountable_owner": "Wrenmoor Energy Generation Analytics",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:RiskLevelMinimal",
+      "intended_deployment_contexts": [
+        "Generation and operations reporting, internal"
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": false
+    }
+  }
+}

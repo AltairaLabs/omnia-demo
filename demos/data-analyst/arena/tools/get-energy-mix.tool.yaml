@@ -1,0 +1,46 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: get_energy_mix
+spec:
+  name: get_energy_mix
+  description: >-
+    Wrenmoor Energy's energy mix by source (wind, solar, battery). Without a
+    date, the live mix in MW and percent, as the website shows it. With a
+    date, that day's energy by source in MWh and percent.
+  input_schema:
+    type: object
+    properties:
+      date:
+        type: string
+        description: The day, YYYY-MM-DD; omit for the live mix
+  output_schema:
+    type: object
+    properties:
+      live: { type: boolean }
+      at: { type: string }
+      date: { type: string }
+      unit: { type: string }
+      total_mw: { type: number }
+      total_mwh: { type: number }
+      parts:
+        type: array
+        items:
+          type: object
+          properties:
+            source: { type: string }
+            site: { type: string }
+            value: { type: number }
+            pct: { type: number }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [grid-operational] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    live: true
+    at: "2026-11-09T14:20:00Z"
+    unit: MW
+    total_mw: 41.6
+    parts:
+      - { source: wind, site: Wrenmoor Edge, value: 26.6, pct: 64 }
+      - { source: solar, site: Cragg Vale Solar, value: 8.7, pct: 21 }
+      - { source: battery, site: Heptonstall Store, value: 6.3, pct: 15 }

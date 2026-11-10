@@ -1,0 +1,76 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: read_bill
+spec:
+  name: read_bill
+  description: >-
+    Read one of the signed-in customer's bills: line items, kWh, unit rate,
+    standing charge, credits, total and due date, plus the change on the
+    previous month's bill in pounds and kWh. Also returns the account's
+    current tariff.
+  input_schema:
+    type: object
+    properties:
+      period:
+        type: string
+        description: The billing month, YYYY-MM (default the latest bill, 2026-10)
+  output_schema:
+    type: object
+    properties:
+      bill:
+        type: object
+        properties:
+          period: { type: string }
+          status: { type: string }
+          due: { type: string }
+          tariff: { type: string }
+          unit_rate_p_per_kwh: { type: number }
+          standing_charge_p_per_day: { type: number }
+          kwh: { type: number }
+          days: { type: integer }
+          total_gbp: { type: number }
+          lines:
+            type: array
+            items:
+              type: object
+              properties:
+                label: { type: string }
+                detail: { type: string }
+                amount_gbp: { type: number }
+      previous:
+        type: object
+        properties:
+          period: { type: string }
+          kwh: { type: number }
+          total_gbp: { type: number }
+          change_gbp: { type: number }
+          change_kwh: { type: number }
+      customer:
+        type: object
+        properties:
+          account_id: { type: string }
+          name: { type: string }
+          postcode: { type: string }
+          tariff: { type: string }
+          heating: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii, financial] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    bill:
+      period: "2026-10"
+      status: due
+      due: "2026-11-15"
+      tariff: moor-steady
+      unit_rate_p_per_kwh: 24.1
+      standing_charge_p_per_day: 46
+      kwh: 312.4
+      days: 31
+      total_gbp: 84.10
+      lines:
+        - { label: Electricity, detail: "312.4 kWh at 24.1p", amount_gbp: 75.29 }
+        - { label: Standing charge, detail: "31 days at 46p", amount_gbp: 14.26 }
+        - { label: Credit from September, detail: "", amount_gbp: -5.45 }
+    previous: { period: "2026-09", kwh: 274.4, total_gbp: 69.90, change_gbp: 14.20, change_kwh: 38 }
+    customer: { account_id: "40021187", name: Amira Saleem, postcode: HX7 8DJ, tariff: moor-steady, heating: Electric storage heaters }

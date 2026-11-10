@@ -1,0 +1,82 @@
+{{- if and .Values.piiChat.enabled .Values.piiChat.portal.enabled }}
+---
+# The customer-facing half of the piiChat redaction demo.
+#
+# Gated on piiChat.enabled as well as its own flag: the portal is a shell around
+# that agent and serves no purpose without it. A portal deployed beside no agent
+# would render a chat panel that answers nothing, which looks like a broken
+# product rather than a disabled demo.
+#
+# The site is embedded in the demo-sites binary (demos/demo-sites), one image
+# for every brand, so there is no ConfigMap, no volume and nothing to keep in
+# step at runtime. --site picks Larkmere Mutual's.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: larkmere-portal
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: member-portal
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: larkmere-portal
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: larkmere-portal
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot" — kubelet refuses
+        # to start the container rather than guess. 65532 is that user's uid.
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: portal
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.piiChat.portal.image) }}
+          imagePullPolicy: {{ .Values.piiChat.portal.image.pullPolicy }}
+          # The agent facade's external listener, which edgeTrust opens to the
+          # portal's asserted identity headers.
+          args: ["--site", "larkmere-mutual", "--agent-url", "http://pii-chat.{{ .Values.namespace }}:8080"]
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: larkmere-portal
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: larkmere-portal
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}

@@ -1,0 +1,208 @@
+{{- if .Values.dataAnalyst.enabled }}
+{{- $da := .Values.dataAnalyst }}
+{{- $provider := include "omnia-demo.llmProvider" (dict "root" $ "own" "data-analyst-llm" "demoRef" $da.providerRef) }}
+{{- if not (or $da.providerRef .Values.llm.providerRef) }}
+---
+# The demo's own Provider, rendered only when no shared one is named.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: data-analyst-llm
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: {{ $da.provider.type }}
+  role: llm
+  model: {{ $da.provider.model }}
+  credential:
+    secretRef:
+      name: {{ $da.provider.secretRef }}
+  defaults:
+    maxTokens: {{ $da.provider.maxTokens }}
+{{- end }}
+---
+# The generation dataset: the three sites, half-hourly output, the energy mix,
+# daily summaries. Same image as the mortgage stubs. Stateless — every figure
+# is a function of the site, the date and the half-hour — so unlike
+# wrenmoor-ops it could scale; one is plenty.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wrenmoor-grid-data
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: grid-data-stub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: wrenmoor-grid-data
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: wrenmoor-grid-data
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: stub
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $da.image) }}
+          imagePullPolicy: {{ $da.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wrenmoor-grid-data
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: wrenmoor-grid-data
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# The data analyst as a FUNCTION: a question in, a typed answer out, at
+# POST /functions/data-analyst. The ScheduledFunction fires this one.
+#
+# cursor rides in the input and comes back in the output so the schedule can
+# carry it from one fire to the next (state.cursorFrom / cursorInto). A plain
+# question passes no cursor and gets "" back.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: data-analyst
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: grid-analyst
+spec:
+  mode: function
+  promptPackRef:
+    name: data-analyst-pack
+  toolRegistryRef:
+    name: data-analyst-tools
+  facades:
+    - type: rest
+      port: 8080
+      # Synchronous: two or three reads and a short answer, well inside the
+      # synchronous limit.
+      async:
+        enabled: false
+  inputSchema:
+    type: object
+    required:
+      - question
+    properties:
+      question:
+        type: string
+        description: "A question about the generation sites or the energy mix, or a request for the daily generation digest."
+      cursor:
+        type: string
+        description: "For the digest: the last day already digested, YYYY-MM-DD, or empty."
+  outputFormat: json_schema
+  outputSchema:
+    type: object
+    # Required by structured-output APIs on every object.
+    additionalProperties: false
+    required:
+      - answer
+      - findings
+      - cursor
+    properties:
+      answer:
+        type: string
+        description: "The answer or digest, in two to four sentences."
+      findings:
+        type: array
+        description: "The figures behind the answer, one per item."
+        items:
+          type: string
+      cursor:
+        type: string
+        description: "The last day covered by the digest (next_cursor), or the input cursor, or empty."
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ $provider }}
+{{- if $da.a2a.enabled }}
+---
+# The same analyst as an A2A peer, for the on-call incident agent.
+#
+# A second AgentRuntime because the first cannot do this: a function-mode
+# AgentRuntime allows only rest and mcp facades (CRD validation), and an
+# agentRuntimeRef in another agent's a2aClients resolves only to a target that
+# serves an a2a facade. Same pack, same tools, same ToolPolicy — one analyst,
+# two surfaces.
+#
+# The agent card is what the caller's tool is built from: PromptKit names the
+# tool a2a__<card name>__<skill id>, so "Grid Analyst" and site_output give
+# a2a__grid_analyst__site_output. Rename either and the tool name moves.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: data-analyst-a2a
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: grid-analyst
+spec:
+  promptPackRef:
+    name: data-analyst-pack
+  toolRegistryRef:
+    name: data-analyst-tools
+  facades:
+    - type: a2a
+      port: 8080
+      a2a:
+        agentCard:
+          name: Grid Analyst
+          organization: Wrenmoor Energy
+          description: "Answers questions about Wrenmoor Energy's generation sites (Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store) and its energy mix."
+          version: "2.0.0"
+          skills:
+            - id: site_output
+              name: Site output and energy mix
+              description: "What output looks like at a generation site on a given day: peak, energy, capacity factor, and any missing export readings. Also the live energy mix, or a day's mix by source."
+              tags: ["generation", "wind", "solar", "battery"]
+              examples:
+                - "What does output look like at Wrenmoor Edge (WM-EDGE) today?"
+                - "What is the energy mix right now?"
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ $provider }}
+{{- end }}
+{{- end }}

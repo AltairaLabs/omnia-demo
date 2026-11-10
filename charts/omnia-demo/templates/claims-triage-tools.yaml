@@ -1,0 +1,214 @@
+{{- if .Values.claimsTriage.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $core := printf "http://claims-systems.%s:8080" $ns }}
+---
+# The tool surface of Larkmere Mutual's claims assessor.
+#
+# Four tools, and the shape of the set is the argument. Two READS (the claim,
+# the settlement policy), one IRREVERSIBLE WRITE that moves money
+# (claim_settle), and one escape hatch that does not (claim_refer).
+#
+# The escape hatch matters as much as the limit. A control that only refuses
+# leaves the agent with nowhere to go and the claim abandoned, which is how a
+# guardrail earns the reputation of stopping work getting done. With
+# claim_refer in the set, the refusal has a next step and the claim ends in a
+# defined state.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: claims-triage-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: claim-fetch-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: claim_fetch
+        description: "Retrieve a claim from the claims system: peril, cover, the assessed amount, the policy excess, what is payable after the excess, and the claim history on that policy."
+        inputSchema:
+          type: object
+          properties:
+            claim_ref:
+              type: string
+              description: "Claim reference, e.g. LM-40718."
+          required: ["claim_ref"]
+        outputSchema:
+          type: object
+          properties:
+            claim_ref: { type: string }
+            policy_ref: { type: string }
+            member_name: { type: string }
+            peril: { type: string }
+            cover: { type: string }
+            reported_on: { type: string }
+            assessed_pence:
+              type: integer
+              description: "What the loss was assessed at, in pence."
+            excess_pence:
+              type: integer
+              description: "The policy excess, in pence."
+            payable_pence:
+              type: integer
+              description: "Assessed less excess, in pence. Computed by the claims system — do not derive it yourself."
+            prior_claims: { type: string }
+            status: { type: string }
+      httpConfig:
+        endpoint: {{ $core }}/claim
+        method: POST
+        contentType: application/json
+
+    - name: claim-policy-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: claim_policy_fetch
+        description: "Retrieve the delegated authority schedule: the maximum a claim may be settled for without a human approver, and the rule against splitting a settlement to get under it."
+        inputSchema:
+          type: object
+          properties: {}
+        outputSchema:
+          type: object
+          properties:
+            policy_ref: { type: string }
+            delegated_authority_limit_pence:
+              type: integer
+              description: "The most that may be settled without a human approver, in pence."
+            reference: { type: string }
+            rule: { type: string }
+            no_split_rule: { type: string }
+      httpConfig:
+        endpoint: {{ $core }}/claim-policy
+        method: POST
+        contentType: application/json
+
+    # The guarded one.
+    #
+    # The description does NOT mention the limit, and that is deliberate. If the
+    # tool told the model not to exceed £500, a well-behaved model would decline
+    # on its own and the ToolPolicy would never fire — the same trap the
+    # mortgage demo documents, where a live model sends the derived summary and
+    # the control is never reached. The limit belongs to the POLICY, and the
+    # agent learns it by calling claim_policy_fetch.
+    - name: claim-settle-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: claim_settle
+        description: "Authorise payment of a claim to the member's account. Irreversible: once authorised the payment leaves the same day."
+        inputSchema:
+          type: object
+          properties:
+            claim_ref:
+              type: string
+              description: "Claim reference to settle."
+            amount_pence:
+              type: integer
+              description: "Amount to pay, in pence. Must not exceed what is payable on the claim."
+          required: ["claim_ref", "amount_pence"]
+        outputSchema:
+          type: object
+          properties:
+            claim_ref: { type: string }
+            settled_pence: { type: integer }
+            payment_ref: { type: string }
+            paid_to: { type: string }
+            status: { type: string }
+      httpConfig:
+        endpoint: {{ $core }}/claim-settle
+        method: POST
+        contentType: application/json
+
+    - name: claim-refer-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: claim_refer
+        description: "Route a claim to a human approver, with the reason. Use this when a claim cannot be settled under your own authority."
+        inputSchema:
+          type: object
+          properties:
+            claim_ref:
+              type: string
+              description: "Claim reference to refer."
+            reason:
+              type: string
+              description: "Why it is being referred, in a sentence."
+          required: ["claim_ref", "reason"]
+        outputSchema:
+          type: object
+          properties:
+            claim_ref: { type: string }
+            referred_to: { type: string }
+            queue: { type: string }
+            status: { type: string }
+      httpConfig:
+        endpoint: {{ $core }}/claim-refer
+        method: POST
+        contentType: application/json
+---
+# THE CONTROL.
+#
+# Cedar is default-deny, so the permit is not decoration: without it every tool
+# in the registry is refused with `no-matching-permit` and the agent looks
+# broken rather than governed. The selector names the whole registry for the
+# same reason (Omnia #2302).
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: claims-triage-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  mode: enforce
+  onFailure: deny
+  selector:
+    registry: claims-triage-tools
+  policy: |
+    // Claims tools are permitted. Cedar is default-deny, so without this grant
+    // nothing runs at all — not even reading the claim.
+    @id("permit-claims-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"claims-triage-tools");
+
+    // Delegated authority DA-2, and the only rule this demo turns on.
+    //
+    // Note what it is NOT conditioned on: the tool's name, and the tool's
+    // declared reversibility. Both were considered and both are wrong here.
+    //
+    // A name match (`tool.name == "claim_settle"`) governs one tool and misses
+    // the second payout tool somebody adds next quarter.
+    //
+    // Reversibility is worse, and it is worse in a way that is easy to miss: a
+    // FORBID conditioned on `tool.reversibility == "irreversible"` does not
+    // fire when the field is absent, so omitting the declaration becomes the
+    // cheapest way past the control. RFC 0013 is explicit that absence means
+    // undeclared rather than safe, and Omnia's ee/pkg/policy/evaluator.go says the same
+    // thing about this exact shape. A forbid may TIGHTEN on a declaration and
+    // must never depend on one to fire.
+    //
+    // So the condition is the money itself: any call carrying more than the
+    // delegated limit is refused, whatever tool it is and whatever it declared.
+    @id("deny-settlement-above-delegated-authority")
+    @message("This is above the £500 an automated assessor may settle without a human approver, so it cannot be paid from here. Refer the claim — and do not part-pay it to bring a payment under the limit, which is the thing the limit exists to stop. (Larkmere delegated authority schedule DA-2.)")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.aboveDelegatedLimit };
+  producers:
+    # The limit, in pence, and never a float. Money that goes through a float64
+    # arrives as 989.9999999 often enough to discredit a control a viewer is
+    # checking against a number on screen.
+    #
+    # 50000 is duplicated: it is here, and it is what claim_policy_fetch
+    # returns from the stub. That is a real seam and it is the honest one to
+    # have — this policy is the CONTROL, and the schedule is what the agent is
+    # TOLD. A demo where the agent's belief and the enforced rule read from the
+    # same variable cannot show them disagreeing. If they ever drift, the agent
+    # attempts a payment it believes is within authority and the broker refuses
+    # it, which is exactly the failure an operator would want to find out about.
+    - name: aboveDelegatedLimit
+      type: cel
+      cel: has(body.amount_pence) && body.amount_pence > 50000
+{{- end }}

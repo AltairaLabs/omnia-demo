@@ -1,0 +1,37 @@
+# Halvern Partners: a legaltech systems integrator that works only in law. It
+# builds agents for law firms and for the in-house legal teams at Larkmere
+# Mutual and Wrenmoor Energy. Its workspace is the build side: the Arena
+# builder (`make builder`) runs here. Its legal agents come later.
+workspace:
+  displayName: Halvern Partners
+  description: Legaltech systems integrator. Builds, evaluates and hands over legal agents for law firms and in-house legal teams.
+
+# The public website, the Practice Desk and the design-system reference.
+halvernSite: { enabled: true }
+
+# The demo catalogue (every tenant's demos), at
+# https://omnia-demo.azure.altairalabs.ai/demo-catalog/ behind the dashboard
+# sign-in. One release carries it; it belongs to the partner presenting the work.
+catalogue:
+  enabled: true
+  authURL: http://omnia-management-api.omnia.svc.cluster.local:8080
+  route:
+    parentRefs:
+      - { name: omnia-external, namespace: omnia }
+    hostnames:
+      - omnia-demo.azure.altairalabs.ai
+  # The Larkmere Mutual website and member portal (the customer side of the
+  # card-support demo), at /larkmere-mutual/ behind the same sign-in. Every
+  # site's paths are relative, so none needs rewrites (which would also turn
+  # off upstream gzip: sub_filter needs the response uncompressed).
+  proxies:
+    - path: /larkmere-mutual
+      upstream: http://larkmere-portal.larkmere-mutual.svc.cluster.local:8080
+    # Wrenmoor Energy's website, customer portal and intranet. All its paths
+    # are relative, so no rewrites.
+    - path: /wrenmoor-energy
+      upstream: http://wrenmoor-site.wrenmoor-energy.svc.cluster.local:8080
+    # Halvern Partners' website, Practice Desk and design system. Relative
+    # paths too.
+    - path: /halvern-partners
+      upstream: http://halvern-site.halvern-partners.svc.cluster.local:8080

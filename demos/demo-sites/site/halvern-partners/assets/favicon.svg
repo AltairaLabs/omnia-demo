@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30" role="img" aria-label="Halvern Partners">
+  <!-- The Halvern mark: Oxblood square, Caslon "H", 3px Brass bottom border. -->
+  <rect width="30" height="30" fill="#7c2529"/>
+  <rect y="27" width="30" height="3" fill="#cea35f"/>
+  <text x="15" y="20.5" text-anchor="middle" font-family="'Libre Caslon Text', Georgia, serif" font-size="18" fill="#f9f5ee">H</text>
+</svg>

@@ -1,0 +1,31 @@
+{{- if .Values.dataAnalyst.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: data-analyst-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: data-analyst-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: data-analyst-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/data-analyst/arena. Regenerate with:
+#   hack/build-packs.sh data-analyst
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: data-analyst-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/data-analyst-pack.json" | indent 4 }}
+{{- end }}

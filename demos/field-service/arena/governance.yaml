@@ -1,0 +1,23 @@
+# Governance metadata merged into the compiled pack under metadata.asserted by
+# hack/build-packs.sh. ASSERTED: typed by a human and verified by nothing. The
+# keys are Wrenmoor Energy's own schema.
+
+domain: energy-utilities
+tags:
+  - field-service
+  - safety
+  - institutional-memory
+
+approved_by: "Head of Field Operations, Wrenmoor Energy"
+approval_date: "2026-10-02"
+change_ticket: "WE-CHG-2297"
+reviewed_by: "Health, Safety and Environment"
+
+decision_authority: "Guidance only. Safety documents and switching are authorised by the Network Control Centre and Authorised Persons."
+control_reference: "Wrenmoor Energy Safety Rules (WESR), section 4"
+knowledge_source: "Field manuals held as institutional memory: WESR, WE-SW-01, WE-FLT-02, WE-MET-03"
+data_classification: "Internal procedures. No customer data."
+retention: "Session transcripts 90 days"
+
+review_due: "2027-04-02"
+review_trigger: "Any revision of the Wrenmoor Energy Safety Rules or a field manual"

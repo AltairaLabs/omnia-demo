@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# Deterministic mock for local runs: canned replies per scenario and turn from
+# mock-responses.yaml. No real model is called. In Omnia the model comes from
+# the Provider the AgentRuntime names.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+spec:
+  id: mock
+  type: mock
+  model: mock-field-copilot
+  pricing:
+    input_cost_per_1k: 0.0
+    output_cost_per_1k: 0.0
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    top_p: 1.0
+  additional_config:
+    mock_config: providers/mock-responses.yaml

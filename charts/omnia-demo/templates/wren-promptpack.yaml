@@ -1,0 +1,34 @@
+{{- if .Values.wren.enabled }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: wren-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: wren-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: wren-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/wren/arena. Regenerate with:
+#   hack/build-packs.sh wren
+#
+# The build merges each tool's action_scope into the pack. The ToolPolicy
+# reads it: switch_tariff is a write, so it needs a consent_id.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wren-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/wren-pack.json" | indent 4 }}
+{{- end }}
