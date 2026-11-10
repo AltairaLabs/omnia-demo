@@ -45,6 +45,7 @@ type config struct {
 type document struct {
 	Title       string `json:"title"`
 	URL         string `json:"url"`
+	Site        string `json:"site,omitempty"`
 	Text        string `json:"text"`
 	ModifiedAt  string `json:"modified_at,omitempty"`
 	ContentHash string `json:"content_hash"`
@@ -53,6 +54,25 @@ type document struct {
 type manifest struct {
 	Kind string   `json:"kind"`
 	Keys []string `json:"keys"`
+}
+
+// batchResponse is memory-api's 202 body.
+type batchResponse struct {
+	Accepted  int   `json:"accepted"`
+	Skipped   int   `json:"skipped"`
+	Forgotten int64 `json:"forgotten"`
+	Rejected  []struct {
+		Key   string `json:"key"`
+		Error string `json:"error"`
+	} `json:"rejected"`
+	EmbeddingBacklog int `json:"embedding_backlog"`
+}
+
+// tally adds up what memory-api reported across a run's batches.
+type tally struct {
+	accepted, skipped int
+	forgotten         int64
+	backlog           int
 }
 
 type batchRequest struct {
@@ -115,6 +135,7 @@ func loadConfig() (config, error) {
 }
 
 func sync(ctx context.Context, store objectStore, cfg config, client *http.Client, log *slog.Logger) error {
+	var n tally
 	present := &manifest{Kind: "document", Keys: []string{}}
 	batch := make([]document, 0, batchSize)
 	var continuation *string
@@ -136,7 +157,7 @@ func sync(ctx context.Context, store objectStore, cfg config, client *http.Clien
 			}
 			batch = append(batch, doc)
 			if len(batch) == batchSize {
-				if err := post(ctx, client, cfg, batch, nil); err != nil {
+				if err := post(ctx, client, cfg, batch, nil, &n); err != nil {
 					return err
 				}
 				batch = batch[:0]
@@ -147,10 +168,11 @@ func sync(ctx context.Context, store objectStore, cfg config, client *http.Clien
 		}
 		continuation = page.NextContinuationToken
 	}
-	if err := post(ctx, client, cfg, batch, present); err != nil {
+	if err := post(ctx, client, cfg, batch, present, &n); err != nil {
 		return err
 	}
-	log.Info("sync complete", "bucket", cfg.bucket, "prefix", cfg.prefix, "documents", len(present.Keys))
+	log.Info("sync complete", "bucket", cfg.bucket, "prefix", cfg.prefix, "documents", len(present.Keys),
+		"accepted", n.accepted, "skipped", n.skipped, "forgotten", n.forgotten, "embedding_backlog", n.backlog)
 	return nil
 }
 
@@ -163,6 +185,7 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 	if err != nil {
 		return fmt.Errorf("read source directory: %w", err)
 	}
+	var n tally
 	present := &manifest{Kind: "document", Keys: []string{}}
 	batch := make([]document, 0, batchSize)
 	for _, entry := range entries {
@@ -182,18 +205,19 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 		url := "file://" + cfg.source + "/" + name
 		present.Keys = append(present.Keys, url)
 		hash := sha256.Sum256(body)
-		batch = append(batch, document{Title: name, URL: url, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])})
+		batch = append(batch, document{Title: name, URL: url, Site: "file://" + cfg.source, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])})
 		if len(batch) == batchSize {
-			if err := post(ctx, client, cfg, batch, nil); err != nil {
+			if err := post(ctx, client, cfg, batch, nil, &n); err != nil {
 				return err
 			}
 			batch = batch[:0]
 		}
 	}
-	if err := post(ctx, client, cfg, batch, present); err != nil {
+	if err := post(ctx, client, cfg, batch, present, &n); err != nil {
 		return err
 	}
-	log.Info("sync complete", "dir", cfg.dir, "documents", len(present.Keys))
+	log.Info("sync complete", "dir", cfg.dir, "documents", len(present.Keys),
+		"accepted", n.accepted, "skipped", n.skipped, "forgotten", n.forgotten, "embedding_backlog", n.backlog)
 	return nil
 }
 
@@ -214,25 +238,32 @@ func read(ctx context.Context, store objectStore, bucket, key string, modified *
 		return document{}, fmt.Errorf("object exceeds %d-byte limit", maxObjectBytes)
 	}
 	hash := sha256.Sum256(body)
-	doc := document{Title: filepath.Base(key), URL: "s3://" + bucket + "/" + key, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])}
+	doc := document{Title: filepath.Base(key), URL: "s3://" + bucket + "/" + key, Site: "s3://" + bucket, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])}
 	if modified != nil {
 		doc.ModifiedAt = modified.UTC().Format(time.RFC3339)
 	}
 	return doc, nil
 }
 
-func post(ctx context.Context, client *http.Client, cfg config, docs []document, present *manifest) error {
+// post sends one batch and adds memory-api's counts to n. A network error, a
+// 429 or a 5xx is retried twice with backoff; any other non-202 is the
+// request's fault and fails at once, with memory-api's error text. A document
+// memory-api rejects fails the run too, so a bad document is never silently
+// missing from memory.
+func post(ctx context.Context, client *http.Client, cfg config, docs []document, present *manifest, n *tally) error {
 	payload, err := json.Marshal(batchRequest{WorkspaceID: cfg.workspace, Source: cfg.source, Documents: docs, Present: present})
 	if err != nil {
 		return fmt.Errorf("encode batch: %w", err)
 	}
-	for attempt := 1; attempt <= 3; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(cfg.memoryURL, "/")+"/api/v1/institutional/ingest/batch", strings.NewReader(string(payload)))
+	endpoint := strings.TrimRight(cfg.memoryURL, "/") + "/api/v1/institutional/ingest/batch"
+	for attempt := 1; ; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(string(payload)))
 		if err != nil {
 			return fmt.Errorf("create request: %w", err)
 		}
 		req.Header.Set("Content-Type", "application/json")
 		if cfg.tokenPath != "" {
+			// Read every time, so a rotated projected token is picked up.
 			token, readErr := os.ReadFile(cfg.tokenPath)
 			if readErr != nil {
 				return fmt.Errorf("read memory token: %w", readErr)
@@ -240,27 +271,44 @@ func post(ctx context.Context, client *http.Client, cfg config, docs []document,
 			req.Header.Set("Authorization", "Bearer "+strings.TrimSpace(string(token)))
 		}
 		resp, err := client.Do(req)
-		if err == nil && resp.StatusCode >= 200 && resp.StatusCode < 300 {
-			_ = resp.Body.Close()
+		var retry error
+		switch {
+		case err != nil:
+			retry = fmt.Errorf("post batch: %w", err)
+		case resp.StatusCode == http.StatusAccepted:
+			defer func() { _ = resp.Body.Close() }()
+			var result batchResponse
+			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+				return fmt.Errorf("decode batch response: %w", err)
+			}
+			if len(result.Rejected) > 0 {
+				return fmt.Errorf("memory-api rejected %d documents (first: %s: %s)",
+					len(result.Rejected), result.Rejected[0].Key, result.Rejected[0].Error)
+			}
+			n.accepted += result.Accepted
+			n.skipped += result.Skipped
+			n.forgotten += result.Forgotten
+			n.backlog = result.EmbeddingBacklog
 			return nil
-		}
-		if resp != nil {
+		default:
+			message, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 			_ = resp.Body.Close()
+			failure := fmt.Errorf("memory-api returned %s: %s", resp.Status, strings.TrimSpace(string(message)))
+			if resp.StatusCode != http.StatusTooManyRequests && resp.StatusCode < 500 {
+				return failure
+			}
+			retry = failure
 		}
 		if attempt == 3 {
-			if err != nil {
-				return fmt.Errorf("post batch: %w", err)
-			}
-			return fmt.Errorf("post batch: HTTP %s", resp.Status)
+			return retry
 		}
 		time.Sleep(time.Duration(attempt) * 2 * time.Second)
 	}
-	return nil
 }
 
 func textLike(key string) bool {
 	switch strings.ToLower(filepath.Ext(key)) {
-	case ".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".log":
+	case ".txt", ".md", ".markdown", ".csv", ".json", ".yaml", ".yml", ".log":
 		return true
 	default:
 		return false

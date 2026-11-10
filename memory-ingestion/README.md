@@ -47,6 +47,7 @@ Content-Type: application/json
     {
       "title": "isolation-and-safety.md",
       "url": "s3://omnia-demo-memory/wrenmoor/isolation-and-safety.md",
+      "site": "s3://omnia-demo-memory",
       "text": "# Isolation and safety\n...",
       "modified_at": "2026-11-09T21:14:03Z",
       "content_hash": "sha256:9f2c..."
@@ -66,6 +67,18 @@ Content-Type: application/json
 | `content_hash` | Makes re-runs cheap and safe: an unchanged document is skipped. |
 | `modified_at` | Optional. Kept with the memory for recency. |
 | `present` | Sent on the **final** batch only: every `url` the source holds now. Documents of this source that are not listed are forgotten, so a deleted file leaves memory too. |
+
+memory-api answers `202` with what it did:
+
+```json
+{"accepted": 4, "skipped": 1, "forgotten": 0, "rejected": [], "embedding_backlog": 12}
+```
+
+`skipped` counts unchanged documents (same `content_hash`), `forgotten` the
+documents the manifest removed, and `embedding_backlog` the chunks still to be
+embedded: ingest does not wait for vectors. A document in `rejected` (for
+example, a `url` another `source` already owns) fails this connector's run, so a
+bad document is never silently missing from memory.
 
 `text` is split by memory-api on Markdown headings; a source that already knows
 its headings can send `sections[]` instead (see the docs). Send documents in
@@ -99,8 +112,18 @@ issued for the workspace (`memory.auth.secretName` in the chart).
 go run .
 ```
 
-It accepts `.txt`, `.md`, `.csv`, `.json`, `.yaml`, `.yml` and `.log` files up
-to 16 MiB, and retries each batch three times with backoff.
+It accepts `.txt`, `.md`, `.markdown`, `.csv`, `.json`, `.yaml`, `.yml` and
+`.log` files up to 16 MiB. A batch that hits a network error, a 429 or a 5xx is
+retried twice with backoff; any other error fails the run at once with
+memory-api's message. The run ends with one JSON log line:
+
+```json
+{"level":"INFO","msg":"sync complete","bucket":"omnia-demo-memory","prefix":"wrenmoor/","documents":5,"accepted":5,"skipped":0,"forgotten":0,"embedding_backlog":31}
+```
+
+`documents` counts what the source listed; a gap between it and
+`accepted` + `skipped` is files the connector skipped (wrong type, too large,
+unreadable), each logged as `skip object` or `skip file`.
 
 ## How the demo runs it
 

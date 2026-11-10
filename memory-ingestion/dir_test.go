@@ -40,6 +40,7 @@ func TestSyncDirPostsTextFilesAndManifest(t *testing.T) {
 		}
 		got = append(got, req)
 		w.WriteHeader(http.StatusAccepted)
+		_, _ = io.WriteString(w, `{"accepted":2,"skipped":0,"forgotten":0,"rejected":[]}`)
 	}))
 	defer srv.Close()
 
@@ -59,6 +60,27 @@ func TestSyncDirPostsTextFilesAndManifest(t *testing.T) {
 	}
 	if got[0].Documents[0].URL != "file://fixtures/isolation.md" {
 		t.Errorf("url = %s", got[0].Documents[0].URL)
+	}
+}
+
+func TestPostFailsOnRejectionAndOnAClientError(t *testing.T) {
+	status, body := http.StatusAccepted, `{"accepted":0,"rejected":[{"key":"file://x/a.md","error":"url owned by another source"}]}`
+	calls := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		calls++
+		w.WriteHeader(status)
+		_, _ = io.WriteString(w, body)
+	}))
+	defer srv.Close()
+	cfg := config{memoryURL: srv.URL, workspace: "ws", source: "x"}
+	var n tally
+	if err := post(context.Background(), srv.Client(), cfg, []document{{URL: "file://x/a.md"}}, nil, &n); err == nil {
+		t.Fatal("a rejected document should fail the run")
+	}
+	// A 403 is not retried: running again will not fix it.
+	status, body, calls = http.StatusForbidden, "enterprise_required", 0
+	if err := post(context.Background(), srv.Client(), cfg, nil, nil, &n); err == nil || calls != 1 {
+		t.Fatalf("403: err %v after %d calls, want an error after 1", err, calls)
 	}
 }
 
