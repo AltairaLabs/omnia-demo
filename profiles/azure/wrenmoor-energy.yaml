@@ -1,0 +1,28 @@
+# Wrenmoor Energy: a renewable (wind and solar) supplier in the South Pennines.
+# Customer side: the website and portal with Wren, the customer assistant.
+# Staff side: the on-call incident agent, the grid analyst (with its 06:00
+# digest and A2A link) and the field-service copilot over the field manuals.
+workspace:
+  displayName: Wrenmoor Energy
+  description: Renewable wind and solar supplier. Customer assistant, on-call operations, field service and grid analytics.
+  # The enforced cost budget demo (Omnia beta.22): a small daily budget that
+  # an evaluation or load-test run will reach. At 100% `block` refuses new
+  # conversations and holds Arena runs; cost analytics shows why. Warning
+  # events at 50% and 80% first.
+  costControls:
+    dailyBudget: "2.00"
+    monthlyBudget: "40.00"
+    budgetExceededAction: block
+    alertThresholds:
+      - percent: 50
+      - percent: 80
+
+wren: { enabled: true }
+wrenmoorSite: { enabled: true }
+incidentAgent: { enabled: true }
+dataAnalyst: { enabled: true }
+fieldService: { enabled: true }
+# The field manuals, ingested as institutional memory for the copilot.
+memory:
+  enabled: true
+  fixtures: wrenmoor-field-procedures

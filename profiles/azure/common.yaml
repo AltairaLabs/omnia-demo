@@ -1,0 +1,72 @@
+# The Azure profile: values every demo tenant shares on an omnia-azure
+# install, layered under the tenant's own file by `make demos`.
+#
+# Everything Azure-specific a tenant needs is made by omnia-azure's
+# `make workspace WS=<tenant>` (its omnia-workspace chart): the namespace, the
+# workspace's own databases and their Secrets, the keyless Foundry Providers
+# named below, the content volume and a managed identity. `make demos` reads
+# that identity from the workspace's omnia-workspace ConfigMap.
+
+# Every agent runs on the tenant's keyless Foundry gpt-4o Provider.
+llm:
+  providerRef: azure-foundry-gpt-4o
+
+workspace:
+  create: true
+  environment: development
+  # Owner for the "Omnia Admins" security group in the HollandTech tenant, the
+  # same group as the dashboard admins (omnia-azure values-azure.yaml).
+  roleBindings:
+    - groups: [0ad6a315-d616-46a5-bf38-3d31203a0be5]
+      role: owner
+  services:
+    - name: default
+      mode: managed
+      session:
+        database:
+          secretRef: { name: omnia-postgres }
+      memory:
+        database:
+          secretRef: { name: omnia-postgres-memory }
+        # Required from beta.22: no embedding Provider, no memory-api.
+        providerRef: { name: azure-foundry-embedding }
+        # Keyless Foundry embeddings. omnia-azure's `make workspace-identity`
+        # federates and annotates memory-api's SA (memory-<tenant>-default).
+        podOverrides:
+          labels:
+            azure.workload.identity/use: "true"
+  # privacy-api: consent, opt-out, DSAR, and the agent register's data (the
+  # dashboard's /agent-registry). DB Secret from the workspace's release.
+  privacy:
+    database:
+      secretRef: { name: omnia-postgres-privacy }
+  # Arena content on the Azure Files NFS share: the workspace's release
+  # makes a PV scoped to its subtree, and the claim.
+  storage:
+    enabled: true
+    storageClass: omnia-nfs-static
+  # Workload identity to Foundry. From Omnia beta.23 every agent runs as its
+  # own <agent>-facade ServiceAccount; these annotations go on each of them.
+  # `make demos` sets the workspace identity's client and tenant ids, and
+  # omnia-azure's `make workspace-identity` federates each agent.
+  runtimeIdentity:
+    podLabels:
+      azure.workload.identity/use: "true"
+
+# Off by default; a tenant that ingests fixtures turns it on.
+memory:
+  enabled: false
+  image: { tag: sha-86c013f }
+
+# The chart's images default to its appVersion, which only exists once that
+# omnia-demo release is tagged. Until then (chart from a sibling checkout), pin
+# the images the publish workflow built from that checkout's commit
+# (workflow_dispatch on the branch tags them sha-<short>). Remove when
+# installing a released chart.
+mortgageUnderwriting: { image: { tag: sha-86c013f } }
+claimsTriage: { image: { tag: sha-86c013f } }
+piiChat: { image: { tag: sha-86c013f }, portal: { image: { tag: sha-86c013f } } }
+incidentAgent: { image: { tag: sha-86c013f } }
+dataAnalyst: { image: { tag: sha-86c013f } }
+wren: { image: { tag: sha-86c013f } }
+wrenmoorSite: { image: { tag: sha-86c013f } }

@@ -18,6 +18,30 @@ documents its prerequisites and can be enabled or disabled through values.
   demos, one release per tenant, with the memory ingestion example, local S3 gateway (Versity Gateway)
   and synthetic fixtures.
 
+- [`profiles/`](profiles/) — per-platform values for the demo tenants (one
+  Workspace per company in the cast). `profiles/azure/` targets an
+  [omnia-azure](https://github.com/AltairaLabs/omnia-azure) deployment.
+
+## Installing the demo tenants
+
+```bash
+make demos                        # every tenant (larkmere-mutual, wrenmoor-energy, halvern-partners)
+make demos TENANTS=larkmere-mutual
+make builder                      # the Arena builder, in Halvern Partners
+```
+
+For each tenant, the azure profile:
+1. asks a sibling omnia-azure checkout (`OMNIA_AZURE`, default `../omnia-azure`)
+   to provision the workspace's Azure side: `make workspace WS=<tenant>`
+   creates its namespace, databases, Foundry Providers, content volume and
+   managed identity;
+2. installs `charts/omnia-demo` with `profiles/azure/common.yaml` and the
+   tenant's file, putting that identity on every agent;
+3. has omnia-azure federate each agent (`make workspace-identity`).
+
+omnia-azure knows nothing about the demos; the cast and what each tenant runs
+live here.
+
 More public-safe examples will be added as independent packages. Enterprise
 examples may require an Omnia Enterprise installation; they will not copy
 private Omnia platform code into this repository.

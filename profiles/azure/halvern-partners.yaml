@@ -1,0 +1,30 @@
+# Halvern Partners: the partner consultancy that builds agents for Larkmere
+# Mutual and Wrenmoor Energy. Its workspace is the build side: the Arena
+# builder (`make builder`) runs here. Templates and its bid assistant come later.
+workspace:
+  displayName: Halvern Partners
+  description: Partner consultancy. Builds, evaluates and hands over client agents.
+
+# The demo catalogue (every tenant's demos), at
+# https://omnia-demo.azure.altairalabs.ai/demo-catalog/ behind the dashboard
+# sign-in. One release carries it; it belongs to the partner presenting the work.
+catalogue:
+  enabled: true
+  authURL: http://omnia-management-api.omnia.svc.cluster.local:8080
+  route:
+    parentRefs:
+      - { name: omnia-external, namespace: omnia }
+    hostnames:
+      - omnia-demo.azure.altairalabs.ai
+  # The Larkmere Mutual website and member portal (the customer side of the
+  # card-support demo), at /larkmere-mutual/ behind the same sign-in.
+  proxies:
+    - path: /larkmere-mutual
+      upstream: http://larkmere-portal.larkmere-mutual.svc.cluster.local:8080
+      rewrites:
+        - { from: '"/api/assistant/ws"', to: '"/larkmere-mutual/api/assistant/ws"' }
+        - { from: '"/ui_kits/portal/', to: '"/larkmere-mutual/ui_kits/portal/' }
+    # Wrenmoor Energy's website, customer portal and intranet. All its paths
+    # are relative, so no rewrites.
+    - path: /wrenmoor-energy
+      upstream: http://wrenmoor-site.wrenmoor-energy.svc.cluster.local:8080
