@@ -679,6 +679,26 @@ galaxy:
   # MemoryPolicy name; empty is <workspace>-memory.
   policyName: ""
   leaves: 24
+  # MemoryPolicy spec.tiers: how long each kind of memory lives. A member's
+  # circumstances go stale in months; their identity and claims history
+  # matter for years; what the society knows is curated, not expired. The
+  # seeder also gives each agent memory its own expiry inside the agent
+  # tier's maxAge, so they don't all lapse on one day.
+  # Omnia 0.9.0-beta.23's MemoryPolicy takes only ttl and perCategory here (no
+  # retention mode): an institutional tier with no ttl never expires.
+  retention:
+    institutional: {}
+    agent:
+      ttl: { default: 365d, maxAge: 730d }
+    user:
+      ttl: { default: 365d, maxAge: 1825d }
+      perCategory:
+        memory:context: { ttl: { default: 90d, maxAge: 180d } }
+        memory:health: { ttl: { default: 180d, maxAge: 365d } }
+        memory:location: { ttl: { default: 365d, maxAge: 730d } }
+        memory:preferences: { ttl: { default: 730d, maxAge: 1095d } }
+        memory:history: { ttl: { default: 1095d, maxAge: 1825d } }
+        memory:identity: { ttl: { default: 1825d, maxAge: 1825d } }
   graphExpansion:
     hops: 1
     maxAdded: 10

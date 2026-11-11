@@ -56,9 +56,7 @@ spec:
       - { name: part_of, kind: containment, inverse: contains, sourceTypes: [section, chunk], targetTypes: [document, section], directed: true }
       - { name: next, kind: sequence, inverse: previous, sourceTypes: [section, chunk], targetTypes: [section, chunk], directed: true }
   tiers:
-    institutional: {}
-    agent: {}
-    user: {}
+    {{- toYaml .Values.galaxy.retention | nindent 4 }}
   {{- with .Values.galaxy.graphExpansion }}
   # Recall walks the graph: a question about a claim reaches the procedure
   # that governs its type and the guidance about it.

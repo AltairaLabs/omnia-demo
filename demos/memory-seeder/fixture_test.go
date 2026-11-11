@@ -7,6 +7,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // The embedded Larkmere corpus loads, every memory names a tier the seeder
@@ -50,6 +51,25 @@ func TestLarkmereGalaxyFixtureLoads(t *testing.T) {
 		if nodes[e.From] != e.FromKind || nodes[e.To] != e.ToKind {
 			t.Fatalf("edge %s -> %s (%s) names a node the graph does not hold", e.From, e.To, e.Type)
 		}
+	}
+}
+
+// Agent memories get a stable expiry inside the window, and not all the same.
+func TestAgentExpirySpreadsAndIsStable(t *testing.T) {
+	now := time.Date(2026, 11, 11, 0, 0, 0, 0, time.UTC)
+	seen := map[time.Time]bool{}
+	for _, id := range []string{"agent/a/0-0", "agent/a/0-1", "agent/b/1-0", "agent/c/2-3"} {
+		e := agentExpiry(id, now)
+		if e.Before(now.Add(agentExpiryMin)) || !e.Before(now.Add(agentExpiryMax)) {
+			t.Fatalf("%s expires %s, outside the window", id, e)
+		}
+		if !agentExpiry(id, now).Equal(e) {
+			t.Fatalf("%s: expiry not stable", id)
+		}
+		seen[e] = true
+	}
+	if len(seen) < 2 {
+		t.Fatal("every agent memory got the same expiry")
 	}
 }
 

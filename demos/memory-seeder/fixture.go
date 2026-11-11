@@ -11,6 +11,7 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"io"
 	"io/fs"
 	"log"
@@ -167,8 +168,27 @@ func (c *Client) SaveFixtureAgent(ctx context.Context, m fixtureMemory, agentUID
 		// field (Omnia memory-api itemFromMemory).
 		fieldMetadata: map[string]any{"theme": m.Theme, "subtheme": m.Subtheme,
 			"about_kind": fixtureKind, "about_key": m.ID},
+		"expires_at": agentExpiry(m.ID, time.Now()).Format(time.RFC3339),
 	}
 	return c.saveID(ctx, pathAgentMemories, body)
+}
+
+// Agent memories expire between agentExpiryMin and agentExpiryMax after the
+// seed, spread by a hash of the memory's id: the same memory gets the same
+// lifetime on every seed, and the tier doesn't lapse all on one day. The
+// chart's agent tier caps expiry at 730 days (galaxy.retention), above
+// agentExpiryMax. The user save route takes no expires_at, so user memories
+// take their category's TTL from the policy instead.
+const (
+	agentExpiryMin = 120 * 24 * time.Hour
+	agentExpiryMax = 720 * 24 * time.Hour
+)
+
+func agentExpiry(id string, now time.Time) time.Time {
+	h := fnv.New64a()
+	_, _ = h.Write([]byte(id))
+	span := uint64((agentExpiryMax - agentExpiryMin) / time.Hour)
+	return now.Add(agentExpiryMin + time.Duration(h.Sum64()%span)*time.Hour)
 }
 
 // fixtureSource names the corpus's institutional rows.

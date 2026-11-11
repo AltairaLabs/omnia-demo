@@ -44,8 +44,10 @@ It plants three findings, so the Galaxy has something to show:
    context category. The memory API takes no write date, so this shows as
    volume, not recency.
 
-At scale 1 (the review sample) the corpus is 1,416 memories (936 user,
-312 user_for_agent, 168 agent), plus 150 institutional items and 74 edges.
+The committed corpus is scale 7 (the default): 9,912 memories (6,552 user,
+2,184 user_for_agent, 1,176 agent), plus 954 institutional items and 428
+edges, about 10.9k points in the Galaxy. Scale 1, the review sample, is 1,416
+memories plus 150 items and 74 edges.
 
 ## Running it
 
@@ -62,14 +64,14 @@ make -C ../omnia-azure foundry-close
 `--dry-run` prints the counts and how many prompts are not cached, and calls
 nothing. Commit `cache/` and the fixture together.
 
-The first full generation (352 prompts, gpt-5.4-mini) took about three minutes
-and well under a dollar. Seeding still embeds the corpus each time it runs
+The review sample (352 prompts, gpt-5.4-mini) took about three minutes and
+well under a dollar; scaling it to 7 (891 more prompts) took eight. Seeding still embeds the corpus each time it runs
 (memory-api computes the vectors), which is cents.
 
 ## Scaling up
 
 ```bash
-go run ./demos/memory-galaxy --dry-run --scale 25    # ~40k memories: see what's not cached
+go run ./demos/memory-galaxy --dry-run --scale 25    # ~35k memories: see what's not cached
 go run ./demos/memory-galaxy --endpoint ... --scale 25
 ```
 

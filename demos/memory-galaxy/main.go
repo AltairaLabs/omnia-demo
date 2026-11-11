@@ -155,7 +155,7 @@ func main() {
 	taxPath := flag.String("taxonomy", "demos/memory-galaxy/taxonomy.yaml", "taxonomy file")
 	cacheDir := flag.String("cache", "demos/memory-galaxy/cache", "response cache (committed)")
 	outDir := flag.String("out", "demos/memory-seeder/fixtures/larkmere-galaxy", "where corpus.jsonl and graph.json go")
-	scale := flag.Float64("scale", 1, "multiplier on every count (1 is the ~2k review sample)")
+	scale := flag.Float64("scale", 7, "multiplier on every count (7, the default, is the ~11k committed corpus; 1 is the ~2k review sample)")
 	endpoint := flag.String("endpoint", os.Getenv("FOUNDRY_ENDPOINT"), "Foundry (Azure OpenAI) endpoint")
 	offline := flag.Bool("offline", false, "never call the model; fail on a cache miss")
 	workers := flag.Int("workers", 8, "concurrent model calls")
