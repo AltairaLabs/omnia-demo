@@ -1,0 +1,159 @@
+{{- if and .Values.piiChat.enabled .Values.piiChat.canary.enabled }}
+{{- $pc := .Values.piiChat }}
+{{- $cn := $pc.canary }}
+{{- range $ver := list "2.0" "2.1" }}
+{{- $slug := replace "." "-" $ver }}
+---
+# Card support {{ $ver }}.0, a candidate for the canary. Derived from 1.0.0 by
+# hack/build-canary-packs.sh (demos/pii-chat/canary): one prompt change, and
+# the judge it is gated on.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: pii-chat-pack-v{{ $slug }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    app.kubernetes.io/component: canary
+spec:
+  # The same logical pack as 1.0.0, at a newer version: a pack is packName plus
+  # version, and an agent names the packName and pins a version
+  # (promptPackRef.version) or follows the channel. Card support pins 1.0.0
+  # (pii-chat-agent.yaml), so publishing these moves no one; the rollout names
+  # this version as its candidate, and candidate sessions are recorded as
+  # pii-chat-pack at this version, which is how the eval worker finds the
+  # judge below.
+  packName: pii-chat-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: pii-chat-pack-v{{ $slug }}
+  version: "{{ $ver }}.0"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pii-chat-pack-v{{ $slug }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    app.kubernetes.io/component: canary
+data:
+  pack.json: |
+{{ $.Files.Get (printf "files/arena/pii-chat-pack-v%s.json" $ver) | indent 4 }}
+---
+# The gate for {{ $ver }}.0: the candidate's average judge score. One template
+# per version because the eval id is per version (see eval.jq) and arenaEval's
+# evalDef takes no arguments.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: RolloutAnalysis
+metadata:
+  name: card-support-gate-v{{ $slug }}
+  namespace: {{ $.Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    app.kubernetes.io/component: canary
+spec:
+  metrics:
+    - name: identity-before-account
+      interval: {{ $cn.gate.interval }}
+      count: {{ $cn.gate.count }}
+      failureLimit: 0
+      successCondition: "result[0] >= {{ $cn.gate.minScore }}"
+      provider:
+        arenaEval:
+          # The suffix is the judge's revision (hack/build-canary-packs.sh
+          # EVAL_REVISION); the two must match.
+          evalDef: identity-before-account-v{{ $slug }}-r5
+{{- end }}
+---
+# The eval worker's identity. The operator runs the worker as this
+# ServiceAccount (the service group's evalWorker.podOverrides, workspace.yaml)
+# and binds its Role to it; the annotations are the workspace runtime
+# identity's, so the judge gets a Foundry token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $cn.evalWorkerServiceAccount }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: canary
+  {{- with .Values.workspace.runtimeIdentity.serviceAccountAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+---
+# Scripted cardholders calling card support, one conversation at a time, so
+# the rollout has traffic to judge. Off (0 replicas) until `make canary`.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: card-callers
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: card-callers
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: canary
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: card-callers
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: card-callers
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: callers
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $pc.portal.image) }}
+          imagePullPolicy: {{ $pc.portal.image.pullPolicy }}
+          command: ["/card-callers"]
+          args:
+            - --agent-url=http://pii-chat.{{ .Values.namespace }}:8080
+            - --namespace={{ .Values.namespace }}
+            - --pause={{ $cn.callers.pause }}
+            # Larkmere's telephony channel verifies a caller before connecting
+            # them, so the callers are an identity provider of their own,
+            # trusted like the portal (docs/stand-ins.md).
+            - --issuer-url={{ include "omnia-demo.issuerURL" (dict "service" "card-callers" "root" $) }}
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "16Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+# The callers' JWKS, for Omnia's mint to verify their tokens against.
+apiVersion: v1
+kind: Service
+metadata:
+  name: card-callers
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: card-callers
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}

@@ -198,6 +198,10 @@ func jsonTool(name string, fn func(toolRequest) (any, int)) http.HandlerFunc {
 		log.Printf("tool request received: tool=%s ref=%s remote=%s", name, req.ref(), r.RemoteAddr)
 
 		body, status := fn(req)
+		// The outcome too, not only the arrival: an agent that retries a tool
+		// call is usually being told no, and the request line alone cannot
+		// say so.
+		log.Printf("tool response: tool=%s status=%d", name, status)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		if err := json.NewEncoder(w).Encode(body); err != nil {

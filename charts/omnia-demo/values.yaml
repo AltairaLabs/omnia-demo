@@ -359,6 +359,40 @@ piiChat:
       tag: ""
       pullPolicy: IfNotPresent
 
+  # -- The eval-gated canary (Larkmere Mutual).
+  #
+  # Installs what `make canary` rolls out: two candidate versions of the card
+  # support pack (2.0.0, a good change; 2.1.0, a regression that acts on a card
+  # before verifying the caller), each with an LLM judge, a RolloutAnalysis
+  # gate per version, and scripted callers that give the rollout traffic. The
+  # rollout itself is not in the chart: `make canary VERSION=2.0` patches it
+  # onto the AgentRuntime and `make canary-reset` takes it off, since a
+  # promotion rewrites spec.promptPackRef and a chart that owned the rollout
+  # would start it again on the next upgrade.
+  #
+  # Needs the portal (edge-trust identity, which the callers assert too), the
+  # Enterprise RolloutAnalysis CRD and the eval worker, which this turns on for
+  # the workspace's service group.
+  canary:
+    enabled: false
+    # The judge runs on the agent's own model (`default`): on Omnia
+    # 0.9.0-beta.23 a pack cannot name a separate judge provider (Omnia #3965,
+    # demos/pii-chat/canary/eval.jq).
+    # The gate: the candidate's average judge score, measured `count` times,
+    # `interval` apart, each at least minScore.
+    gate:
+      minScore: "0.8"
+      count: 3
+      interval: 90s
+    # The eval worker runs as this ServiceAccount, with the runtime identity's
+    # annotations, so the judge can reach a keyless Provider. omnia-azure's
+    # `make workspace-identity` federates it.
+    evalWorkerServiceAccount: eval-worker
+    # Scripted callers (demos/card-callers, in the sites image). Scaled to 0
+    # until `make canary` starts them.
+    callers:
+      pause: 20s
+
 # ---------------------------------------------------------------------------
 # claimsTriage — Larkmere Mutual claims triage, the delegated-authority demo
 #

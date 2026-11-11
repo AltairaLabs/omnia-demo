@@ -149,6 +149,12 @@ metadata:
 spec:
   promptPackRef:
     name: pii-chat-pack
+{{- if $pc.canary.enabled }}
+    # Pinned, not following the channel: the canary publishes newer versions
+    # of this pack (2.0.0, 2.1.0), and an unpinned agent moves to the highest
+    # stable version the moment one appears. The rollout moves it instead.
+    version: "1.0.0"
+{{- end }}
   toolRegistryRef:
     name: pii-chat-tools
   # The binding that makes the demo work. Without it the agent falls back to the
@@ -225,4 +231,12 @@ spec:
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
         name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef) }}{{ end }}
+{{- if $pc.canary.enabled }}
+  # Realtime evals, for the canary gate. 1.0.0 declares none; the candidate
+  # packs declare the judge, and the eval worker (which runs llm_judge, and is
+  # the only path that records the variant the gate filters on) scores the
+  # candidate's sessions with the pack each session ran.
+  evals:
+    enabled: true
+{{- end }}
 {{- end }}

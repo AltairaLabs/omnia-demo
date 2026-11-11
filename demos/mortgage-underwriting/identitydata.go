@@ -28,6 +28,13 @@ var cardholders = map[string]cardholder{
 		CardLast4:   "4471",
 		CardStatus:  "active",
 	},
+	// The card-support canary's scripted callers (demos/card-callers). Their
+	// own records, so a rollout's worth of conversations is spread across
+	// members other than the portal's. SSNs in the 9xx range are never issued.
+	"900-11-2041": {CustomerRef: "MEM-5120-034", FullName: "Tomasz Brennan", DOB: "1979-07-22", CardLast4: "2041", CardStatus: "active"},
+	"900-11-3318": {CustomerRef: "MEM-5127-118", FullName: "Priya Hallworth", DOB: "1992-11-03", CardLast4: "3318", CardStatus: "active"},
+	"900-11-5562": {CustomerRef: "MEM-5133-207", FullName: "Gwen Ashby", DOB: "1965-01-30", CardLast4: "5562", CardStatus: "active"},
+	"900-11-7709": {CustomerRef: "MEM-5141-552", FullName: "Callum Reyes", DOB: "2001-05-17", CardLast4: "7709", CardStatus: "active"},
 }
 
 // identityResponse is what verify_identity returns. It deliberately carries

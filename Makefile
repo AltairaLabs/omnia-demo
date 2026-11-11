@@ -94,6 +94,69 @@ images:
 	printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$$server" "$$tag" > $(IMAGE_ENV); \
 	echo "==> Built $$tag; make demos now runs it (rm .images.env to go back)"
 
+# The eval-gated canary on Larkmere Mutual's card support (piiChat.canary).
+#
+#   make canary VERSION=2.0   a good candidate: promotes
+#   make canary VERSION=2.1   a regression: the judge fails it and it rolls back
+#   make canary-status        where the rollout is
+#   make canary-reset         back to 1.0.0, callers stopped
+#
+# The rollout runs on the namespace's ambient waypoint (mesh routing), so each
+# step's weight is exact and each conversation, one WebSocket, stays on the
+# version it opened on. At every weight an analysis step reads the candidate's
+# average judge score (RolloutAnalysis card-support-gate-v<ver>), and a failed
+# gate rolls back on its own. mesh.waypoint is left unset on purpose: on Omnia
+# 0.9.0-beta.23 it puts istio.io/use-waypoint in the Service's selector, which
+# empties the Service (Omnia #3952). The namespace's own use-waypoint label
+# (omnia-azure `make workspace`) already sends the Service through the waypoint.
+# Not in the chart: a promotion rewrites
+# spec.promptPackRef, and a chart-owned rollout would restart on the next
+# upgrade.
+CANARY_NS    ?= larkmere-mutual
+CANARY_AGENT ?= pii-chat
+VERSION      ?= 2.0
+
+.PHONY: canary canary-status canary-reset
+canary:
+	@set -euo pipefail; \
+	slug=$$(tr . - <<< "$(VERSION)"); \
+	$(KUBECTL) -n $(CANARY_NS) get promptpack "pii-chat-pack-v$$slug" -o name >/dev/null; \
+	gate="{\"analysis\":{\"templateName\":\"card-support-gate-v$$slug\"}}"; \
+	: "The candidate is the same pack (packName pii-chat-pack) at the new version."; \
+	patch=$$(jq -n -c --arg ver "$(VERSION).0" --argjson gate "$$gate" '{spec: {rollout: { \
+	  candidate: {promptPackRef: {name: "pii-chat-pack", version: $$ver}}, \
+	  steps: [{setWeight: 20}, $$gate, {setWeight: 50}, $$gate, {setWeight: 100}, $$gate], \
+	  rollback: {mode: "automatic"}, \
+	  trafficRouting: {mode: "mesh"}}}}'); \
+	echo "==> Rolling out card support $(VERSION).0 to $(CANARY_AGENT): 20%, 50%, 100%, gated by the judge"; \
+	$(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge -p "$$patch" >/dev/null; \
+	$(KUBECTL) -n $(CANARY_NS) scale deploy card-callers --replicas=1 >/dev/null; \
+	echo "==> Callers started. Watch: make canary-status, or the agent's rollout in the dashboard"
+
+canary-status:
+	@$(KUBECTL) -n $(CANARY_NS) get agentruntime $(CANARY_AGENT) -o json | jq '{ \
+	  promptPack: .spec.promptPackRef, \
+	  candidate: .spec.rollout.candidate.promptPackRef, \
+	  rollout: .status.rollout, \
+	  condition: (.status.conditions[]? | select(.type == "RolloutActive") | {status, reason, message})}'
+
+canary-reset:
+	@set -euo pipefail; \
+	$(KUBECTL) -n $(CANARY_NS) scale deploy card-callers --replicas=0 >/dev/null; \
+	: "End a live rollout the documented way: a candidate equal to the spec is a"; \
+	: "rollback, and the controller returns its routing to stable and removes the"; \
+	: "canary. Dropping spec.rollout instead leaves the operator-owned"; \
+	: "VirtualService sending the last weight to a canary with no pods (503s)."; \
+	if [[ -n "$$($(KUBECTL) -n $(CANARY_NS) get agentruntime $(CANARY_AGENT) -o jsonpath='{.spec.rollout.candidate}')" ]]; then \
+	  ref=$$($(KUBECTL) -n $(CANARY_NS) get agentruntime $(CANARY_AGENT) -o jsonpath='{.spec.promptPackRef}'); \
+	  $(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge \
+	    -p "{\"spec\":{\"rollout\":{\"candidate\":{\"promptPackRef\":$$ref}}}}" >/dev/null; \
+	  until ! $(KUBECTL) -n $(CANARY_NS) get deploy $(CANARY_AGENT)-canary >/dev/null 2>&1; do sleep 5; done; \
+	fi; \
+	$(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge \
+	  -p '{"spec":{"rollout":null,"promptPackRef":{"name":"pii-chat-pack","version":"1.0.0"}}}' >/dev/null; \
+	echo "==> $(CANARY_AGENT) back on card support 1.0.0, no rollout, callers stopped"
+
 builder:
 	@$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" builder BUILDER_TARGETS="$(BUILDER_TENANT):$(BUILDER_PROVIDER)"
 

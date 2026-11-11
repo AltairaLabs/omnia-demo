@@ -57,6 +57,12 @@ spec:
     {{- if and $.Values.galaxy.enabled $s.memory (not $s.memory.policyRef) }}
     {{- $_ := set $s.memory "policyRef" (dict "name" (include "omnia-demo.galaxyPolicyName" $)) }}
     {{- end }}
+    {{- /* The card-support canary needs the eval worker, which a pack with no
+           evals of its own (card support 1.0.0) does not bring up. It runs as
+           the canary's ServiceAccount, with workload identity for the judge. */}}
+    {{- if and $.Values.piiChat.enabled $.Values.piiChat.canary.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.evalWorker) }}
+    {{- $_ := set $s "evalWorker" (dict "enabled" true "podOverrides" (dict "serviceAccountName" $.Values.piiChat.canary.evalWorkerServiceAccount "labels" ($.Values.workspace.runtimeIdentity.podLabels | default dict))) }}
+    {{- end }}
     {{- $services = append $services $s }}
     {{- end }}
     {{- toYaml $services | nindent 4 }}
