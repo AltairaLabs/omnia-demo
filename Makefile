@@ -35,9 +35,10 @@ KUBECTL := kubectl --context $(KUBE_CONTEXT)
 HELM    := helm --kube-context $(KUBE_CONTEXT)
 PROFILE_DIR := profiles/$(PROFILE)
 
-# The last `make images` build, if any: IMAGE_REGISTRY and IMAGE_TAG.
--include .images.env
-IMAGE_SET := $(if $(IMAGE_REGISTRY),--set-string images.registry=$(IMAGE_REGISTRY) --set-string images.tag=$(IMAGE_TAG))
+# The last `make images` build, if any, is in .images.env (IMAGE_REGISTRY and
+# IMAGE_TAG). `make demos` reads it when its recipe runs, not when make starts,
+# so `make images demos` deploys the build it just made.
+IMAGE_ENV := .images.env
 
 # name,build context,Dockerfile — the images publish.yml builds, by repository.
 IMAGES := \
@@ -53,6 +54,13 @@ demos:
 	@set -euo pipefail; \
 	test "$(PROFILE)" = azure || { echo "only the azure profile is wired: PROFILE=$(PROFILE)" >&2; exit 1; }; \
 	test -d "$(OMNIA_AZURE)" || { echo "OMNIA_AZURE=$(OMNIA_AZURE) is not a checkout of omnia-azure" >&2; exit 1; }; \
+	image_set=""; \
+	if [[ -f $(IMAGE_ENV) ]]; then \
+	  reg=$$(awk -F' *:?= *' '$$1=="IMAGE_REGISTRY"{print $$2}' $(IMAGE_ENV)); \
+	  tag=$$(awk -F' *:?= *' '$$1=="IMAGE_TAG"{print $$2}' $(IMAGE_ENV)); \
+	  image_set="--set-string images.registry=$$reg --set-string images.tag=$$tag"; \
+	  echo "==> Images: $$reg, tag $$tag ($(IMAGE_ENV))"; \
+	fi; \
 	for t in $(TENANTS); do \
 	  echo "==> $$t"; \
 	  $(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" workspace WS="$$t"; \
@@ -60,7 +68,7 @@ demos:
 	  tenant_id=$$($(KUBECTL) -n "$$t" get configmap omnia-workspace -o jsonpath='{.data.workloadIdentityTenantId}'); \
 	  $(HELM) upgrade --install "$$t" $(CHART) -n "$$t" \
 	    -f $(PROFILE_DIR)/common.yaml -f "$(PROFILE_DIR)/$$t.yaml" \
-	    --set namespace="$$t" $(IMAGE_SET) \
+	    --set namespace="$$t" $$image_set \
 	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/client-id=$$client_id" \
 	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/tenant-id=$$tenant_id" \
 	    --wait --timeout 10m >/dev/null; \
@@ -83,7 +91,7 @@ images:
 	  az acr build --subscription "$$sub" --registry "$$acr" --platform linux/amd64 --image "$$name:$$tag" \
 	    --file "$$file" --no-logs --output none "$$context"; \
 	done; \
-	printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$$server" "$$tag" > .images.env; \
+	printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$$server" "$$tag" > $(IMAGE_ENV); \
 	echo "==> Built $$tag; make demos now runs it (rm .images.env to go back)"
 
 builder:
