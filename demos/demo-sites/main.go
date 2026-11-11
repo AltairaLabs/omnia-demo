@@ -31,6 +31,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 )
 
 func main() {
@@ -44,13 +46,22 @@ func main() {
 	flag.StringVar(&m.id, "member-id", "", "customer id asserted to the agent (x-user-id); empty: the site's default")
 	flag.StringVar(&m.email, "member-email", "", "customer email asserted to the agent (x-user-email); empty: the site's default")
 	flag.StringVar(&m.roles, "member-roles", "", "roles asserted to the agent (x-user-roles); empty: the site's default")
+	issuerURL := flag.String("issuer-url", "",
+		"sign a token for the member on each assistant connection, as this issuer (its JWKS at "+demoidp.JWKSPath+
+			"); empty: assert the member in headers only, and the conversation has no verified user")
 	flag.Parse()
 
 	b, err := lookupBrand(*name, m)
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}
-	handler, err := newServer(b, *agent, *backend)
+	var iss *demoidp.Issuer
+	if *issuerURL != "" {
+		if iss, err = demoidp.New(*issuerURL); err != nil {
+			log.Fatalf("issuer: %v", err)
+		}
+	}
+	handler, err := newServer(b, *agent, *backend, iss)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

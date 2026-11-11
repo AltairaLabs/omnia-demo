@@ -47,3 +47,13 @@ http://memory-{{ include "omnia-demo.workspaceName" . }}-{{ .Values.workspace.se
 {{- define "omnia-demo.galaxyPolicyName" -}}
 {{- default (printf "%s-memory" (include "omnia-demo.workspaceName" .)) .Values.galaxy.policyName -}}
 {{- end -}}
+
+{{/*
+The `iss` of a front door's identity provider (demos/demoidp), and the base of
+its JWKS URL (<issuer>/.well-known/jwks.json): the in-cluster address of its
+Service, which is where Omnia's mint fetches the keys. The install lists each
+in the operator's delegation.trustedIssuers.
+*/}}
+{{- define "omnia-demo.issuerURL" -}}
+http://{{ .service }}.{{ .root.Values.namespace }}.svc.cluster.local:8080
+{{- end }}

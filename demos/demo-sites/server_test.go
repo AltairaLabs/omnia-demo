@@ -7,6 +7,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 )
 
 func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
@@ -15,7 +17,7 @@ func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, agentURL, backendURL)
+	h, err := newServer(b, agentURL, backendURL, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,6 +226,43 @@ func TestAssistantDropsCookie(t *testing.T) {
 	_ = resp.Body.Close()
 	if gotCookie != "" || gotUser == "someone-else" || gotUser == "" {
 		t.Fatalf("assistant forwarded cookie %q user %q", gotCookie, gotUser)
+	}
+}
+
+// With an issuer, every assistant connection carries a token for the member
+// the site asserts (the browser's own Authorization dropped), and the site
+// serves the issuer's JWKS for the install to trust.
+func TestAssistantForwardsMemberToken(t *testing.T) {
+	var gotAuth string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+	}))
+	defer agent.Close()
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	h, err := newServer(b, agent.URL, "", iss)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("Authorization", "Bearer from-the-browser")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	tok, ok := strings.CutPrefix(gotAuth, "Bearer ")
+	if !ok || tok == "from-the-browser" || strings.Count(tok, ".") != 2 {
+		t.Fatalf("Authorization forwarded: %q", gotAuth)
+	}
+	if resp, body := get(t, srv.URL+demoidp.JWKSPath); resp.StatusCode != http.StatusOK || !strings.Contains(body, `"RS256"`) {
+		t.Fatalf("jwks: %d %s", resp.StatusCode, body)
 	}
 }
 

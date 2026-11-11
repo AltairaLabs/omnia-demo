@@ -17,6 +17,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 )
 
 // site holds every brand's design-system export, plus the scripts they share.
@@ -39,14 +42,22 @@ const sharedDir = "shared"
 // member is the identity the site asserts to the agent.
 //
 // The site is the trusted EDGE: it owns the visitor's signed-in session, so it
-// is the thing that knows who is asking. The AgentRuntime's
-// externalAuth.edgeTrust reads these headers and does not re-verify them, which
-// is exactly the arrangement a real deployment has behind an API gateway — and
-// it means the demo needs no API key, no secret and no dashboard-minted JWT.
+// is the thing that knows who is asking. A real edge does two things, and the
+// site does both (docs/stand-ins.md):
 //
-// There is no login here and there should not be: authenticating a fictional
-// customer would be a page of theatre in front of the thing the demo is
-// actually about.
+//   - it asserts the user in the headers the AgentRuntime's
+//     externalAuth.edgeTrust reads (x-user-id, x-user-email, x-user-roles),
+//     which admit the conversation;
+//   - it forwards the user's token from the identity provider, which Omnia's
+//     mint exchanges for the subject proof that gives the conversation a
+//     VERIFIED user. Without it the conversation has no user for memory: no
+//     memory tools, no member memories recalled. With --issuer-url the site
+//     is that provider (demos/demoidp), signing a token for the member it
+//     asserts; the install trusts it in delegation.trustedIssuers.
+//
+// There is no login page: the site's member is fixed and fictional, and
+// signing them in would be theatre in front of what the demo is about. The
+// token is what makes the identity real to the platform.
 type member struct {
 	id    string
 	email string
@@ -182,7 +193,11 @@ const (
 // newServer returns the site handler: the embedded site, the assistant proxy,
 // a redirect from the root to the brand's public site, and a health endpoint.
 // backendURL may be empty, in which case the consent and receipt routes 404.
-func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
+//
+// iss, when set, signs a token for the member on every assistant connection
+// and serves its JWKS at demoidp.JWKSPath; nil asserts the member in headers
+// only.
+func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer) (http.Handler, error) {
 	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
@@ -202,12 +217,15 @@ func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
 	}
 	files := gzipped(root, http.FileServer(http.FS(root)))
 
-	proxy, err := assistantProxy(agentURL, b.who)
+	proxy, err := assistantProxy(agentURL, b.who, iss)
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
+	if iss != nil {
+		mux.HandleFunc(demoidp.JWKSPath, iss.ServeJWKS)
+	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
@@ -300,7 +318,7 @@ func gzipped(root fs.FS, next http.Handler) http.Handler {
 // The header names are edgeTrust's defaults (x-user-id, x-user-email,
 // x-user-roles). The roles header name is NOT configurable on the CRD side, so
 // don't rename it here expecting the facade to follow.
-func assistantProxy(agentURL string, m member) (http.Handler, error) {
+func assistantProxy(agentURL string, m member, iss *demoidp.Issuer) (http.Handler, error) {
 	target, err := url.Parse(agentURL)
 	if err != nil {
 		return nil, err
@@ -341,6 +359,17 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 			pr.Out.Header.Set("x-user-id", m.id)
 			pr.Out.Header.Set("x-user-email", m.email)
 			pr.Out.Header.Set("x-user-roles", m.roles)
+			// The member's token, as a real edge forwards the IdP's: the
+			// browser's own Authorization (it has none) never passes.
+			pr.Out.Header.Del("Authorization")
+			if iss != nil {
+				tok, err := iss.Sign(m.id, m.email, memberTokenTTL)
+				if err != nil {
+					log.Printf("assistant: signing the member token: %v", err)
+					return
+				}
+				pr.Out.Header.Set("Authorization", "Bearer "+tok)
+			}
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			// Loud, and on the way out. A silent proxy failure looks exactly
@@ -363,6 +392,11 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 		proxy.ServeHTTP(w, r)
 	}), nil
 }
+
+// memberTokenTTL bounds a member token. Nothing Omnia mints from it outlives
+// it, and a conversation re-exchanges it on every message, so it covers the
+// longest conversation a visitor has.
+const memberTokenTTL = 8 * time.Hour
 
 // accountProxy forwards the panel's consent and receipt requests to the account
 // back end, asserting the customer's identity the same way the runtime does on

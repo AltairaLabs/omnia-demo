@@ -43,8 +43,18 @@ spec:
           image: {{ include "omnia-demo.image" (dict "root" $ "image" .Values.piiChat.portal.image) }}
           imagePullPolicy: {{ .Values.piiChat.portal.image.pullPolicy }}
           # The agent facade's external listener, which edgeTrust opens to the
-          # portal's asserted identity headers.
-          args: ["--site", "larkmere-mutual", "--agent-url", "http://pii-chat.{{ .Values.namespace }}:8080"]
+          # portal's asserted identity headers. --issuer-url makes the portal
+          # Larkmere's member identity provider too: it forwards a signed
+          # token for the member, which the install trusts
+          # (delegation.trustedIssuers) and Omnia's mint turns into a verified
+          # user. See docs/stand-ins.md.
+          args:
+            - --site
+            - larkmere-mutual
+            - --agent-url
+            - http://pii-chat.{{ .Values.namespace }}:8080
+            - --issuer-url
+            - {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" $) }}
           ports:
             - name: http
               containerPort: 8080

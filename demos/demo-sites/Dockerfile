@@ -24,10 +24,15 @@ COPY --from=kits /src/demos/demo-sites/site demos/demo-sites/site
 ARG TARGETOS=linux
 ARG TARGETARCH=amd64
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOWORK=off \
-    go build -o /out/demo-sites ./demos/demo-sites
+    go build -o /out/demo-sites ./demos/demo-sites && \
+    CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} GOWORK=off \
+    go build -o /out/card-callers ./demos/card-callers
 
 FROM gcr.io/distroless/static:nonroot
 COPY --from=build /out/demo-sites /demo-sites
+# The card-support canary's scripted callers (demos/card-callers), shipped here
+# rather than as an image of their own.
+COPY --from=build /out/card-callers /card-callers
 USER nonroot:nonroot
 EXPOSE 8080
 ENTRYPOINT ["/demo-sites"]
