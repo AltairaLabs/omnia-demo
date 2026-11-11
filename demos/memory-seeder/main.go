@@ -297,6 +297,9 @@ func main() {
 	agents := agentFlag{}
 	flag.Var(agents, "agent", "with --fixture: name=AgentRuntime-UID for each agent the corpus writes for (repeatable)")
 	flag.Parse()
+	if *leaves < 1 || *leaves > maxLeaves {
+		log.Fatalf("--galaxy-leaves must be between 1 and %d", maxLeaves)
+	}
 	if *fixtureName != "" {
 		if *wsUID == "" {
 			log.Fatal("--workspace-uid is required")
@@ -312,9 +315,6 @@ func main() {
 	if *agentUID == "" {
 		log.Fatal("--agent-uid is required " +
 			"(retrieve the AgentRuntime metadata.uid from your cluster)")
-	}
-	if *leaves < 1 || *leaves > maxLeaves {
-		log.Fatalf("--galaxy-leaves must be between 1 and %d", maxLeaves)
 	}
 	pseudo, err := loadPseudonymizer()
 	if err != nil {

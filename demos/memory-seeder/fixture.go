@@ -409,8 +409,14 @@ func (c *Client) GrantConsent(ctx context.Context, privacyBase, member string, g
 // copies replayed before the seeder put the key where the agent route reads
 // it (memory-api keeps no other metadata to tell them by). Memories the agent
 // learned itself match neither and are left.
+//
+// It runs after the replay, so the agent's listing must show the keys just
+// written. If it shows none, memory-api has stopped echoing them in metadata,
+// every replayed memory would look key-less, and pruning would delete the whole
+// tier just written: PruneAgent refuses instead.
 func (c *Client) PruneAgent(ctx context.Context, agentUID string, keep, corpusText map[string]bool) (int, error) {
-	var stale []string
+	var stale, legacy []string
+	keyed := 0
 	for offset := 0; ; offset += 100 {
 		q := url.Values{"workspace": {c.workspaceUID}, "agent": {agentUID}, "limit": {"100"}, "offset": {strconv.Itoa(offset)}}
 		raw, err := c.getJSON(ctx, pathAgentMemories+"?"+q.Encode())
@@ -430,17 +436,24 @@ func (c *Client) PruneAgent(ctx context.Context, agentUID string, keep, corpusTe
 		for _, m := range page.Memories {
 			kind, _ := m.Metadata["about_kind"].(string)
 			key, _ := m.Metadata["about_key"].(string)
+			if kind == fixtureKind {
+				keyed++
+			}
 			switch {
 			case kind == fixtureKind && !keep[key]:
 				stale = append(stale, m.ID) // the corpus no longer has it
 			case kind == "" && corpusText[m.Content]:
-				stale = append(stale, m.ID) // replayed before agent memories carried a key
+				legacy = append(legacy, m.ID) // replayed before agent memories carried a key
 			}
 		}
 		if len(page.Memories) < 100 {
 			break
 		}
 	}
+	if keyed == 0 && len(legacy) > 0 {
+		return 0, fmt.Errorf("agent listing carries no %q about keys after the replay; not pruning %d key-less memories", fixtureKind, len(legacy))
+	}
+	stale = append(stale, legacy...)
 	for _, id := range stale {
 		q := url.Values{"workspace": {c.workspaceUID}, "agent": {agentUID}}
 		if err := c.deleteReq(ctx, pathAgentMemories+"/"+url.PathEscape(id)+"?"+q.Encode()); err != nil {

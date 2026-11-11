@@ -330,6 +330,10 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 			// check any site could open a socket here and talk to the agent as
 			// this customer.
 			pr.Out.Header.Del("Origin")
+			// The sites are served under the dashboard's host, so the browser
+			// sends the dashboard's session cookie here too. The agent has no
+			// use for an operator credential: it never leaves this proxy.
+			pr.Out.Header.Del("Cookie")
 
 			// The identity the edge asserts, set on the OUTBOUND request only.
 			// Whatever the browser sent under these names is overwritten: a
@@ -383,7 +387,9 @@ func accountProxy(backendURL string, m member) (http.Handler, error) {
 			pr.Out.Header.Del("Origin")
 			pr.Out.Header.Del("Cookie")
 			// Overwritten, never passed through: the browser does not get to
-			// say whose consent this is.
+			// say whose consent this is. The back end reads the email before
+			// the id, so a browser-sent email is dropped too.
+			pr.Out.Header.Del("X-Omnia-User-Email")
 			pr.Out.Header.Set("X-Omnia-User-Id", m.id)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {

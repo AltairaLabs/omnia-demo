@@ -163,9 +163,10 @@ func TestAssistantRefusesCrossOrigin(t *testing.T) {
 }
 
 func TestAccountProxy(t *testing.T) {
-	var gotPath, gotUser, gotMethod string
+	var gotPath, gotUser, gotMethod, gotEmail, gotCookie string
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath, gotUser, gotMethod = r.URL.Path, r.Header.Get("X-Omnia-User-Id"), r.Method
+		gotEmail, gotCookie = r.Header.Get("X-Omnia-User-Email"), r.Header.Get("Cookie")
 		_, _ = io.WriteString(w, "{}")
 	}))
 	defer backend.Close()
@@ -173,6 +174,8 @@ func TestAccountProxy(t *testing.T) {
 
 	req, _ := http.NewRequest(http.MethodPost, srv.URL+consentPath, strings.NewReader(`{"tariff":"moor-flex"}`))
 	req.Header.Set("X-Omnia-User-Id", "someone-else")
+	req.Header.Set("X-Omnia-User-Email", "someone@else.example")
+	req.Header.Set("Cookie", "session=operator")
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +183,9 @@ func TestAccountProxy(t *testing.T) {
 	_ = resp.Body.Close()
 	if gotPath != "/wren/consent" || gotUser != "40021187" || gotMethod != http.MethodPost {
 		t.Fatalf("consent forwarded as %s %s user %q", gotMethod, gotPath, gotUser)
+	}
+	if gotEmail != "" || gotCookie != "" {
+		t.Fatalf("browser identity passed through: email %q cookie %q", gotEmail, gotCookie)
 	}
 
 	if resp, _ := get(t, srv.URL+receiptsPath+"?session=s1"); resp.StatusCode != http.StatusOK || gotPath != "/wren/receipts" {
@@ -198,6 +204,26 @@ func TestAccountProxy(t *testing.T) {
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusForbidden {
 		t.Fatalf("cross-origin consent: status %d", resp.StatusCode)
+	}
+}
+
+func TestAssistantDropsCookie(t *testing.T) {
+	var gotCookie, gotUser string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCookie, gotUser = r.Header.Get("Cookie"), r.Header.Get("x-user-id")
+	}))
+	defer agent.Close()
+	srv := serve(t, "wrenmoor-energy", agent.URL, "")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("Cookie", "session=operator")
+	req.Header.Set("x-user-id", "someone-else")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if gotCookie != "" || gotUser == "someone-else" || gotUser == "" {
+		t.Fatalf("assistant forwarded cookie %q user %q", gotCookie, gotUser)
 	}
 }
 

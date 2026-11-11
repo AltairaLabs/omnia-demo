@@ -196,6 +196,11 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 		if strings.HasPrefix(name, ".") || entry.IsDir() || !textLike(name) {
 			continue
 		}
+		// In the manifest before it is read, as the S3 path does: a file that
+		// fails to read this time is skipped, but memory-api keeps the copy it
+		// already holds rather than forgetting it.
+		url := "file://" + cfg.source + "/" + name
+		present.Keys = append(present.Keys, url)
 		body, err := os.ReadFile(filepath.Join(cfg.dir, name))
 		if err != nil {
 			log.Warn("skip file", "name", name, "error", err)
@@ -205,8 +210,6 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 			log.Warn("skip file", "name", name, "error", "exceeds size limit")
 			continue
 		}
-		url := "file://" + cfg.source + "/" + name
-		present.Keys = append(present.Keys, url)
 		hash := sha256.Sum256(body)
 		batch = append(batch, document{Title: name, URL: url, Site: "file://" + cfg.source, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])})
 		if len(batch) == batchSize {
@@ -249,7 +252,7 @@ func read(ctx context.Context, store objectStore, bucket, key string, modified *
 }
 
 // post sends one batch and adds memory-api's counts to n. A network error, a
-// 429 or a 5xx is retried twice with backoff; any other non-202 is the
+// 429 or a 5xx is retried twice with backoff; any other non-2xx is the
 // request's fault and fails at once, with memory-api's error text. A document
 // memory-api rejects fails the run too, so a bad document is never silently
 // missing from memory.
@@ -278,7 +281,7 @@ func post(ctx context.Context, client *http.Client, cfg config, docs []document,
 		switch {
 		case err != nil:
 			retry = fmt.Errorf("post batch: %w", err)
-		case resp.StatusCode == http.StatusAccepted:
+		case resp.StatusCode >= 200 && resp.StatusCode < 300:
 			defer func() { _ = resp.Body.Close() }()
 			var result batchResponse
 			if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {

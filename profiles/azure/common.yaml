@@ -71,3 +71,4 @@ dataAnalyst: { image: { tag: sha-682590d } }
 wren: { image: { tag: sha-682590d } }
 wrenmoorSite: { image: { tag: sha-682590d } }
 halvernSite: { image: { tag: sha-682590d } }
+galaxy: { image: { tag: sha-682590d } }

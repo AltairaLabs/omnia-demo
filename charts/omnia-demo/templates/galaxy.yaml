@@ -118,21 +118,34 @@ roleRef:
 subjects:
   - { kind: ServiceAccount, name: {{ $memSA }}, namespace: {{ $ns }} }
 ---
-# One Job per seeder image: a new build (or a new fixture) seeds again, and the
-# same build never does. Re-seeding is safe — every memory carries an about key,
-# so a second write supersedes the first instead of adding a copy.
+# One Job per seed: its name hashes the whole pod template (image, fixture,
+# leaves, agents, privacy), so changing any of them seeds again under a new
+# name rather than editing an immutable Job, and the same seed never runs twice.
+# The finished Job is kept (no TTL) for that reason. Re-seeding is safe anyway —
+# every memory carries an about key, so a second write supersedes the first.
+{{- $pod := include "omnia-demo.galaxySeedPod" . }}
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: galaxy-seed-{{ printf "%s|%s" $image .Values.galaxy.fixture | sha256sum | trunc 10 }}
+  name: galaxy-seed-{{ $pod | sha256sum | trunc 10 }}
   namespace: {{ $ns }}
   labels:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
     app.kubernetes.io/component: galaxy
 spec:
   backoffLimit: 2
-  ttlSecondsAfterFinished: 604800
+  # Covers the init container too: an agent in galaxy.agents that this tenant
+  # never deploys fails the Job instead of waiting for it forever.
+  activeDeadlineSeconds: {{ .Values.galaxy.deadlineSeconds }}
   template:
+{{ $pod }}
+{{- end }}
+
+{{- define "omnia-demo.galaxySeedPod" }}
+{{- $ns := .Values.namespace }}
+{{- $ws := include "omnia-demo.workspaceName" . }}
+{{- $memSA := printf "memory-%s-%s" $ws .Values.galaxy.serviceGroup }}
+{{- $image := include "omnia-demo.image" (dict "root" $ "image" .Values.galaxy.image) }}
     metadata:
       labels:
         app.kubernetes.io/component: galaxy

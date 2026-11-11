@@ -679,6 +679,9 @@ galaxy:
   # MemoryPolicy name; empty is <workspace>-memory.
   policyName: ""
   leaves: 24
+  # How long the seed Job may run, waiting for memory-api and the agents
+  # included, before it fails.
+  deadlineSeconds: 3600
   # MemoryPolicy spec.tiers: how long each kind of memory lives. A member's
   # circumstances go stale in months; their identity and claims history
   # matter for years; what the society knows is curated, not expired. The
