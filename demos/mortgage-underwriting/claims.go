@@ -3,6 +3,9 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
 )
 
 // Claims-triage tool implementations. See claimsdata.go for the fixtures and
@@ -24,7 +27,29 @@ func fetchClaim(req toolRequest) (any, int) {
 // limit without redeploying a pack, and on camera it shows the agent reading
 // policy rather than remembering it.
 func fetchSettlementPolicy(_ toolRequest) (any, int) {
-	return delegatedAuthority, http.StatusOK
+	return reportedSchedule(os.Getenv), http.StatusOK
+}
+
+// reportedSchedule is the schedule as the claims system reports it: DA-2, or,
+// with CLAIMS_SCHEDULE_LIMIT_PENCE set to a positive whole number of pence,
+// DA-2 with that limit.
+//
+// The override exists for the demo's drift beat. A real claims system's
+// schedule can be set wrong, and when it is, the agent believes it: it attempts
+// a settlement it thinks is within authority. The ToolPolicy holds the real
+// limit independently, so the broker refuses the payment anyway. A value that
+// isn't a positive whole number is ignored, so a typo can never make the
+// reported limit zero.
+func reportedSchedule(getenv func(string) string) settlementPolicy {
+	s := delegatedAuthority
+	v, err := strconv.Atoi(strings.TrimSpace(getenv("CLAIMS_SCHEDULE_LIMIT_PENCE")))
+	if err != nil || v <= 0 {
+		return s
+	}
+	s.DelegatedLimitPence = v
+	s.Rule = fmt.Sprintf("An automated assessor may settle a claim up to £%d.%02d. Above that a "+
+		"human approver must authorise the payment.", v/100, v%100)
+	return s
 }
 
 // settleClaim authorises payment.

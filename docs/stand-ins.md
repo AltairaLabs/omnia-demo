@@ -125,6 +125,11 @@ Add a row when you add a stand-in.
     under demonstration to the platform: the claims system does not enforce
     the £500 delegated-authority limit, because the ToolPolicy does. Do not add
     the check here; it would make the demo impossible to read.
+  - **The schedule it reports can be set wrong.** `CLAIMS_SCHEDULE_LIMIT_PENCE`
+    on `claims-systems` changes the limit `claim_policy_fetch` reports, and
+    only that: the ToolPolicy keeps its own £500. That is demo 3's drift beat
+    (`demos/claims-triage/RUNBOOK.md`). A value that isn't a positive whole
+    number of pence is ignored.
 
 ## Models
 

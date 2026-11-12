@@ -94,6 +94,11 @@ There is no chat window anywhere in this demo. `mode: function`, typed input
 and output — because the use cases these partners described are backend
 processing, not interactive chat.
 
+Re-verified live 2026-11-12 on the Azure deployment, invoked from the
+dashboard (Functions, `mortgage-underwriting`, Test, `APP-2026-00417`): the
+broker denied the first `income_verify`, the supplier received exactly one
+request, and the note recommended REFER.
+
 ## What it does not show
 
 **Enforcement on runtimes Omnia does not run.** The policy broker is a sidecar
