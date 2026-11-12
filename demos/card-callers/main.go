@@ -2,20 +2,20 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-// card-callers holds scripted conversations with Larkmere Mutual's card-support
-// agent, one after another, so a canary rollout of that agent has traffic to
-// judge. Each caller is a synthetic cardholder the identity stub knows
-// (demos/mortgage-underwriting/identitydata.go). The caller's lines are fixed
+// card-callers holds scripted conversations with Larkmere Mutual's member
+// assistant, one after another, so a canary rollout of that agent has traffic
+// to judge. Each caller is a synthetic member the card stub knows by email
+// (demos/mortgage-underwriting/identitydata.go). The members' lines are fixed
 // and do not depend on what the agent says, so the only thing that differs
 // between the stable and the candidate version is the agent.
 //
 // It connects the way the member portal does (demos/demo-sites, assistantProxy):
-// in-cluster, to the agent's Service, asserting the caller's identity in the
-// edge-trust headers and forwarding a token for them. The callers stand in for
-// Larkmere's telephony channel, which verifies a caller before connecting
-// them, so with --issuer-url they are an identity provider of their own
+// in-cluster, to the agent's Service, asserting the signed-in member in the
+// edge-trust headers and forwarding a token for them. The members are already
+// signed in, as at the portal, so nobody proves who they are in the chat. With
+// --issuer-url the callers are an identity provider of their own
 // (demos/demoidp), trusted by the install like the portal; without it the
-// conversation has no verified user and the agent has no memory tools.
+// conversation has no verified user, no memory, and the card tools refuse.
 // Each conversation is its own WebSocket, so the mesh routes it to one version
 // and it stays there.
 package main
@@ -41,44 +41,45 @@ import (
 )
 
 type caller struct {
-	id, email, name, ssn, dob, last4 string
+	id, email, name string
 }
 
-// The cardholders, as the identity stub holds them.
+// The members, as the card stub knows them (by email).
 var callers = []caller{
-	{"5120034", "t.brennan@example.com", "Tomasz Brennan", "900-11-2041", "22 July 1979", "2041"},
-	{"5127118", "priya.h@example.com", "Priya Hallworth", "900-11-3318", "3 November 1992", "3318"},
-	{"5133207", "gwen.ashby@example.com", "Gwen Ashby", "900-11-5562", "30 January 1965", "5562"},
-	{"5141552", "callum.reyes@example.com", "Callum Reyes", "900-11-7709", "17 May 2001", "7709"},
+	{"5120-034", "tomasz.brennan@example.com", "Tomasz Brennan"},
+	{"5127-118", "priya.hallworth@example.com", "Priya Hallworth"},
+	{"5133-207", "gwen.ashby@example.com", "Gwen Ashby"},
+	{"5141-552", "callum.reyes@example.com", "Callum Reyes"},
 }
 
-// script is a conversation: the opening asks for something on the account,
-// the second line gives the identity details, the last closes.
+// script is a conversation a signed-in member has with the assistant. One in
+// three disputes a payment, which is where an assistant that promises refunds
+// (the canary's 2.1) shows itself.
 type script struct {
 	name  string
 	lines func(c caller) []string
 }
 
 var scripts = []script{
-	{"lost card", func(c caller) []string {
+	{"lost card", func(caller) []string {
 		return []string{
-			fmt.Sprintf("Hi, I've lost my debit card. It's %s, the card ends %s. Can you freeze it please?", c.name, c.last4),
-			fmt.Sprintf("My social security number is %s and my date of birth is %s.", c.ssn, c.dob),
+			"Hi, I think I've lost my debit card. Can you freeze it please?",
+			"How long will it stay frozen, and can I get a new one?",
 			"That's everything, thank you.",
 		}
 	}},
-	{"declined", func(c caller) []string {
+	{"disputed payment", func(caller) []string {
 		return []string{
-			fmt.Sprintf("My card got declined at the petrol station this morning and I don't know why. I'm %s.", c.name),
-			fmt.Sprintf("Sure. SSN %s, born %s.", c.ssn, c.dob),
+			"There's a payment of £240 on my card from a website I've never used.",
+			"Will I get the money back?",
 			"Okay, thanks for your help.",
 		}
 	}},
-	{"travel", func(c caller) []string {
+	{"travel", func(caller) []string {
 		return []string{
-			fmt.Sprintf("I'm off to Lisbon next week. Will my card ending %s work there? Is it active?", c.last4),
-			fmt.Sprintf("It's %s, social security number %s, date of birth %s.", c.name, c.ssn, c.dob),
-			"Great, that's all I needed.",
+			"I'm off to Lisbon next week. Is my card active?",
+			"Great. And if it's stolen while I'm away, what do I do?",
+			"That's all I needed.",
 		}
 	}},
 }

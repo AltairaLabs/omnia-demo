@@ -55,7 +55,7 @@ metadata:
     app.kubernetes.io/component: canary
 spec:
   metrics:
-    - name: identity-before-account
+    - name: promises-outcome
       interval: {{ $cn.gate.interval }}
       count: {{ $cn.gate.count }}
       failureLimit: 0
@@ -64,7 +64,7 @@ spec:
         arenaEval:
           # The suffix is the judge's revision (hack/build-canary-packs.sh
           # EVAL_REVISION); the two must match.
-          evalDef: identity-before-account-v{{ $slug }}-r6
+          evalDef: promises-outcome-v{{ $slug }}-r7
 {{- end }}
 ---
 # The eval worker's identity. The operator runs the worker as this

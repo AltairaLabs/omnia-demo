@@ -94,10 +94,11 @@ images:
 	printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$$server" "$$tag" > $(IMAGE_ENV); \
 	echo "==> Built $$tag; make demos now runs it (rm .images.env to go back)"
 
-# The eval-gated canary on Larkmere Mutual's card support (piiChat.canary).
+# The eval-gated canary on Larkmere Mutual's member assistant (agent pii-chat,
+# values piiChat.canary).
 #
 #   make canary VERSION=2.0   a good candidate: promotes
-#   make canary VERSION=2.1   a regression: the judge fails it and it rolls back
+#   make canary VERSION=2.1   a regression (promises refunds): the judge fails it and it rolls back
 #   make canary-status        where the rollout is
 #   make canary-reset         back to 1.0.0, callers stopped
 #
@@ -121,6 +122,17 @@ canary:
 	@set -euo pipefail; \
 	slug=$$(tr . - <<< "$(VERSION)"); \
 	$(KUBECTL) -n $(CANARY_NS) get promptpack "pii-chat-pack-v$$slug" -o name >/dev/null; \
+	: "The gate averages every result ever recorded for its eval id (Omnia #3950),"; \
+	: "so a second run on the same id is decided by the first. Each run stamps the"; \
+	: "gate with the id it used, and a run on a stamped id is refused."; \
+	analysis="rolloutanalysis/card-support-gate-v$$slug"; \
+	evaldef=$$($(KUBECTL) -n $(CANARY_NS) get $$analysis -o jsonpath='{.spec.metrics[0].provider.arenaEval.evalDef}'); \
+	ran=$$($(KUBECTL) -n $(CANARY_NS) get $$analysis -o jsonpath='{.metadata.annotations.demo\.altairalabs\.ai/gated-eval}'); \
+	if [[ "$$ran" == "$$evaldef" ]]; then \
+	  echo "eval id $$evaldef already has results from an earlier run: bump EVAL_REVISION in hack/build-canary-packs.sh (and evalDef in pii-chat-canary.yaml), then make demos" >&2; \
+	  exit 1; \
+	fi; \
+	$(KUBECTL) -n $(CANARY_NS) annotate $$analysis --overwrite "demo.altairalabs.ai/gated-eval=$$evaldef" >/dev/null; \
 	gate="{\"analysis\":{\"templateName\":\"card-support-gate-v$$slug\"}}"; \
 	: "The candidate is the same pack (packName pii-chat-pack) at the new version."; \
 	patch=$$(jq -n -c --arg ver "$(VERSION).0" --argjson gate "$$gate" '{spec: {rollout: { \
@@ -128,7 +140,7 @@ canary:
 	  steps: [{setWeight: 20}, $$gate, {setWeight: 50}, $$gate, {setWeight: 100}, $$gate], \
 	  rollback: {mode: "automatic"}, \
 	  trafficRouting: {mode: "mesh"}}}}'); \
-	echo "==> Rolling out card support $(VERSION).0 to $(CANARY_AGENT): 20%, 50%, 100%, gated by the judge"; \
+	echo "==> Rolling out member assistant $(VERSION).0 to $(CANARY_AGENT): 20%, 50%, 100%, gated by the judge ($$evaldef)"; \
 	$(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge -p "$$patch" >/dev/null; \
 	$(KUBECTL) -n $(CANARY_NS) scale deploy card-callers --replicas=1 >/dev/null; \
 	echo "==> Callers started. Watch: make canary-status, or the agent's rollout in the dashboard"
@@ -155,7 +167,11 @@ canary-reset:
 	fi; \
 	$(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge \
 	  -p '{"spec":{"rollout":null,"promptPackRef":{"name":"pii-chat-pack","version":"1.0.0"}}}' >/dev/null; \
-	echo "==> $(CANARY_AGENT) back on card support 1.0.0, no rollout, callers stopped"
+	: "Wait for the stable Deployment to settle: a canary started while it is still"; \
+	: "rolling (2.0.0 back to 1.0.0) raced it."; \
+	sleep 3; \
+	$(KUBECTL) -n $(CANARY_NS) rollout status deploy/$(CANARY_AGENT) --timeout=300s >/dev/null; \
+	echo "==> $(CANARY_AGENT) back on 1.0.0, no rollout, callers stopped"
 
 builder:
 	@$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" builder BUILDER_TARGETS="$(BUILDER_TENANT):$(BUILDER_PROVIDER)"

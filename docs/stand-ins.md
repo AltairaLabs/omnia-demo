@@ -80,12 +80,14 @@ Add a row when you add a stand-in.
 
 ### Scripted callers (`demos/card-callers`)
 
-- **Fakes:** Larkmere's telephony channel and the cardholders on it, four
-  synthetic members with scripted lines.
-- **Real system:** a contact-centre platform that verifies a caller before it
-  connects them to an agent.
+- **Fakes:** four signed-in members of the portal, with scripted lines, so the
+  canary has traffic to judge.
+- **Real system:** members using the portal, verified by its sign-in before
+  they reach the assistant.
 - **What the stand-in does:** it is its own identity provider, signing a token
-  for each caller (`--issuer-url`). The install trusts it like the portal.
+  for each member (`--issuer-url`), and asserts their email in `x-user-email`
+  so the card tools find their card. The install trusts it like the portal.
+  No line gives an SSN or other proof of identity.
 - **Downstream:** the same as the front doors. The callers only run while
   `make canary` has scaled them up, so their JWKS is reachable only then.
 

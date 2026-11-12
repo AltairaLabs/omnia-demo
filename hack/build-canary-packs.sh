@@ -23,12 +23,13 @@ SRC="${ROOT}/demos/pii-chat/canary"
 # every earlier run's results, so a second run of 2.1 is rolled back within a
 # second on the first run's 0.00, before any new conversation, and a second
 # run of 2.0 passes partly on the first run's scores. Bump it for a clean run.
-# r6: card support 1.0.0 gained freeze_card, unfreeze_card and ambient memory.
-EVAL_REVISION=r6
+# `make canary` refuses an id that already has results.
+# r7: the member assistant; the judge checks for promised outcomes.
+EVAL_REVISION=r7
 
 for ver in 2.0 2.1; do
   out="${ARENA}/pii-chat-pack-v${ver}.json"
-  id="identity-before-account-v${ver/./-}-${EVAL_REVISION}"
+  id="promises-outcome-v${ver/./-}-${EVAL_REVISION}"
   jq --arg id "${id}" \
     "$(cat "${SRC}/v${ver}.jq") | $(cat "${SRC}/eval.jq")" \
     "${ARENA}/pii-chat-pack.json" > "${out}"

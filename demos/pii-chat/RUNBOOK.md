@@ -98,6 +98,47 @@ number that fails Luhn is stored in the clear, which is correct and reads as a
 bug on camera. `4929 1234 5601 4471` is fictional, passes Luhn, and ends in
 Ellen's 4471.
 
+## Demo 9: a prompt change, rolled out safely
+
+The canary rolls a new version of the member assistant out to 20%, 50% and
+then every member, and an LLM judge decides at each step. Scripted members
+(`demos/card-callers`, four of them, signed in like Ellen) give it traffic; one
+conversation in three disputes a payment.
+
+```bash
+make canary VERSION=2.0   # adds "what happens next" on a freeze: promotes
+make canary-reset
+make canary VERSION=2.1   # promises refunds on disputed payments: rolled back at 20%
+make canary-reset
+make canary-status        # at any point
+```
+
+- **The judge** (`demos/pii-chat/canary/eval.jq`, `promises-outcome-v<ver>-r<n>`)
+  scores each whole conversation 1.0 if the assistant never promised an
+  outcome it can't guarantee (a refund, a reversal, how a dispute is decided),
+  and 0.0 if it did. The gate passes at an average of 0.8.
+- **Show the failed conversation.** Dashboard, Sessions, a disputed-payment
+  session from the candidate, Evaluations tab. On 2026-11-12, 2.1 said "Yes,
+  Callum, you'll get the money back once the payment is investigated" and the
+  judge's reason quoted it.
+- **Each run needs a fresh eval id.** The gate averages every result ever
+  recorded for its id (Omnia #3950), so a second run would be decided by the
+  first. `make canary` stamps the gate with the id it ran and refuses to run it
+  again; bump `EVAL_REVISION` in `hack/build-canary-packs.sh` and `evalDef` in
+  `charts/omnia-demo/templates/pii-chat-canary.yaml`, then `make demos`.
+- **Reset waits for the stable Deployment.** A canary started while card
+  support was still rolling back from 2.0.0 to 1.0.0 raced it.
+
+Verified live 2026-11-12 on r7: 2.0 promoted through every gate; 2.1 was
+rolled back at 20% about four minutes in, on its own conversations.
+
+## Who sees what
+
+Every member's memories stay theirs. With the callers running and Ellen's
+memories present, open any caller's session and read "What you know about this
+member" in its system prompt: only that caller's notes, never Ellen's. Checked
+2026-11-12 across six sessions of four members.
+
 ## Gotchas
 
 - **The card tools act on the member the runtime names.** Omnia sends the
