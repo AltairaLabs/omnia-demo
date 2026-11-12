@@ -44,6 +44,11 @@ Invoke from the dashboard (Functions, `claims-triage`, Test, `claim_ref`).
    The claims system logs `claim_fetch`, `claim_refer`: no settlement reached
    it.
 
+Verified live 2026-11-12 on the rule-free prompt: `LM-40733` settled;
+`LM-40718`'s `claim_settle` was refused by
+`deny-settlement-above-delegated-authority` and never reached the claims
+system, and the assessor referred it citing the refusal.
+
 **Show the prompt.** The session's system prompt has no limit in it. That is
 the point to make on camera: the model didn't know, and it didn't need to.
 

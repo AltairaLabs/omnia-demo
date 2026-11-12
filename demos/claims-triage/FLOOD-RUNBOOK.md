@@ -46,6 +46,11 @@ through on camera against the 10k corpus.
    system routes it to Flood Response. With #4009, the assessor's note also
    tells the member what happens next and what to do now, from the guidance.
 
+Verified live 2026-11-12 (rule half): with `floodRule=true`, `LM-40751`'s
+`claim_settle` was refused by `deny-flood-settlement` after the policy's peril
+lookup (`policy lookup claim-peril … peril="Flood"` in the claims system's
+log), and the assessor referred it under CP-7.
+
 Put it back after: `--set claimsTriage.floodRule=false`, and restart
 `claims-systems`.
 
