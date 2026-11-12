@@ -18,7 +18,13 @@ SRC="${ROOT}/demos/pii-chat/canary"
 # result for an eval id it has ever recorded (Omnia #3950), so a changed judge
 # needs a new id, or its scores average with the old judge's. Bump it whenever
 # eval.jq's criteria change, and the same in pii-chat-canary.yaml's evalDef.
-EVAL_REVISION=r5
+#
+# The same goes for running a candidate again: the gate's average includes
+# every earlier run's results, so a second run of 2.1 is rolled back within a
+# second on the first run's 0.00, before any new conversation, and a second
+# run of 2.0 passes partly on the first run's scores. Bump it for a clean run.
+# r6: card support 1.0.0 gained freeze_card, unfreeze_card and ambient memory.
+EVAL_REVISION=r6
 
 for ver in 2.0 2.1; do
   out="${ARENA}/pii-chat-pack-v${ver}.json"

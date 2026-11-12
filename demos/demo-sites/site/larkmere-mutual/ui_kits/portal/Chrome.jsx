@@ -16,6 +16,7 @@ const NAV = [
 const SECONDARY = [
   { id: "documents", label: "Documents", icon: "file-text" },
   { id: "retirement", label: "Retirement", icon: "trending-up" },
+  { id: "data", label: "Your data", icon: "lock" },
   { id: "settings", label: "Settings", icon: "settings" },
 ];
 

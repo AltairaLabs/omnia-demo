@@ -56,6 +56,42 @@ func TestTokenVerifiesAgainstJWKS(t *testing.T) {
 	}
 }
 
+// SignFor sets `aud`; Sign leaves it out, as the mint's tokens always have.
+func TestSignForSetsAudience(t *testing.T) {
+	iss, _ := New("http://x")
+	for aud, want := range map[string]bool{"larkmere-members": true, "": false} {
+		raw, err := iss.SignFor("4471-889", "", aud, time.Minute)
+		if err != nil {
+			t.Fatal(err)
+		}
+		claims := jwt.MapClaims{}
+		if _, _, err := jwt.NewParser().ParseUnverified(raw, claims); err != nil {
+			t.Fatal(err)
+		}
+		if _, has := claims["aud"]; has != want || (want && claims["aud"] != aud) {
+			t.Fatalf("aud %q: claims %v", aud, claims)
+		}
+	}
+}
+
+// The discovery document names this issuer and its JWKS, as Omnia's end-user
+// plane requires.
+func TestDiscoveryNamesIssuerAndJWKS(t *testing.T) {
+	iss, _ := New("http://portal.example.svc:8080")
+	rec := httptest.NewRecorder()
+	iss.ServeDiscovery(rec, httptest.NewRequest("GET", DiscoveryPath, nil))
+	var doc struct {
+		Issuer  string `json:"issuer"`
+		JWKSURI string `json:"jwks_uri"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Issuer != "http://portal.example.svc:8080" || doc.JWKSURI != "http://portal.example.svc:8080"+JWKSPath {
+		t.Fatalf("discovery %s", rec.Body.String())
+	}
+}
+
 func TestSignRefusesNoSubject(t *testing.T) {
 	iss, _ := New("http://x")
 	if _, err := iss.Sign("", "", time.Minute); err == nil {

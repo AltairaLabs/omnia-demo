@@ -174,10 +174,9 @@ spec:
   # path that emits pii_redacted, so it is what moves the redactions counter on
   # /memory-analytics — the session path emits nothing.
   #
-  # NO embedding provider is needed for this. memory-api logs
-  # `providerConfigured: false` and runs the consent classifier in regex-only
-  # mode, which is enough: the demo is about what gets STORED, not about
-  # semantic recall quality.
+  # NO embedding provider is needed for this. The agent names each memory's
+  # consent category, and memory-api's classifier can only make it stricter;
+  # without an embedding Provider that classifier is a keyword list.
   memory:
     enabled: true
     tools:
@@ -186,10 +185,17 @@ spec:
       # subject to the ToolPolicy the broker enforces.
       enabled: true
     retrieval:
-      # Ambient per-turn RAG injection is off: it would pull earlier memories
-      # into the prompt and make each take depend on what previous takes wrote,
-      # which is the opposite of what a scripted capture needs.
-      enabled: false
+      # Ambient retrieval: each turn the runtime puts what memory holds about
+      # the member into the prompt's memory_context variable, the member's
+      # preferences, identity and health always. That is what makes "it
+      # remembers you" work: a preference saved in one conversation is in
+      # context from the first turn of the next, without the model choosing
+      # to call memory__recall.
+      #
+      # It also means a take depends on what earlier takes remembered. Reset
+      # the member between takes by erasing their data (Your data in the
+      # portal, or the RUNBOOK's erasure step), not by turning this off.
+      enabled: {{ $pc.memory.retrieval }}
 {{- end }}
   facades:
     - type: websocket

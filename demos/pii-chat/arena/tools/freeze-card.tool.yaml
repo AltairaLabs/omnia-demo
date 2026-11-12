@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/tool.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: freeze_card
+spec:
+  name: freeze_card
+  # Takes the customer reference verify_identity returned, not the SSN: the SSN
+  # goes through one tool call, verify_identity, and no further. Without this
+  # tool a live model asked to freeze a card said it had, with nothing to do it
+  # with (docs/stand-ins.md).
+  description: >-
+    Freeze the cardholder's card so no new payments go through, for example
+    when it is lost or stolen. Only after verify_identity has verified the
+    caller: pass the customer_ref it returned. Returns the card's new status;
+    changed is false if it was already frozen.
+  input_schema:
+    type: object
+    properties:
+      customer_ref:
+        type: string
+        description: "The customer reference verify_identity returned, e.g. MEM-4471-889."
+    required:
+      - customer_ref
+  output_schema:
+    type: object
+    properties:
+      customer_ref: { type: string }
+      card_last4: { type: string }
+      card_status: { type: string }
+      changed: { type: boolean }
+  action_scope: { effect: write, reversibility: reversible, data_classes: [card-account] }
+  # The executor in the cluster is the ToolRegistry's (pii-chat-tools.yaml);
+  # mock applies only to a local arena run.
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    customer_ref: "MEM-4471-889"
+    card_last4: "4471"
+    card_status: "frozen"
+    changed: true

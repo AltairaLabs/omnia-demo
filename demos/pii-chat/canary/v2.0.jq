@@ -6,5 +6,5 @@
     "- Never read back more than the last four digits of a card number.\n";
     "- Never read back more than the last four digits of a card number.\n" +
     "- Before you close, tell the caller in one sentence what happens next. A\n" +
-    "  frozen card stays frozen until they unfreeze it in the app; a replacement\n" +
-    "  arrives in 3 to 5 working days.\n")
+    "  frozen card stays frozen until they call back to unfreeze it; a\n" +
+    "  replacement arrives in 3 to 5 working days.\n")

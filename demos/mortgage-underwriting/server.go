@@ -64,6 +64,9 @@ type toolRequest struct {
 	// verifyIdentity.
 	SSN string `json:"ssn"`
 	DOB string `json:"dob"`
+	// CustomerRef is what freeze_card and unfreeze_card take: the reference
+	// verify_identity returned, so the SSN is sent once.
+	CustomerRef string `json:"customer_ref"`
 
 	// ClaimRef, AmountPence and Reason belong to claims triage.
 	//
@@ -105,6 +108,8 @@ func (r toolRequest) ref() string {
 		return r.CaseRef
 	case r.ApplicantRef != "":
 		return r.ApplicantRef
+	case r.CustomerRef != "":
+		return r.CustomerRef
 	case r.Service != "":
 		return r.Service
 	case r.Namespace != "":
@@ -140,7 +145,8 @@ func newServer() http.Handler {
 	mux.HandleFunc("/valuation", jsonTool("property_valuation", valueProperty))
 	mux.HandleFunc("/aml-screen", jsonTool("aml_screen", screenAML))
 	mux.HandleFunc("/case-note", jsonTool("case_note_write", writeCaseNote))
-	mux.HandleFunc("/verify-identity", jsonTool("verify_identity", verifyIdentity))
+	// Card support: the identity check and the card system (cards.go).
+	newCardDesk().register(mux)
 	// Claims triage. claim_settle is the one the ToolPolicy guards; the other
 	// three are the reads and the escape hatch that make the refusal
 	// actionable rather than a dead end.
@@ -282,34 +288,5 @@ func writeCaseNote(req toolRequest) (any, int) {
 		CaseRef:  req.ref(),
 		NoteID:   "NOTE-" + req.ref(),
 		FiledFor: "R. Nkemdirim, Head of Credit Risk",
-	}, http.StatusOK
-}
-
-// verifyIdentity is the card-support demo's identity check. It requires BOTH
-// the SSN and the date of birth, so the agent genuinely has to put the SSN in
-// the tool call rather than merely mention it in conversation — the recorded
-// tool-call arguments are half of what the demo shows.
-//
-// Note what is missing: a log line naming the subject. jsonTool logs
-// req.ref(), which is empty here, and that is deliberate. The only identifier
-// this endpoint receives is an SSN, and a demo about not persisting SSNs must
-// not print one into a container log that someone may well open on camera.
-func verifyIdentity(req toolRequest) (any, int) {
-	h, ok := cardholders[req.SSN]
-	if !ok {
-		// Same answer for an unknown SSN and a mismatched DOB. Distinguishing
-		// them would turn this into an oracle that confirms whether a given
-		// SSN is on file.
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	if req.DOB != h.DOB {
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	return identityResponse{
-		Verified:    true,
-		CustomerRef: h.CustomerRef,
-		FullName:    h.FullName,
-		CardLast4:   h.CardLast4,
-		CardStatus:  h.CardStatus,
 	}, http.StatusOK
 }

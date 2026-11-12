@@ -69,6 +69,16 @@ func (i *Issuer) URL() string { return i.url }
 // the user, derives the workspace pseudonym from it, and lets nothing it mints
 // from the token outlive `exp`, so ttl must cover the conversation.
 func (i *Issuer) Sign(sub, email string, ttl time.Duration) (string, error) {
+	return i.SignFor(sub, email, "", ttl)
+}
+
+// SignFor is Sign with an audience: the token's `aud`, omitted when empty.
+//
+// Omnia's end-user plane (management-api's /api/v1/me routes, a Workspace's
+// spec.endUserAuth.oidc) requires an `aud` and matches it exactly. Its docs
+// ask for an audience of its own, never an agent's, so a token minted for a
+// conversation cannot also open the person's privacy controls.
+func (i *Issuer) SignFor(sub, email, audience string, ttl time.Duration) (string, error) {
 	if sub == "" {
 		return "", errors.New("demoidp: a token must name a subject")
 	}
@@ -80,12 +90,36 @@ func (i *Issuer) Sign(sub, email string, ttl time.Duration) (string, error) {
 		"nbf": now.Unix(),
 		"exp": now.Add(ttl).Unix(),
 	}
+	if audience != "" {
+		claims["aud"] = audience
+	}
 	if email != "" {
 		claims["email"] = email
 	}
 	t := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	t.Header["kid"] = i.kid
 	return t.SignedString(i.key)
+}
+
+// DiscoveryPath is where an issuer serves its OpenID Connect discovery
+// document. Omnia's end-user plane finds the JWKS through it, not from a
+// configured URL, and refuses a document naming another issuer.
+const DiscoveryPath = "/.well-known/openid-configuration"
+
+// ServeDiscovery serves the issuer's discovery document: the fields a token
+// verifier reads. There is no authorization endpoint, because nobody signs in
+// to this issuer.
+func (i *Issuer) ServeDiscovery(w http.ResponseWriter, _ *http.Request) {
+	doc := map[string]any{
+		"issuer":                                i.url,
+		"jwks_uri":                              i.url + JWKSPath,
+		"id_token_signing_alg_values_supported": []string{"RS256"},
+		"subject_types_supported":               []string{"public"},
+		"response_types_supported":              []string{"id_token"},
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "max-age=300")
+	_ = json.NewEncoder(w).Encode(doc)
 }
 
 // ServeJWKS serves the issuer's public key as a JWK set.

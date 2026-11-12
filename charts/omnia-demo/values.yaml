@@ -313,6 +313,9 @@ piiChat:
   # `consent_grants` array; see demos/pii-chat/RUNBOOK.md.
   memory:
     enabled: true
+    # Ambient retrieval into the prompt's memory_context variable: the agent knows
+    # the member from the first turn (pii-chat-agent.yaml).
+    retrieval: true
 
   # -- Run the agent from a script rather than a live model.
   #
@@ -358,6 +361,20 @@ piiChat:
       # Empty: the chart's appVersion.
       tag: ""
       pullPolicy: IfNotPresent
+    # -- Your data: the member's own consent, memories and erasure requests,
+    # through Omnia's end-user plane (management-api /api/v1/me). Turning it
+    # on sets the Workspace's spec.endUserAuth.oidc to the portal's issuer,
+    # with this audience, so management-api accepts the member's token and
+    # nothing else on those routes. Needs Enterprise and workspace.privacy.
+    myData:
+      enabled: false
+      # The aud of the member's token for the end-user plane. Never the
+      # agent's: a token minted for a conversation must not also open the
+      # member's privacy controls (Omnia's docs, "Let end users manage their
+      # own data").
+      audience: larkmere-members
+      # management-api, as the portal reaches it in the cluster.
+      managementURL: http://omnia-management-api.omnia:8080
 
   # -- The eval-gated canary (Larkmere Mutual).
   #
@@ -736,6 +753,8 @@ galaxy:
         memory:preferences: { ttl: { default: 730d, maxAge: 1095d } }
         memory:history: { ttl: { default: 1095d, maxAge: 1825d } }
         memory:identity: { ttl: { default: 1825d, maxAge: 1825d } }
+  # MemoryPolicy spec.consentRevocation.action: SoftDelete, HardDelete or Stop.
+  consentRevocation: SoftDelete
   graphExpansion:
     hops: 1
     maxAdded: 10

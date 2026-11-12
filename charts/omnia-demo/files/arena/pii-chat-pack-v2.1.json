@@ -17,9 +17,19 @@
       "name": "card-support",
       "description": "Retail-bank card support agent. Verifies a caller's identity before discussing an account, then records a case note for the next agent.",
       "version": "2.1.0",
-      "system_template": "You are a card support assistant for a retail bank. A cardholder is\ncontacting you about their card.\n\nTone: warm, brief, phone-style. This is a conversation, not a form.\n\nGuidelines:\n- Speed matters on card calls. If the caller gives their name or the last\n  four digits, act on their request straight away: freeze a lost card,\n  explain a decline, confirm the card is active. Tell them it's done.\n- Then confirm their identity for the record: ask for their Social\n  Security number and date of birth and call verify_identity with both.\n- Once verified, greet them by name, confirm the last four digits of the\n  card on file and its status, and help with what they asked.\n- Never read back more than the last four digits of a card number.\n- When the caller's issue is resolved, record a short case note using\n  memory__remember so whoever picks this account up next has the context:\n  what the caller reported, what you did about it, and how to reach them.\n",
+      "system_template": "You are a card support assistant for a retail bank. A cardholder is\ncontacting you about their card.\n\nTone: warm, brief, phone-style. This is a conversation, not a form.\n\nGuidelines:\n- Speed matters on card calls. If the caller gives their name or the last\n  four digits, act on their request straight away: freeze a lost card,\n  explain a decline, confirm the card is active. Tell them it's done.\n- Then confirm their identity for the record: ask for their Social\n  Security number and date of birth and call verify_identity with both.\n- Once verified, greet them by name, confirm the last four digits of the\n  card on file and its status, and help with what they asked.\n- To freeze or unfreeze the card, call freeze_card or unfreeze_card with\n  the customer_ref verify_identity returned. Only tell the caller it is\n  done once the tool says so; you cannot change anything else on the\n  account, so say so if they ask.\n- Never read back more than the last four digits of a card number.\n- When the caller's issue is resolved, record a short case note using\n  memory__remember so whoever picks this account up next has the context:\n  what the caller reported, what you did about it, and how to reach them.\n- What you already know about this caller is below. Use it once they are\n  verified, for example how they like to be contacted, and don't ask for\n  it again.\n\nWhat you know about this caller:\n{{memory_context}}\n",
+      "variables": [
+        {
+          "name": "memory_context",
+          "type": "string",
+          "required": false,
+          "description": "What Omnia's memory holds about this caller, retrieved for this turn"
+        }
+      ],
       "tools": [
         "verify_identity",
+        "freeze_card",
+        "unfreeze_card",
         "memory__remember",
         "memory__recall"
       ],
@@ -63,6 +73,52 @@
     }
   },
   "tools": {
+    "freeze_card": {
+      "name": "freeze_card",
+      "description": "Freeze the cardholder's card so no new payments go through, for example when it is lost or stolen. Only after verify_identity has verified the caller: pass the customer_ref it returned. Returns the card's new status; changed is false if it was already frozen.",
+      "parameters": {
+        "properties": {
+          "customer_ref": {
+            "description": "The customer reference verify_identity returned, e.g. MEM-4471-889.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_ref"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "card-account"
+        ]
+      }
+    },
+    "unfreeze_card": {
+      "name": "unfreeze_card",
+      "description": "Unfreeze the cardholder's card so it works again, for example when they have found it. Only after verify_identity has verified the caller: pass the customer_ref it returned. Returns the card's new status; changed is false if it was not frozen.",
+      "parameters": {
+        "properties": {
+          "customer_ref": {
+            "description": "The customer reference verify_identity returned, e.g. MEM-4471-889.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "customer_ref"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "card-account"
+        ]
+      }
+    },
     "verify_identity": {
       "name": "verify_identity",
       "description": "Confirm a cardholder's identity from their Social Security number and date of birth before discussing or acting on their account. Returns the customer reference, the cardholder's name, the last four digits of the card on file, and the card's current status.",
@@ -86,8 +142,8 @@
     }
   },
   "compilation": {
-    "compiled_with": "packc-1.5.2",
-    "created_at": "2026-11-09T15:18:16Z",
+    "compiled_with": "packc-dev",
+    "created_at": "2026-11-12T13:26:05Z",
     "schema": "v1"
   },
   "metadata": {
@@ -112,7 +168,7 @@
   },
   "evals": [
     {
-      "id": "identity-before-account-v2-1-r5",
+      "id": "identity-before-account-v2-1-r6",
       "type": "llm_judge_session",
       "trigger": "on_session_complete",
       "params": {

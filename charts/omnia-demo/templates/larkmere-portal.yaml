@@ -55,6 +55,16 @@ spec:
             - http://pii-chat.{{ .Values.namespace }}:8080
             - --issuer-url
             - {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" $) }}
+            {{- with .Values.piiChat.portal.myData }}
+            {{- if .enabled }}
+            # Your data: the member's consent, memories and erasure requests,
+            # forwarded to Omnia's end-user plane with a token for the member
+            # and this audience (the Workspace's spec.endUserAuth.oidc).
+            - --enduser-url={{ .managementURL }}
+            - --enduser-workspace={{ include "omnia-demo.workspaceName" $ }}
+            - --enduser-audience={{ .audience }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 8080

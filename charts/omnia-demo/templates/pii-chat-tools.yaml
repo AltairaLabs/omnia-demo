@@ -1,7 +1,8 @@
 {{- if .Values.piiChat.enabled }}
 {{- $ns := .Values.namespace }}
 ---
-# One tool, and it needs the SSN.
+# The identity check, which needs the SSN, and the card system, which takes the
+# customer reference the check returns.
 #
 # That is the design, not an oversight. The demo's claim is that a sensitive
 # value is redacted everywhere it comes to rest, and session-api redacts
@@ -62,6 +63,35 @@ spec:
         endpoint: http://pii-chat-identity.{{ $ns }}:8080/verify-identity
         method: POST
         contentType: application/json
+    # The card system (demos/mortgage-underwriting/cards.go). The model reads
+    # demos/pii-chat/arena/tools/{freeze,unfreeze}-card.tool.yaml; keep these
+    # in step with them.
+    {{- range $t := list (dict "name" "freeze_card" "path" "card-freeze" "verb" "Freeze") (dict "name" "unfreeze_card" "path" "card-unfreeze" "verb" "Unfreeze") }}
+    - name: {{ replace "_" "-" $t.name }}-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: {{ $t.name }}
+        description: "{{ $t.verb }} the cardholder's card. Only after verify_identity has verified the caller: pass the customer_ref it returned. Returns the card's new status; changed is false if it was already in that state."
+        inputSchema:
+          type: object
+          properties:
+            customer_ref:
+              type: string
+              description: "The customer reference verify_identity returned, e.g. MEM-4471-889."
+          required: ["customer_ref"]
+        outputSchema:
+          type: object
+          properties:
+            customer_ref: { type: string }
+            card_last4: { type: string }
+            card_status: { type: string }
+            changed: { type: boolean }
+      httpConfig:
+        endpoint: http://pii-chat-identity.{{ $ns }}:8080/{{ $t.path }}
+        method: POST
+        contentType: application/json
+    {{- end }}
 ---
 # Without this the demo does not run at all.
 #

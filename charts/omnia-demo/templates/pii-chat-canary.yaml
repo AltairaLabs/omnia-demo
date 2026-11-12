@@ -64,7 +64,7 @@ spec:
         arenaEval:
           # The suffix is the judge's revision (hack/build-canary-packs.sh
           # EVAL_REVISION); the two must match.
-          evalDef: identity-before-account-v{{ $slug }}-r5
+          evalDef: identity-before-account-v{{ $slug }}-r6
 {{- end }}
 ---
 # The eval worker's identity. The operator runs the worker as this

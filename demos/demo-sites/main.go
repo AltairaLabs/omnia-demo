@@ -49,6 +49,13 @@ func main() {
 	issuerURL := flag.String("issuer-url", "",
 		"sign a token for the member on each assistant connection, as this issuer (its JWKS at "+demoidp.JWKSPath+
 			"); empty: assert the member in headers only, and the conversation has no verified user")
+	var eu endUserPlane
+	flag.StringVar(&eu.url, "enduser-url", "",
+		"base URL of Omnia's management-api, whose end-user plane serves the member's My data page at "+myDataPrefix+
+			"; needs --issuer-url, --enduser-workspace and --enduser-audience; empty: My data is off")
+	flag.StringVar(&eu.workspace, "enduser-workspace", "", "the member's Omnia Workspace")
+	flag.StringVar(&eu.audience, "enduser-audience", "",
+		"the aud of the member's end-user token: the Workspace's spec.endUserAuth.oidc.audience, never an agent's")
 	flag.Parse()
 
 	b, err := lookupBrand(*name, m)
@@ -61,7 +68,7 @@ func main() {
 			log.Fatalf("issuer: %v", err)
 		}
 	}
-	handler, err := newServer(b, *agent, *backend, iss)
+	handler, err := newServer(b, *agent, *backend, iss, eu)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

@@ -37,9 +37,12 @@ before storage"*.
   kubectl --context <ctx> logs -n <ns> -l app.kubernetes.io/name=memory-<workspace>-default | grep "privacy middleware"
   ```
   You want `privacy middleware enabled` from both.
-- **No embedding provider is needed.** memory-api logs `providerConfigured:
-  false` and runs the consent classifier in regex-only mode, which is all this
-  demo requires.
+- **No embedding provider is needed.** The agent names each memory's consent
+  category itself (`memory__remember`'s `category`), and memory-api's
+  classifier can only raise it to a stricter one. Without an embedding Provider
+  that classifier is a keyword list (memory-api logs `consent classifier
+  running in regex-only mode`); with one, as on Azure, it also compares each
+  memory with example sentences per category.
 - For live mode, an `anthropic-api-key` Secret in the demo namespace
   (`piiChat.provider.secretRef`), or `llm.providerRef` naming a Provider that
   already exists there. Deterministic mode needs neither.
@@ -351,11 +354,11 @@ been wrong here twice.
   `--agent-url`), the facade's external listener. Without
   `externalAuth.edgeTrust` that listener rejects it, which is why the chart
   only adds edgeTrust together with the portal.
-- **Only Accounts is a real screen.** The other six rail destinations render a
-  titled empty state, because the design-project handoff shipped the dashboard
-  and the assistant panel but not Policies, Claims or Transfer. They are safe to
-  click — that was deliberate, since the previous behaviour was a silent bounce
-  back to the dashboard, which reads as a broken page — but do not linger on one.
+- **Documents, Retirement and Settings are empty states.** The design project
+  has no screen for them, so they render a titled placeholder. They are safe to
+  click (a silent bounce back to the dashboard read as a broken page), but do
+  not linger on one. Your data is a real screen: see
+  [CONSENT-RUNBOOK.md](CONSENT-RUNBOOK.md).
 - **The site is compiled into the binary** (`go:embed all:site`), so any change
   to `demos/demo-sites/site/larkmere-mutual/**` needs the image rebuilt; there is no volume
   to edit in place. If a `.dockerignore` ever excludes the tree the failure is
@@ -388,6 +391,33 @@ been wrong here twice.
 - **The Memory Galaxy masks memory content** (`"masked": true` in the projection
   response, Omnia #1643), so the memory text is not readable in that view. Read it
   from Postgres for a close-up.
+- **The agent knows the member from the first turn.** Ambient retrieval
+  (`piiChat.memory.retrieval`) fills the prompt's `memory_context` each turn,
+  and the member's preferences, identity and health memories are always in
+  it. Two things follow:
+  - **The profile is cached for 30 seconds per member.** A chat started
+    within 30 seconds of the one that saved a memory may not know it yet.
+    Leave a pause between the two calls of a "it remembers you" take.
+  - **Takes depend on earlier takes.** Reset Ellen between takes by erasing
+    her data: `POST /api/me/privacy/erasure` on the portal, or Your data's
+    Erase button. It deletes her conversations and memories, not her card.
+- **A memory that was not saved.** Find out why in this order:
+  1. The session's stored `memory__remember` call (dashboard, Sessions, the
+     call, Raw): the text and category the agent sent, and what it was told.
+     A refused save comes back to the agent as an error, not "remembered".
+  2. memory-api's `memory write suppressed` log line, with the reason and
+     category but never the content:
+     ```bash
+     kubectl --context <ctx> -n <ns> logs -l app.kubernetes.io/component=memory-api --tail=-1 --since=30m | grep "memory write suppressed"
+     ```
+     `--tail=-1` matters: with `-l`, kubectl returns only the last 10 lines
+     of each pod.
+  3. `omnia_memory_writes_suppressed_total{category,reason}` and
+     `omnia_memory_classify_overrides_total{from,to,source}` on memory-api's
+     `:9090`, for whether the classifier raised the agent's category.
+  A memory that WAS saved but that the agent did not use is a retrieval
+  question, not a storage one: read the next session's system prompt in the
+  dashboard, which shows what `memory_context` rendered.
 - **`enforcement-stats` lags.** memory-api's audit events drain to privacy-api
   asynchronously (the e2e allows three minutes), and the dashboard hook
   refetches every five minutes. Local metrics on memory-api `:9090` are

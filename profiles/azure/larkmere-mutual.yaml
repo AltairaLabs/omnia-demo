@@ -16,6 +16,9 @@ piiChat:
   enabled: true
   portal:
     enabled: true
+    # Your data: consent, memories and erasure, on Omnia's end-user plane.
+    myData:
+      enabled: true
   # The eval-gated canary: `make canary VERSION=2.0` (promotes) or 2.1 (rolls back).
   canary:
     enabled: true

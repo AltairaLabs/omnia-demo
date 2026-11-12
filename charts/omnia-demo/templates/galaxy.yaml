@@ -57,6 +57,12 @@ spec:
       - { name: next, kind: sequence, inverse: previous, sourceTypes: [section, chunk], targetTypes: [section, chunk], directed: true }
   tiers:
     {{- toYaml .Values.galaxy.retention | nindent 4 }}
+  # What a member's withdrawn consent does to the memories already stored in
+  # that category: SoftDelete and HardDelete both delete them, Stop keeps them.
+  # Omnia's default is SoftDelete; stated here because the Your data demo
+  # depends on it.
+  consentRevocation:
+    action: {{ .Values.galaxy.consentRevocation }}
   {{- with .Values.galaxy.graphExpansion }}
   # Recall walks the graph: a question about a claim reaches the procedure
   # that governs its type and the guidance about it.

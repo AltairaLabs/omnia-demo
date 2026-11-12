@@ -52,6 +52,31 @@ Add a row when you add a stand-in.
     true of any edge-trust deployment. The real system's network controls are
     what make it safe.
 
+### Your data (the Larkmere portal's `/api/me/`, `piiChat.portal.myData`)
+
+- **Fakes:** the member's sign-in to their own privacy controls. The portal
+  signs a second token for Ellen, with the audience `larkmere-members`, and
+  forwards her consent, memory and erasure calls with it.
+- **Real system:** the customer's identity provider issues the member a token
+  for Omnia's end-user plane, and the customer's application sends it to
+  management-api's `/api/v1/me/workspaces/<name>` routes.
+- **What the stand-in does:** it serves an OpenID Connect discovery document
+  (`/.well-known/openid-configuration`), because the end-user plane finds the
+  issuer's keys through discovery. The Workspace's `spec.endUserAuth.oidc`
+  names the portal's issuer and that audience. The proxy forwards only the
+  page's routes, never the plane's MCP endpoint or opt-outs, and never the
+  browser's cookie, Authorization or identity headers.
+- **Downstream:**
+  - **The audience is not the agent's.** The conversation's token has no
+    audience; this one has `larkmere-members`. Omnia's docs ask for that
+    split, so that a token for a conversation cannot open the person's privacy
+    controls. Don't merge them.
+  - **Omnia picks the member from the token alone.** No path, query or body
+    names a subject, so the page cannot read or erase anyone else's data.
+  - **Erasure deletes Ellen's real conversations and memories.** She has none
+    in the Galaxy corpus, so the Galaxy is untouched, and she starts afresh
+    the next time she talks to card support.
+
 ### Scripted callers (`demos/card-callers`)
 
 - **Fakes:** Larkmere's telephony channel and the cardholders on it, four
@@ -82,6 +107,12 @@ Add a row when you add a stand-in.
     invocation at a time.
   - **Cardholders are a fixed list in `identitydata.go`.** A caller
     `verify_identity` doesn't know is refused.
+  - **Freezing is real, within the stub.** `freeze_card` and `unfreeze_card`
+    (`cards.go`) change the status `verify_identity` reports, so a card frozen
+    in one conversation is frozen in the next, until the stub restarts. They
+    take the customer reference, never the SSN. Before they existed, card
+    support told callers their card was frozen with no tool to freeze it:
+    give an agent the tools for what it is asked to do, or it will pretend.
   - **Limits are deliberately not enforced here.** The stubs leave the controls
     under demonstration to the platform: the claims system does not enforce
     the £500 delegated-authority limit, because the ToolPolicy does. Do not add

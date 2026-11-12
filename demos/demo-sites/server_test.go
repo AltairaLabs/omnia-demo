@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
@@ -17,7 +18,7 @@ func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, agentURL, backendURL, nil)
+	h, err := newServer(b, agentURL, backendURL, nil, endUserPlane{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -243,7 +244,7 @@ func TestAssistantForwardsMemberToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := lookupBrand("larkmere-mutual", member{})
-	h, err := newServer(b, agent.URL, "", iss)
+	h, err := newServer(b, agent.URL, "", iss, endUserPlane{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,6 +264,126 @@ func TestAssistantForwardsMemberToken(t *testing.T) {
 	}
 	if resp, body := get(t, srv.URL+demoidp.JWKSPath); resp.StatusCode != http.StatusOK || !strings.Contains(body, `"RS256"`) {
 		t.Fatalf("jwks: %d %s", resp.StatusCode, body)
+	}
+}
+
+// myDataSite serves Larkmere with My data proxied to mgmt, returning the site
+// and what mgmt last received.
+func myDataSite(t *testing.T) (*httptest.Server, *http.Request) {
+	t.Helper()
+	got := &http.Request{}
+	mgmt := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*got = *r.Clone(r.Context())
+		_, _ = io.WriteString(w, "{}")
+	}))
+	t.Cleanup(mgmt.Close)
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	h, err := newServer(b, "http://127.0.0.1:1", "", iss,
+		endUserPlane{url: mgmt.URL, workspace: "larkmere-mutual", audience: "larkmere-members"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv, got
+}
+
+func do(t *testing.T, method, url string, hdr map[string]string) int {
+	t.Helper()
+	req, _ := http.NewRequest(method, url, strings.NewReader(`{}`))
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode
+}
+
+// My data reaches the member's own end-user routes with a token for the
+// member and the plane's audience; nothing of the browser's passes.
+func TestMyDataForwardsAsTheMember(t *testing.T) {
+	srv, got := myDataSite(t)
+	code := do(t, http.MethodPut, srv.URL+myDataPrefix+"privacy/consent", map[string]string{
+		"Authorization": "Bearer from-the-browser", "Cookie": "session=operator", "X-Omnia-User-Id": "someone-else",
+	})
+	if code != http.StatusOK || got.Method != http.MethodPut ||
+		got.URL.Path != "/api/v1/me/workspaces/larkmere-mutual/privacy/consent" {
+		t.Fatalf("status %d, forwarded %s %s", code, got.Method, got.URL.Path)
+	}
+	if got.Header.Get("Cookie") != "" || got.Header.Get("X-Omnia-User-Id") != "" {
+		t.Fatalf("browser identity passed: %v", got.Header)
+	}
+	tok, ok := strings.CutPrefix(got.Header.Get("Authorization"), "Bearer ")
+	if !ok || tok == "from-the-browser" {
+		t.Fatalf("Authorization %q", got.Header.Get("Authorization"))
+	}
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(tok, claims); err != nil {
+		t.Fatal(err)
+	}
+	if claims["sub"] != "4471-889" || claims["aud"] != "larkmere-members" {
+		t.Fatalf("token claims %v", claims)
+	}
+}
+
+// Memories pass only their paging and type filters; nothing names a subject.
+func TestMyDataMemoryQuery(t *testing.T) {
+	srv, got := myDataSite(t)
+	if code := do(t, http.MethodGet, srv.URL+myDataPrefix+"memories?limit=5&virtual_user_id=someone-else", nil); code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	if got.URL.RawQuery != "limit=5" {
+		t.Fatalf("query %q", got.URL.RawQuery)
+	}
+	if code := do(t, http.MethodDelete, srv.URL+myDataPrefix+"memories/abc-123", nil); code != http.StatusOK ||
+		got.URL.Path != "/api/v1/me/workspaces/larkmere-mutual/memories/abc-123" {
+		t.Fatalf("forget: status %d path %q", code, got.URL.Path)
+	}
+}
+
+// Only My data's routes pass: not the plane's MCP endpoint or opt-outs, not a
+// method a route does not take, not a cross-origin write.
+func TestMyDataRefusals(t *testing.T) {
+	srv, _ := myDataSite(t)
+	for _, c := range []struct {
+		method, path string
+		hdr          map[string]string
+		want         int
+	}{
+		{http.MethodPost, "mcp", nil, http.StatusNotFound},
+		{http.MethodPost, "privacy/opt-out", nil, http.StatusNotFound},
+		{http.MethodDelete, "privacy/consent", nil, http.StatusNotFound},
+		{http.MethodGet, "memories/abc", nil, http.StatusNotFound},
+		{http.MethodDelete, "memories/a%2Fb", nil, http.StatusNotFound},
+		{http.MethodPost, "privacy/erasure", map[string]string{"Origin": "https://elsewhere.example"}, http.StatusForbidden},
+	} {
+		if code := do(t, c.method, srv.URL+myDataPrefix+c.path, c.hdr); code != c.want {
+			t.Errorf("%s %s: status %d, want %d", c.method, c.path, code, c.want)
+		}
+	}
+}
+
+// The issuer's discovery document is served beside its JWKS.
+func TestDiscoveryServed(t *testing.T) {
+	srv, _ := myDataSite(t)
+	if resp, body := get(t, srv.URL+demoidp.DiscoveryPath); resp.StatusCode != http.StatusOK ||
+		!strings.Contains(body, `"jwks_uri":"http://larkmere-portal.test:8080/.well-known/jwks.json"`) {
+		t.Fatalf("discovery: %d %s", resp.StatusCode, body)
+	}
+}
+
+func TestMyDataNeedsIssuer(t *testing.T) {
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	if _, err := newServer(b, "http://127.0.0.1:1", "", nil,
+		endUserPlane{url: "http://mgmt", workspace: "w", audience: "a"}); err == nil {
+		t.Fatal("My data without an issuer would forward no credential")
 	}
 }
 

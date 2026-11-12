@@ -75,6 +75,17 @@ spec:
   privacy:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- $md := .Values.piiChat.portal.myData }}
+  {{- if and .Values.piiChat.enabled .Values.piiChat.portal.enabled $md.enabled }}
+  # The end-user plane (management-api /api/v1/me/workspaces/<name>): members
+  # reach their own consent, memories and erasure with a token from the member
+  # portal, the demo's stand-in identity provider (docs/stand-ins.md). The
+  # audience is the plane's own, never an agent's.
+  endUserAuth:
+    oidc:
+      issuer: {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" .) | quote }}
+      audience: {{ required "piiChat.portal.myData.audience" $md.audience | quote }}
+  {{- end }}
   {{- with .Values.workspace.costControls }}
   costControls:
     {{- toYaml . | nindent 4 }}

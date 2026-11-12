@@ -190,14 +190,34 @@ const (
 	receiptsPath = "/api/assistant/receipts"
 )
 
+// myDataPrefix is where the portal's My data page calls: the member's own
+// consent, memories and erasure requests, proxied to Omnia's end-user plane.
+const myDataPrefix = "/api/me/"
+
+// endUserPlane is Omnia's end-user API for the member's workspace:
+// management-api's /api/v1/me/workspaces/<workspace> routes, which accept only
+// the person's own bearer token, checked against the Workspace's
+// spec.endUserAuth.oidc (this site's issuer, and audience).
+type endUserPlane struct {
+	// url is management-api's base URL; empty turns My data off.
+	url       string
+	workspace string
+	// audience is the `aud` of the member's token for this plane, the
+	// Workspace's spec.endUserAuth.oidc.audience. Never the agent's.
+	audience string
+}
+
 // newServer returns the site handler: the embedded site, the assistant proxy,
 // a redirect from the root to the brand's public site, and a health endpoint.
 // backendURL may be empty, in which case the consent and receipt routes 404.
 //
 // iss, when set, signs a token for the member on every assistant connection
-// and serves its JWKS at demoidp.JWKSPath; nil asserts the member in headers
-// only.
-func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer) (http.Handler, error) {
+// and serves its JWKS at demoidp.JWKSPath and its discovery document at
+// demoidp.DiscoveryPath; nil asserts the member in headers only.
+//
+// eu, when its url is set, serves My data at myDataPrefix. It needs iss: the
+// end-user plane takes nothing but the member's token.
+func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane) (http.Handler, error) {
 	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
@@ -225,6 +245,14 @@ func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer) (http.
 	mux := http.NewServeMux()
 	if iss != nil {
 		mux.HandleFunc(demoidp.JWKSPath, iss.ServeJWKS)
+		mux.HandleFunc(demoidp.DiscoveryPath, iss.ServeDiscovery)
+	}
+	if eu.url != "" {
+		myData, err := myDataProxy(eu, b.who, iss)
+		if err != nil {
+			return nil, err
+		}
+		mux.Handle(myDataPrefix, myData)
 	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -448,6 +476,109 @@ func accountProxy(backendURL string, m member) (http.Handler, error) {
 		proxy.ServeHTTP(w, r)
 	}), nil
 }
+
+// myDataRoutes are the end-user routes My data may reach, by path under
+// myDataPrefix and method. Everything else under the prefix is refused: the
+// plane also serves an MCP endpoint and opt-outs, which this page does not
+// offer, and a proxy that forwarded any path would offer them anyway.
+var myDataRoutes = map[string][]string{
+	"privacy/consent": {http.MethodGet, http.MethodPut},
+	"privacy/erasure": {http.MethodGet, http.MethodPost},
+	"memories":        {http.MethodGet},
+}
+
+// memoryQuery are the query parameters GET memories passes on. The subject is
+// never among them: the plane takes it from the token alone.
+var memoryQuery = []string{"limit", "offset", "type"}
+
+// myDataRoute reports whether method on rest (the path under myDataPrefix) is
+// a route My data may reach. DELETE memories/<id> forgets one memory.
+func myDataRoute(method, rest string) bool {
+	if id, ok := strings.CutPrefix(rest, "memories/"); ok {
+		return method == http.MethodDelete && id != "" && !strings.ContainsAny(id, "/?#%") && id != "." && id != ".."
+	}
+	for _, m := range myDataRoutes[rest] {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+// myDataProxy forwards the My data page's calls to Omnia's end-user plane as
+// the signed-in member: a bearer token this site signs for them, with the
+// plane's audience, and nothing of the browser's. The plane picks the subject
+// from that token alone, so the page can only ever see and change the member's
+// own data.
+//
+//	GET|PUT   <site>/api/me/privacy/consent  -> <mgmt>/api/v1/me/workspaces/<ws>/privacy/consent
+//	GET|POST  <site>/api/me/privacy/erasure  -> .../privacy/erasure
+//	GET       <site>/api/me/memories         -> .../memories
+//	DELETE    <site>/api/me/memories/<id>    -> .../memories/<id>
+func myDataProxy(eu endUserPlane, m member, iss *demoidp.Issuer) (http.Handler, error) {
+	if iss == nil {
+		return nil, errors.New("my data: the end-user plane takes only the member's token, so it needs --issuer-url")
+	}
+	if eu.workspace == "" || eu.audience == "" {
+		return nil, errors.New("my data: a workspace and an audience are required")
+	}
+	target, err := url.Parse(eu.url)
+	if err != nil {
+		return nil, err
+	}
+	base := path.Join(target.Path, "/api/v1/me/workspaces", url.PathEscape(eu.workspace))
+
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			rest := strings.TrimPrefix(pr.In.URL.Path, myDataPrefix)
+			pr.Out.URL.Path = base + "/" + rest
+			pr.Out.URL.RawPath = ""
+			q := url.Values{}
+			if rest == "memories" {
+				for _, k := range memoryQuery {
+					for _, v := range pr.In.URL.Query()[k] {
+						q.Add(k, v)
+					}
+				}
+			}
+			pr.Out.URL.RawQuery = q.Encode()
+			// The browser's credentials and claimed identity never pass: the
+			// dashboard's session cookie (the sites share its host), any
+			// Authorization, and Omnia's identity headers.
+			for _, h := range []string{"Origin", "Cookie", "Authorization", "X-Omnia-User-Id", "X-Omnia-User-Email"} {
+				pr.Out.Header.Del(h)
+			}
+			tok, err := iss.SignFor(m.id, m.email, eu.audience, myDataTokenTTL)
+			if err != nil {
+				log.Printf("my data: signing the member token: %v", err)
+				return
+			}
+			pr.Out.Header.Set("Authorization", "Bearer "+tok)
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			log.Printf("my data proxy failed: %v", err)
+			http.Error(w, "privacy service unavailable", http.StatusBadGateway)
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !myDataRoute(r.Method, strings.TrimPrefix(r.URL.Path, myDataPrefix)) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		// Revoking consent and requesting erasure are state changes made from
+		// a browser: another site must not be able to make them for the member.
+		if !sameOrigin(r) {
+			log.Printf("my data: refused cross-origin %s %s from %q", r.Method, r.URL.Path, r.Header.Get("Origin"))
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}), nil
+}
+
+// myDataTokenTTL bounds a My data token: one is signed per call.
+const myDataTokenTTL = 5 * time.Minute
 
 // sameOrigin reports whether the request's Origin, if any, matches the host it
 // was sent to.
