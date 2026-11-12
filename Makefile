@@ -24,7 +24,7 @@
 SHELL := bash
 
 PROFILE          ?= azure
-TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners
+TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners halvern-research
 KUBE_CONTEXT     ?= aks-omnia-demo
 OMNIA_AZURE      ?= ../omnia-azure
 CHART            ?= charts/omnia-demo

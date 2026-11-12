@@ -1,0 +1,128 @@
+{{- if .Values.researchFunction.enabled }}
+---
+# Halvern Partners' research function (demo 10, "research on a budget"): one
+# client matter per invocation, run in batches by the knowledge team
+# (hack/research-batch.sh), under the workspace's daily budget.
+#
+# A MOCK Provider. The demo's point is that spend stops at the cap, and
+# spending real money to show that would be burning it: the mock answers with
+# a fixed response and reports a cost at PromptKit's built-in mock rate ($0.01
+# per 1,000 tokens), so the workspace's cap is set to fractions of a cent
+# (profiles/azure/halvern-research.yaml). A `pricing` block here would be
+# ignored: beta.23 doesn't apply a Provider's pricing to the mock.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: research-mock
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: mock
+  role: llm
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: research-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: research-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: research-pack-v1
+  version: "1.0.0"
+---
+# Compiled from demos/research/arena: hack/build-packs.sh research.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: research-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/research-pack.json" | indent 4 }}
+---
+# What the mock answers, every time: valid JSON for the output schema below, so
+# the facade's output validation passes. The summary is the same for every
+# matter, which is fine: what the demo shows is the spend.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: research-mock-script
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  mock-responses.yaml: |
+    defaultResponse: '{"summary": "The change brings this matter''s closed-book products into scope. The supervising lawyer should check whether the client''s communications to existing customers meet the outcomes standard, and when the client last reviewed fair value for those products."}'
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: research
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: research
+  # The mock provider's script: the runtime reads these from the AgentRuntime.
+  annotations:
+    omnia.altairalabs.ai/mock-provider: "true"
+    omnia.altairalabs.ai/mock-config-path: "/etc/omnia/mock/mock-responses.yaml"
+spec:
+  mode: function
+  promptPackRef:
+    name: research-pack
+  facades:
+    - type: rest
+      port: 8080
+      async:
+        enabled: false
+  # The knowledge team's batch job calls the function with a client key minted
+  # in the dashboard (the key never lives in a CR). hack/research-batch.sh
+  # sends it as a bearer token.
+  externalAuth:
+    clientKeys: {}
+  inputSchema:
+    type: object
+    required:
+      - matter_ref
+      - change
+    properties:
+      matter_ref:
+        type: string
+        description: "The client matter, e.g. M-17."
+      change:
+        type: string
+        description: "The regulatory change to assess."
+  # Free-form, because the mock can't honour a structured-output request; the
+  # facade still validates the answer against outputSchema.
+  outputFormat: text
+  outputSchema:
+    type: object
+    additionalProperties: false
+    required:
+      - summary
+    properties:
+      summary:
+        type: string
+        description: "What the change means for the matter, in three or four sentences."
+  runtime:
+    replicas: 1
+    volumes:
+      - name: mock-script
+        configMap:
+          name: research-mock-script
+    volumeMounts:
+      - name: mock-script
+        mountPath: /etc/omnia/mock
+  providers:
+    - name: default
+      providerRef:
+        name: research-mock
+{{- end }}

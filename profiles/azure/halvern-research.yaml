@@ -1,0 +1,20 @@
+# Halvern Partners' research workspace: the knowledge team's batch research
+# function, under a small daily budget that blocks (demo 10). A workspace of
+# its own, because a budget covers every agent in its workspace.
+workspace:
+  displayName: Halvern Partners Research
+  description: Halvern Partners' knowledge team. Batch research on a daily budget.
+  # Half a cent, on purpose, spent by a mock Provider at its built-in rate
+  # ($0.01 per 1,000 tokens, about $0.0008 a run): seven or so research runs
+  # reach it. A Provider's `pricing` is not applied to the mock on beta.23,
+  # so the cap is set to the mock's own rate rather than the rate raised.
+  costControls:
+    dailyBudget: "0.005"
+    monthlyBudget: "0.10"
+    budgetExceededAction: block
+    alertThresholds:
+      - percent: 50
+      - percent: 80
+
+researchFunction:
+  enabled: true
