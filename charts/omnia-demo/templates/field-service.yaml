@@ -50,11 +50,10 @@ data:
   pack.json: |
 {{ .Files.Get "files/arena/field-service-pack.json" | indent 4 }}
 ---
-# Wrenmoor Energy's field-service copilot. A chat agent with no tools at all:
-# what it knows comes from the field manuals in institutional memory, which
-# the memory job ingests (memory.enabled with
-# memory.fixtures: wrenmoor-field-procedures) and the runtime retrieves into
-# the prompt's {{ "{{" }}memory_context{{ "}}" }} every turn.
+# Wrenmoor Energy's field-service copilot. What it knows comes from the field
+# manuals in institutional memory, which the memory job ingests (memory.enabled
+# with memory.fixtures: wrenmoor-field-procedures). It looks them up with
+# memory__recall, so each lookup is a tool call on the session record.
 #
 # Without the documents in memory the copilot still runs, and says the manuals
 # do not cover the question — which is the prompt working, not the demo.
@@ -71,15 +70,13 @@ spec:
     name: field-service-pack
   memory:
     enabled: true
-    # Read-only over a curated store: ambient retrieval on, the
-    # memory__remember / memory__recall tools off. An engineer's chat is no
-    # place to rewrite a safety manual.
+    # The memory tools on, ambient retrieval off. The pack's allowed_tools
+    # offers the model memory__recall and memory__open only. The tools need a
+    # verified user: the console's operator, or a signed-in engineer.
     tools:
-      enabled: false
-    retrieval:
       enabled: true
-      strategy: {{ $fs.retrieval.strategy }}
-      limit: {{ $fs.retrieval.limit }}
+    retrieval:
+      enabled: false
   facades:
     - type: websocket
       port: 8080

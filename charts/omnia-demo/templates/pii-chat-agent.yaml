@@ -192,6 +192,12 @@ spec:
       # the member between takes by erasing their data (Your data in the
       # portal, or the RUNBOOK's erasure step), not by turning this off.
       enabled: {{ $pc.memory.retrieval }}
+      # Semantic and few. The default (keyword, 10) matched any shared document
+      # with "stolen" in it, so a question about a card abroad brought in the
+      # home-burglary claims procedure: noise in the prompt, and a prompt that
+      # changed every turn.
+      strategy: semantic
+      limit: 4
 {{- end }}
   facades:
     - type: websocket

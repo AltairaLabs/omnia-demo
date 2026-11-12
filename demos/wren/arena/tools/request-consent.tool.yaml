@@ -9,8 +9,8 @@ metadata:
 spec:
   name: request_consent
   description: >-
-    Ask the customer, in their portal, to agree to a change on their account
-    before you make it. They see your summary with "Switch me" and "Not now"
+    Ask the customer, in their portal, to agree to a change on their account.
+    They see your summary with "Switch me" and "Not now"
     buttons. Returns approved true with a consent_id when they agree; the call
     is denied when they decline.
   input_schema:

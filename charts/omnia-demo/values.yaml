@@ -601,12 +601,9 @@ fieldService:
     secretRef: anthropic-api-key
     maxTokens: 1024
 
-  # Ambient retrieval from memory each turn, into the prompt's
-  # {{memory_context}}. The memory tools stay off: the copilot reads the
-  # manuals and has no business writing to them.
-  retrieval:
-    strategy: semantic
-    limit: 4
+  # The copilot looks the manuals up with memory__recall (a tool call on the
+  # session record), not ambient retrieval. The pack offers it recall and open
+  # only: it has no business writing to memory.
 
 # ---------------------------------------------------------------------------
 # wren — Wrenmoor Energy's customer assistant: consent before a contract change

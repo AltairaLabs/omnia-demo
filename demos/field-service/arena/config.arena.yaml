@@ -5,9 +5,9 @@
 #
 # The manuals are NOT in this pack. They are documents in
 # charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/, ingested into the workspace's
-# institutional memory by the chart's memory job, and retrieved into the
-# prompt's {{memory_context}} each turn. Updating a procedure means updating a
-# document, not redeploying the agent.
+# institutional memory by the chart's memory job, and looked up by the copilot
+# with memory__recall. Updating a procedure means updating a document, not
+# redeploying the agent.
 #
 # Regenerate with: hack/build-packs.sh field-service
 apiVersion: promptkit.altairalabs.ai/v1alpha1
@@ -22,7 +22,8 @@ spec:
   providers:
     - file: providers/mock.provider.yaml
 
-  # No tools. The copilot reads; everything it knows comes from memory.
+  # No pack tools. The copilot's one tool is the runtime's memory__recall
+  # (with memory__open), which the platform registers, not the pack.
   scenarios:
     - file: scenarios/isolation-before-work.scenario.yaml
     - file: scenarios/meter-exchange.scenario.yaml

@@ -93,7 +93,7 @@ spec:
       type: client
       tool:
         name: request_consent
-        description: "Ask the customer, in their portal, to agree to a change on their account before you make it. Returns approved with a consent_id when they agree; denied when they decline."
+        description: "Ask the customer, in their portal, to agree to a change on their account. Returns approved with a consent_id when they agree; denied when they decline."
         inputSchema:
           type: object
           properties:
@@ -116,14 +116,18 @@ spec:
       timeout: 30s
       tool:
         name: switch_tariff
-        description: "Switch the signed-in customer's tariff from a future date, on the consent_id request_consent returned."
+        description: "Switch the signed-in customer's tariff from a future date. The customer can switch back within 14 days at no cost."
         inputSchema:
           type: object
           properties:
             tariff: { type: string, enum: ["moor-steady", "moor-flex"], description: "The tariff to switch to." }
             effective_date: { type: string, description: "When the change takes effect, YYYY-MM-DD." }
-            consent_id: { type: string, description: "The consent_id from request_consent, exactly as returned." }
-          required: ["tariff", "effective_date", "consent_id"]
+            consent_id: { type: string, description: "The customer's consent reference for this change, if you have one." }
+          # consent_id is optional in the schema on purpose: requiring it would
+          # tell the model the rule. The ToolPolicy below refuses a switch
+          # without one, and the account system refuses one the customer didn't
+          # create.
+          required: ["tariff", "effective_date"]
       httpConfig:
         endpoint: {{ $acct }}/wren/switch
         method: POST

@@ -3,13 +3,13 @@
 # Wrenmoor Energy's field-service copilot. Engineers in vans ask about
 # procedures; the answers come from the field manuals, ingested as
 # institutional memory (charts/omnia-demo/files/fixtures/
-# wrenmoor-field-procedures/) and placed into
-# {{memory_context}} by the runtime's ambient retrieval every turn.
+# wrenmoor-field-procedures/).
 #
-# {{memory_context}} is load-bearing: Omnia runs retrieval only for a pack
-# whose prompt renders it. Without it the agent answers from the model's
-# general knowledge of electrical work, which for a safety procedure is the
-# failure, not a fallback.
+# The copilot looks the manuals up with memory__recall, a tool call, rather
+# than having passages pasted into its prompt by ambient retrieval. The lookup
+# is then on the session record: what it searched for and which manual
+# passages came back, which is what an engineer's supervisor or an auditor
+# needs to see. The system prompt stays fixed for the whole conversation.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
 metadata:
@@ -27,10 +27,12 @@ spec:
     procedures on the distribution network: switching, isolation and safety,
     fault finding, and meter exchange.
 
-    Answer from the Wrenmoor Energy field manuals below. Quote the procedure's
-    steps, limits and references as written there. If the manuals do not cover
-    the question, say so and tell the engineer to call the Network Control
-    Centre; do not fill the gap from general knowledge.
+    Answer from the Wrenmoor Energy field manuals. Before you answer a question
+    about a procedure, search the manuals with memory__recall, and open a
+    passage with memory__open if recall returns only a preview. Quote the
+    procedure's steps, limits and references as written there. If the manuals
+    do not cover the question, say so and tell the engineer to call the
+    Network Control Centre; do not fill the gap from general knowledge.
 
     Safety comes first, and it is not yours to relax:
     - Never tell anyone that work may start on equipment that has not been
@@ -44,16 +46,12 @@ spec:
 
     Engineers read you on a phone in a van. Keep answers short: numbered steps
     for a procedure, one line each, with the manual reference at the end.
-
-    Field manuals:
-    {{memory_context}}
-  # Declared so the pack validates. Not a parameter anyone passes: the runtime
-  # writes it each turn from retrieval, and renders it empty when a turn
-  # retrieves nothing.
-  variables:
-    - name: memory_context
-      type: string
-      required: false
-      description: Field-manual passages retrieved from institutional memory for this turn
   parameters:
     temperature: 0.2
+  # Read-only over the manuals: recall and open, never remember, list or
+  # forget. An engineer's chat is no place to write to the society's memory.
+  # The memory tools are the runtime's, not the pack's; this list is what the
+  # model is offered of them.
+  allowed_tools:
+    - memory__recall
+    - memory__open
