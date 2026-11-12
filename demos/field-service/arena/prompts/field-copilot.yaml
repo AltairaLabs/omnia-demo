@@ -56,10 +56,11 @@ spec:
     for a procedure, one line each, with the manual reference at the end.
   parameters:
     temperature: 0.2
-  # Read-only over the manuals: recall and open, never remember, list or
-  # forget. An engineer's chat is no place to write to the society's memory.
-  # The memory tools are the runtime's, not the pack's; this list is what the
-  # model is offered of them.
+  # Documentation only: PromptKit offers its memory capability's tools
+  # (remember, list, forget too) whatever this list says. That's harmless
+  # here: a remember from the copilot writes to the engineer's own memory, and
+  # no agent can write to the manuals, which are institutional memory only
+  # system services write.
   allowed_tools:
     - memory__recall
     - memory__open

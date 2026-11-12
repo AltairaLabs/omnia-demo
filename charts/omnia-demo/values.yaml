@@ -602,8 +602,8 @@ fieldService:
     maxTokens: 1024
 
   # The copilot looks the manuals up with memory__recall (a tool call on the
-  # session record), not ambient retrieval. The pack offers it recall and open
-  # only: it has no business writing to memory.
+  # session record), not ambient retrieval. It can't write to the manuals:
+  # only system services write institutional memory.
 
 # ---------------------------------------------------------------------------
 # wren — Wrenmoor Energy's customer assistant: consent before a contract change

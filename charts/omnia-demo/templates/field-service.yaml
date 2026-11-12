@@ -70,9 +70,11 @@ spec:
     name: field-service-pack
   memory:
     enabled: true
-    # The memory tools on, ambient retrieval off. The pack's allowed_tools
-    # offers the model memory__recall and memory__open only. The tools need a
-    # verified user: the console's operator, or a signed-in engineer.
+    # The memory tools on, ambient retrieval off. The tools need a verified
+    # user: the console's operator, or a signed-in engineer. All five are
+    # offered (PromptKit ignores allowed_tools for its capabilities); the
+    # manuals stay read-only because only system services write institutional
+    # memory.
     tools:
       enabled: true
       # Appended to the memory tools' descriptions. A live model asked for
