@@ -75,6 +75,14 @@ spec:
     # verified user: the console's operator, or a signed-in engineer.
     tools:
       enabled: true
+      # Appended to the memory tools' descriptions. A live model asked for
+      # limit 1, got the manual's opening section, and answered the steps from
+      # general knowledge.
+      notes: >-
+        The field manuals are stored in sections, one memory per section. Ask
+        recall for at least 6 results and don't filter by kinds or types. If
+        the sections you get don't contain the steps the engineer asked about,
+        search again with different words before answering.
     retrieval:
       enabled: false
   facades:
