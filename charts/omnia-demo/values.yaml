@@ -428,15 +428,20 @@ claimsTriage:
   # length, stream timeout), which a shared Provider does not carry.
   providerRef: ""
   enabled: false
-  # -- The agent looks up the society's procedure for each claim's peril in
-  # institutional memory (memory__recall). Needs memory.enabled for the
-  # documents. The flood gap demo (demo 11) adds the flood procedure on stage:
-  # demos/claims-triage/RUNBOOK.md.
+  # -- The assessor reads the society's guidance for members (what happens
+  # next on a claim like this) from institutional memory, by ambient
+  # retrieval. Needs memory.enabled for the documents. Guidance only: it holds
+  # no rule the assessor must apply.
   procedures: false
+  # -- CP-7, flood claims go to Flood Response whatever their amount, as a
+  # ToolPolicy rule. Off until demo 11 turns it on: the flood gap is that the
+  # society had no such rule. The policy asks the claims system for the claim's
+  # peril (/policy/claim-peril); the assessor is never told the rule.
+  floodRule: false
 
   # The claims system stub. Same image and same Go binary as the mortgage
-  # stubs — it serves /claim, /claim-policy, /claim-settle and /claim-refer
-  # alongside that demo's endpoints and the card-support identity check.
+  # stubs: it serves /claim, /claim-settle, /claim-refer and the policy's
+  # /policy/claim-peril lookup alongside that demo's endpoints.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
     # Empty: the chart's appVersion.
@@ -452,10 +457,9 @@ claimsTriage:
 
   # Deterministic mode swaps the live provider for the mock and a scripted
   # chain, whatever llm.providerRef says. Unlike the mortgage demo this is not
-  # the ONLY path to the refusal — a live model asked to settle £990 will
-  # attempt it, because the amount is correct for the claim and the tool does
-  # not tell it the limit. It is the repeatable path, which is what a
-  # recording wants.
+  # the ONLY path to the refusal: a live model asked to settle £990 will
+  # attempt it, because the amount is correct for the claim and nothing tells
+  # it the limit. It is the repeatable path, which is what a recording wants.
   deterministic: false
 
 # ---------------------------------------------------------------------------

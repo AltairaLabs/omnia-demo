@@ -136,13 +136,13 @@ func newServer() http.Handler {
 	mux.HandleFunc("/case-note", jsonTool("case_note_write", writeCaseNote))
 	// The member assistant's card system (cards.go).
 	newCardDesk().register(mux)
-	// Claims triage. claim_settle is the one the ToolPolicy guards; the other
-	// three are the reads and the escape hatch that make the refusal
-	// actionable rather than a dead end.
+	// Claims triage. claim_settle is the one the ToolPolicy guards; the read
+	// and the escape hatch make the refusal actionable rather than a dead end.
+	// /policy/claim-peril is not a tool: the ToolPolicy's producer asks it.
 	mux.HandleFunc("/claim", jsonTool("claim_fetch", fetchClaim))
-	mux.HandleFunc("/claim-policy", jsonTool("claim_policy_fetch", fetchSettlementPolicy))
 	mux.HandleFunc("/claim-settle", jsonTool("claim_settle", settleClaim))
 	mux.HandleFunc("/claim-refer", jsonTool("claim_refer", referClaim))
+	mux.HandleFunc("/policy/claim-peril", claimPerilFact)
 	// Wrenmoor Energy: on-call operations and grid data. Fresh in-memory state
 	// per server, so a rollback in one test or one pod never leaks into
 	// another.

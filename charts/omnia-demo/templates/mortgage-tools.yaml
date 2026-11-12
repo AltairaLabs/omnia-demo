@@ -49,7 +49,7 @@ spec:
             income_notes: { type: string }
             raw_statement_lines:
               type: array
-              description: "Raw bank statement lines, present only when the applicant supplied them. Held legitimately inside the firm; may be read here and may not be sent to an external supplier."
+              description: "Raw bank statement lines, present only when the applicant supplied them."
               items: { type: string }
       httpConfig:
         endpoint: {{ $core }}/case

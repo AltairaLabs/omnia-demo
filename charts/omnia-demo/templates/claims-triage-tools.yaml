@@ -4,9 +4,10 @@
 ---
 # The tool surface of Larkmere Mutual's claims assessor.
 #
-# Four tools, and the shape of the set is the argument. Two READS (the claim,
-# the settlement policy), one IRREVERSIBLE WRITE that moves money
-# (claim_settle), and one escape hatch that does not (claim_refer).
+# Three tools, and the shape of the set is the argument. One READ (the claim),
+# one IRREVERSIBLE WRITE that moves money (claim_settle), and one escape hatch
+# that does not (claim_refer). No tool tells the agent the rules: those are the
+# ToolPolicy's, below.
 #
 # The escape hatch matters as much as the limit. A control that only refuses
 # leaves the agent with nowhere to go and the claim abandoned, which is how a
@@ -60,38 +61,12 @@ spec:
         method: POST
         contentType: application/json
 
-    - name: claim-policy-handler
-      type: http
-      timeout: 30s
-      tool:
-        name: claim_policy_fetch
-        description: "Retrieve the delegated authority schedule: the maximum a claim may be settled for without a human approver, and the rule against splitting a settlement to get under it."
-        inputSchema:
-          type: object
-          properties: {}
-        outputSchema:
-          type: object
-          properties:
-            policy_ref: { type: string }
-            delegated_authority_limit_pence:
-              type: integer
-              description: "The most that may be settled without a human approver, in pence."
-            reference: { type: string }
-            rule: { type: string }
-            no_split_rule: { type: string }
-      httpConfig:
-        endpoint: {{ $core }}/claim-policy
-        method: POST
-        contentType: application/json
-
     # The guarded one.
     #
-    # The description does NOT mention the limit, and that is deliberate. If the
-    # tool told the model not to exceed £500, a well-behaved model would decline
-    # on its own and the ToolPolicy would never fire — the same trap the
-    # mortgage demo documents, where a live model sends the derived summary and
-    # the control is never reached. The limit belongs to the POLICY, and the
-    # agent learns it by calling claim_policy_fetch.
+    # The description states no rule. If the tool told the model not to exceed
+    # £500, a well-behaved model would decline on its own and the ToolPolicy
+    # would never fire. The rules belong to the POLICY, and the agent learns of
+    # one only when the broker refuses a call.
     - name: claim-settle-handler
       type: http
       timeout: 30s
@@ -126,7 +101,7 @@ spec:
       timeout: 30s
       tool:
         name: claim_refer
-        description: "Route a claim to a human approver, with the reason. Use this when a claim cannot be settled under your own authority."
+        description: "Refer a claim to a human claims handler, with the reason. The claims system routes it to the right team."
         inputSchema:
           type: object
           properties:
@@ -174,7 +149,7 @@ spec:
     permit (principal, action == Action::"invoke",
             resource in Registry::"claims-triage-tools");
 
-    // Delegated authority DA-2, and the only rule this demo turns on.
+    // Delegated authority DA-2 (demo 3).
     //
     // Note what it is NOT conditioned on: the tool's name, and the tool's
     // declared reversibility. Both were considered and both are wrong here.
@@ -196,19 +171,42 @@ spec:
     @message("This is above the £500 an automated assessor may settle without a human approver, so it cannot be paid from here. Refer the claim — and do not part-pay it to bring a payment under the limit, which is the thing the limit exists to stop. (Larkmere delegated authority schedule DA-2.)")
     forbid (principal, action == Action::"invoke", resource)
     when { context.aboveDelegatedLimit };
+    {{- if .Values.claimsTriage.floodRule }}
+
+    // CP-7: every flood claim goes to Flood Response, whatever its amount.
+    //
+    // The call's arguments name the claim but not its peril, so the policy
+    // asks the claims system (the claimPeril producer). Conditioned on the
+    // call being a payment, not on the tool's name, for the reason above:
+    // a referral of the same claim must still go through.
+    @id("deny-flood-settlement")
+    @message("This is a flood claim. Under Larkmere claims procedure CP-7 every flood claim goes to the Flood Response team, whatever its amount, so it cannot be paid from here. Refer the claim.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.isPayment && context.claimPeril == "Flood" };
+    {{- end }}
   producers:
     # The limit, in pence, and never a float. Money that goes through a float64
     # arrives as 989.9999999 often enough to discredit a control a viewer is
     # checking against a number on screen.
     #
-    # 50000 is duplicated: it is here, and it is what claim_policy_fetch
-    # returns from the stub. That is a real seam and it is the honest one to
-    # have — this policy is the CONTROL, and the schedule is what the agent is
-    # TOLD. A demo where the agent's belief and the enforced rule read from the
-    # same variable cannot show them disagreeing. If they ever drift, the agent
-    # attempts a payment it believes is within authority and the broker refuses
-    # it, which is exactly the failure an operator would want to find out about.
+    # 50000 lives here and nowhere else. The agent is never told it.
     - name: aboveDelegatedLimit
       type: cel
-      cel: has(body.amount_pence) && body.amount_pence > 50000
+      cel: has(body.amount_pence) && int(body.amount_pence) > 50000
+    {{- if .Values.claimsTriage.floodRule }}
+    # A call that pays money, whichever tool makes it.
+    - name: isPayment
+      type: cel
+      cel: has(body.amount_pence)
+    # The claim's peril, from the system of record: the one fact a peril rule
+    # needs that the call doesn't carry. onError deny: if the claims system
+    # can't say, the payment doesn't go.
+    - name: claimPeril
+      type: http
+      http:
+        endpoint: {{ $core }}/policy/claim-peril
+        resultType: string
+        timeoutMs: 500
+        onError: deny
+    {{- end }}
 {{- end }}

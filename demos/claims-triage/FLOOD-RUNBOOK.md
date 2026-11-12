@@ -1,13 +1,21 @@
 # What members ask that we can't answer (demo 11)
 
-**Held**: the agent half needs an Omnia fix (functions get no institutional
-memory through retrieval, below). The Galaxy half needs no Omnia change, but
-hasn't yet been walked through on camera against the 10k corpus.
+The head of claims looks for gaps in the society's guidance. The Memory Galaxy
+shows a large cluster of members asking about flood, with no flood procedure
+beside it. The society closes the gap in two parts, kept apart as they would be
+in a real insurer:
 
-The head of claims looks for gaps in the society's guidance. The Memory
-Galaxy shows a large cluster of members asking about flood and no flood
-procedure beside it. They write one; it's ingested; claims triage follows it
-on the next flood claim.
+- **The rule**, CP-7: every flood claim goes to Flood Response, whatever its
+  amount. A ToolPolicy rule (`claimsTriage.floodRule`). The assessor is never
+  told it.
+- **The guidance**, what a flooded member needs to know
+  (`demos/claims-triage/flood-claims.md`). Ingested as institutional memory;
+  the assessor uses it to tell the member what happens next.
+
+**Partly held.** The rule half works on beta.23. The guidance half needs Omnia
+#4009: a function gets no institutional memory through retrieval yet, so the
+assessor can't read the guidance. The Galaxy half hasn't yet been walked
+through on camera against the 10k corpus.
 
 ## The beats
 
@@ -18,37 +26,36 @@ on the next flood claim.
    "Planted finding 1").
 2. **Before.** Invoke claims triage on the flood claim (dashboard, Functions,
    `claims-triage`, Test): `{"claim_ref": "LM-40751", "peril": "Flood"}`. £420
-   payable, within the £500 limit, and no procedure says otherwise: `SETTLED`.
+   payable, within the £500 limit, and no rule says otherwise: `SETTLED`.
    Reset the claims system after (`kubectl --context aks-omnia-demo -n
    larkmere-mutual rollout restart deploy/claims-systems`).
-3. **Write the procedure.** `demos/claims-triage/flood-claims.md` (CP-7: every
-   flood claim goes to the Flood Response team, whatever its amount).
-   Ingest it:
+3. **Add the rule.** Turn CP-7 on:
+   ```bash
+   helm --kube-context aks-omnia-demo -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true
+   ```
+   Show the rule in the ToolPolicy (`kubectl --context aks-omnia-demo -n
+   larkmere-mutual get toolpolicy claims-triage-policy -o yaml`): it asks the
+   claims system for the claim's peril and refuses a payment on a flood claim.
+   A policy change takes effect on the next invocation.
+4. **Add the guidance.** Ingest it:
    ```bash
    hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual
    ```
-4. **After.** Invoke again: the agent refers the claim to Flood Response under
-   CP-7. **Not yet:** see below.
+5. **After.** Invoke again. The assessor tries to settle; the broker refuses
+   with `deny-flood-settlement`; the assessor refers the claim, and the claims
+   system routes it to Flood Response. With #4009, the assessor's note also
+   tells the member what happens next and what to do now, from the guidance.
 
-## Why it's held
-
-A function has no end user, so Omnia registers no memory tools for it, and its
-docs say ambient retrieval still reads the agent and institutional tiers
-without one. On 0.9.0-beta.23 it doesn't: the retriever returns nothing when
-the scope has no user (`memory retrieval returned no context`, reason `no
-subject key in scope`), so `memory_context` renders empty and the agent never
-sees CP-7. Verified 2026-11-12: beat 2 settles as expected; after beat 3 the
-agent still had no procedure in its prompt.
-
-Don't work round it by giving the function a member's identity: a back-office
-function doesn't act as the member.
+Put it back after: `--set claimsTriage.floodRule=false`, and restart
+`claims-systems`.
 
 ## Setup already in place
 
 - `claimsTriage.procedures` (Larkmere profile): memory retrieval on, the prompt
   renders `memory_context`, and the function's input takes the adjuster's
   `peril`, which retrieval searches on with the claim reference.
-- `memory.enabled` (Larkmere profile): the society's procedure documents
+- `memory.enabled` (Larkmere profile): the society's documents
   (`charts/omnia-demo/files/fixtures/memory-s3`) ingested at install. None of
   them covers flood.
-- The flood claim `LM-40751` in the claims stub.
+- The flood claim `LM-40751` in the claims stub, and its `/policy/claim-peril`
+  lookup for the policy.

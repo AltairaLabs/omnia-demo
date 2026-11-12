@@ -26,3 +26,26 @@ func TestFloodClaimIsWithinTheLimit(t *testing.T) {
 		t.Fatalf("flood claim: %v", got)
 	}
 }
+
+// The claims system routes a referral by the claim's peril, as a real one
+// would: the agent says why, never where to.
+func TestReferralGoesToTheTeamForThePeril(t *testing.T) {
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	for claim, queue := range map[string]string{
+		"LM-40751": "Flood Response",
+		"LM-40718": "Household claims approvals",
+	} {
+		resp, err := http.Post(srv.URL+"/claim-refer", "application/json",
+			strings.NewReader(`{"claim_ref":"`+claim+`","reason":"refused"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var got map[string]any
+		err = json.NewDecoder(resp.Body).Decode(&got)
+		_ = resp.Body.Close()
+		if err != nil || got["queue"] != queue {
+			t.Fatalf("%s: %v %v", claim, err, got)
+		}
+	}
+}

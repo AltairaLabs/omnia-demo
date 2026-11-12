@@ -132,11 +132,13 @@ Add a row when you add a stand-in.
     under demonstration to the platform: the claims system does not enforce
     the £500 delegated-authority limit, because the ToolPolicy does. Do not add
     the check here; it would make the demo impossible to read.
-  - **The schedule it reports can be set wrong.** `CLAIMS_SCHEDULE_LIMIT_PENCE`
-    on `claims-systems` changes the limit `claim_policy_fetch` reports, and
-    only that: the ToolPolicy keeps its own £500. That is demo 3's drift beat
-    (`demos/claims-triage/RUNBOOK.md`). A value that isn't a positive whole
-    number of pence is ignored.
+  - **It answers the claims policy's peril lookup.** `/policy/claim-peril`
+    is not a tool: the ToolPolicy's http producer asks it for the peril of the
+    claim a call names, so CP-7 (flood claims go to Flood Response) can be a
+    policy rule. A real insurer's policy would ask its claims system the same
+    way.
+  - **It routes referrals by peril**, as a claims system does: the agent gives
+    a reason, never a team.
 
 ## Models
 

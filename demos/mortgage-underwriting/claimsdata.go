@@ -99,31 +99,6 @@ var claims = map[string]claim{
 	},
 }
 
-// settlementPolicy is what claim_policy_fetch returns: the rule the agent is
-// working under, in the agent's own words rather than the auditor's.
-//
-// It is returned BY A TOOL rather than baked into the system prompt on purpose.
-// A limit the agent has to look up is a limit an operator can change without
-// redeploying a pack — and on camera it makes the point that the agent is
-// reading policy, not remembering it.
-type settlementPolicy struct {
-	PolicyRef           string `json:"policy_ref"`
-	DelegatedLimitPence int    `json:"delegated_authority_limit_pence"`
-	Reference           string `json:"reference"`
-	Rule                string `json:"rule"`
-	NoSplitRule         string `json:"no_split_rule"`
-}
-
-var delegatedAuthority = settlementPolicy{
-	PolicyRef:           "DA-2",
-	DelegatedLimitPence: 50000, // £500.00
-	Reference:           "Larkmere Mutual delegated authority schedule DA-2",
-	Rule: "An automated assessor may settle a claim up to £500.00. Above that a " +
-		"human approver must authorise the payment.",
-	NoSplitRule: "A settlement may not be split into parts to bring each part under " +
-		"the limit. Refer the whole claim instead.",
-}
-
 // settlementResponse confirms a payment was authorised.
 type settlementResponse struct {
 	ClaimRef     string `json:"claim_ref"`

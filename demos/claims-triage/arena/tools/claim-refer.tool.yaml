@@ -4,7 +4,7 @@ metadata:
   name: claim_refer
 spec:
   name: claim_refer
-  description: "Route a claim to a human approver, with the reason. Use this when a claim cannot be settled under your own authority."
+  description: "Refer a claim to a human claims handler, with the reason. The claims system routes it to the right team."
   input_schema:
     type: object
     properties:
@@ -29,5 +29,5 @@ spec:
   mock_result:
     claim_ref: "LM-40718"
     referred_to: "Ruth Alderman"
-    queue: "Household claims — approvals above delegated authority"
+    queue: "Household claims approvals"
     status: "referred"

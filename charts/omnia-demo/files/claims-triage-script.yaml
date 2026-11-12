@@ -5,13 +5,13 @@
 # WHAT IS REAL: the ToolRegistry handlers, the HTTP calls to the claims system,
 # the policy-broker decision, the REFUSAL, and the session recording.
 #
-# The refusal is NOT scripted. Turn 3 attempts a settlement of 99000 pence and
+# The refusal is NOT scripted. Turn 2 attempts a settlement of 99000 pence and
 # the broker evaluates it against the delegated authority limit and says no.
-# Change 99000 to 18000 here and the same script settles cleanly — which is the
+# Change 99000 to 18000 here and the same script settles cleanly, which is the
 # check worth running if you ever doubt the block is real.
 #
 # Turn indexing: a tool call advances the counter by two, so each exchange lands
-# on the odd turn and its reply on the even one. Measured, not derived — see
+# on the odd turn and its reply on the even one. Measured, not derived: see
 # charts/omnia-demo/files/pii-chat-script.yaml for the probe and the numbers.
 defaultResponse: "The claim could not be assessed."
 scenarios:
@@ -27,28 +27,16 @@ scenarios:
             arguments:
               claim_ref: "LM-40718"
 
-      # Read the schedule that governs it. This is the agent finding out what
-      # its own authority is — £500, from DA-2 — rather than being told in the
-      # system prompt. The limit it learns here is the same number the
-      # ToolPolicy enforces, from a different source.
-      2:
-        type: tool_calls
-        content: ""
-        tool_calls:
-          - name: claim_policy_fetch
-            arguments: {}
-
       # THE CALL THE POLICY REFUSES.
       #
       # 99000 pence is £990: assessed £1,240 less the £250 excess, which is what
-      # the claims system said was payable. The agent is not misbehaving — this
-      # is the correct amount for this claim, and it is attempting to pay it
-      # because that is its job.
+      # the claims system said was payable. The agent knows no limit, so it pays
+      # what is payable, which is its job.
       #
       # It is refused because £990 is above the £500 an automated assessor may
       # authorise. The broker decides that; nothing in the agent, the pack or
       # the stub does.
-      3:
+      2:
         type: tool_calls
         content: ""
         tool_calls:
@@ -57,14 +45,9 @@ scenarios:
               claim_ref: "LM-40718"
               amount_pence: 99000
 
-      # The agent does NOT fall over on the refusal, and does not try again for
-      # less. Splitting a settlement to get under the limit is the thing the
-      # limit exists to stop, and an agent that did it would make the control
-      # look like an obstacle it had routed around.
-      #
-      # It refers the claim instead: the work still gets done, by a human with
-      # the authority to do it.
-      4:
+      # The agent refers the claim with the refusal's reason, as its prompt says
+      # to on any refusal. It learned the limit from the refusal, not before.
+      3:
         type: tool_calls
         content: ""
         tool_calls:
@@ -72,12 +55,12 @@ scenarios:
             arguments:
               claim_ref: "LM-40718"
               reason: >-
-                Settlement of £990.00 is above the £500.00 an automated assessor
-                may authorise under delegated authority DA-2. Not part-paid;
-                referred in full for approval.
+                The platform refused settlement of £990.00: above the £500 an
+                automated assessor may settle without a human approver
+                (delegated authority schedule DA-2). Referred in full.
 
       # The answer, matching the function's output schema.
-      5:
+      4:
         type: text
         content: |
-          {"outcome":"REFERRED","note":"Claim LM-40718, escape of water on LM-HOME-4471, buildings cover. Assessed at £1,240.00 against a £250.00 excess, so £990.00 is payable. One prior claim on this policy, November 2023, nothing flagged. I could not settle it: £990.00 is above the £500.00 an automated assessor may authorise under delegated authority DA-2, and the policy refused the payment. I have not part-paid it — splitting a settlement to get under the limit is the thing the limit exists to stop. Referred in full to Ruth Alderman, household claims approvals."}
+          {"outcome":"REFERRED","note":"Claim LM-40718, escape of water on LM-HOME-4471, buildings cover. Assessed at £1,240.00 against a £250.00 excess, so £990.00 is payable. The platform refused the payment: £990.00 is above the £500.00 an automated assessor may settle without a human approver (DA-2). Referred in full to Ruth Alderman, household claims approvals."}
