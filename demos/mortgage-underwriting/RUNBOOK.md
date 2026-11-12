@@ -97,7 +97,10 @@ processing, not interactive chat.
 Re-verified live 2026-11-12 on the Azure deployment, invoked from the
 dashboard (Functions, `mortgage-underwriting`, Test, `APP-2026-00417`): the
 broker denied the first `income_verify`, the supplier received exactly one
-request, and the note recommended REFER.
+request, and the note recommended REFER. Verified again the same evening
+after `case_fetch` stopped telling the model that statements may not leave the
+firm (DSA-114 is the ToolPolicy's alone): same result, the model attached the
+statements, the broker refused, the compliant retry reached the supplier once.
 
 ## What it does not show
 

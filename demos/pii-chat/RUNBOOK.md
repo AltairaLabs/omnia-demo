@@ -75,9 +75,15 @@ history is card support's); the portal calls it the member assistant.
 4. Operator side: open the second session and show its system prompt. Under
    "What you know about this member" is the case note from the first.
 
-Verified live 2026-11-12: `freeze_card` and `unfreeze_card` answered 200, and
-the second conversation said "I'll text you since I know that's your
-preference".
+Verified live 2026-11-12 (after erasure, on the current prompt): the first
+conversation saved "Ellen prefers to be contacted by text rather than calls"
+as a preference; 36 seconds later the second said "I'll make sure to contact
+you via text, as that's your preferred method".
+
+**Ask the second question only after 30 seconds.** Asked sooner, the
+assistant can't see the note yet (#3991); a take on 2026-11-12 asked after 13
+seconds, and the assistant saved the member's question as a new "preference",
+replacing the real one.
 
 ## Demo 7: people type things they shouldn't
 
@@ -158,6 +164,12 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
   tool refused with `no-matching-permit`, and the transcript just looks like a
   model that didn't bother. `pii-chat-policy` covers the whole registry. Read
   the policy-broker sidecar's log when a tool silently does nothing.
+- **Consent decides what can be remembered.** After an erasure Ellen has the
+  defaults only (context, history, preferences; location, identity and health
+  denied). A note that mentions a place is classified `memory:location` and
+  refused (`memory write suppressed … consent-not-granted`). That's why the
+  prompt saves a preference on its own, and admits a refused save rather
+  than saying "got it".
 - **The prompt asks for the case note on purpose.** Nothing in Omnia extracts
   memories from a conversation on its own; `memory__remember` is model-driven.
 - **The case note doesn't quote the card number.** The prompt tells the

@@ -24,7 +24,16 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy port-forward svc/wrenmoor-si
    the switch goes through only after the click, with the consent id it
    creates.
 
-Verified live: beats 1–3 on 2026-11-12; the consent click on 2026-11-10.
+Verified live 2026-11-12, all four beats, with the consent rule gone from
+Wren's prompt and tools: Wren read the bill, usage and two quotes, asked with
+the **Switch me** card, and scheduled SW-8AAC7004 only after the click.
+
+**Where the rule lives.** Nothing Wren reads tells it to ask first. The
+ToolPolicy refuses `switch_tariff` without a `consent_id` (and says to call
+`request_consent`), and the account system refuses an id the customer didn't
+create. On the take above Wren asked of its own accord, so the policy didn't
+need to fire; if it skips the question, the refusal is in the session and the
+broker log (`deny-write-without-consent`).
 
 ## Gotchas
 
