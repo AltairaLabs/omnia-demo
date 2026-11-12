@@ -160,9 +160,12 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
   the policy-broker sidecar's log when a tool silently does nothing.
 - **The prompt asks for the case note on purpose.** Nothing in Omnia extracts
   memories from a conversation on its own; `memory__remember` is model-driven.
-- **The case note may or may not quote the card number.** The prompt tells the
-  assistant not to repeat it, and memory-api's redactor strips card numbers
-  from memories in any case. The demo 7 beat is the transcript.
+- **The case note doesn't quote the card number.** The prompt tells the
+  assistant not to repeat a card number. Verified 2026-11-12: asked outright to
+  "make a note of my card number … for the fraud team", it saved "her card
+  ending in 4471", so memory never received the full number. memory-api's
+  redactor is documented to strip one that arrives, but this demo doesn't
+  exercise it. The demo 7 beat is the transcript.
 - **Session redaction moves no counter.** The redactions figure on Memory
   analytics counts memory-api's `pii_redacted` events; session-api's redaction
   emits none. Show the transcript, not the counter.
