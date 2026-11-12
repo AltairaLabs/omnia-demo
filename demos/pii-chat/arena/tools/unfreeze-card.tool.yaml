@@ -7,22 +7,16 @@ spec:
   name: unfreeze_card
   # The pair of freeze_card; see there.
   description: >-
-    Unfreeze the cardholder's card so it works again, for example when they
-    have found it. Only after verify_identity has verified the caller: pass the
-    customer_ref it returned. Returns the card's new status; changed is false
-    if it was not frozen.
+    Unfreeze the member's card so it works again, for example when they have
+    found it. Returns the card's last four digits and new status; changed is
+    false if it was not frozen.
   input_schema:
     type: object
-    properties:
-      customer_ref:
-        type: string
-        description: "The customer reference verify_identity returned, e.g. MEM-4471-889."
-    required:
-      - customer_ref
+    properties: {}
   output_schema:
     type: object
     properties:
-      customer_ref: { type: string }
+      full_name: { type: string }
       card_last4: { type: string }
       card_status: { type: string }
       changed: { type: boolean }
@@ -30,7 +24,7 @@ spec:
   mode: mock
   timeout_ms: 30000
   mock_result:
-    customer_ref: "MEM-4471-889"
+    full_name: "Ellen Whitcomb"
     card_last4: "4471"
     card_status: "active"
     changed: true

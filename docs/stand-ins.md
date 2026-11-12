@@ -42,8 +42,9 @@ Add a row when you add a stand-in.
   - **Without the token, or with an untrusted issuer,** the conversation still
     opens but has no user for memory. The runtime then registers no memory
     tools and logs "no verified user on this conversation". An agent whose
-    prompt uses memory tools will misbehave: card support looped on
-    `verify_identity` until it was aborted.
+    prompt uses memory tools will misbehave: card support, when it still
+    checked identity in chat, looped on `verify_identity` until it was
+    aborted. The card tools also see no member and refuse.
   - **The key is not persisted.** It is generated at start, so a restart
     rotates it. The mint refetches the JWKS when it meets an unknown key id.
   - **The site cannot be trusted further than its network.** Anyone who can
@@ -75,7 +76,7 @@ Add a row when you add a stand-in.
     names a subject, so the page cannot read or erase anyone else's data.
   - **Erasure deletes Ellen's real conversations and memories.** She has none
     in the Galaxy corpus, so the Galaxy is untouched, and she starts afresh
-    the next time she talks to card support.
+    the next time she talks to the member assistant.
 
 ### Scripted callers (`demos/card-callers`)
 
@@ -95,7 +96,7 @@ Add a row when you add a stand-in.
 - **Fakes:** the systems the agents' tools call:
   - mortgage case, credit, income, affordability, valuation, AML and case
     notes;
-  - card holder identity (`verify_identity`);
+  - the member's card (`get_card_status`, `freeze_card`, `unfreeze_card`);
   - claims (`claim_*`);
   - Wrenmoor's billing and tariff system.
 - **Real system:** the customer's own systems of record.
@@ -105,14 +106,19 @@ Add a row when you add a stand-in.
   - **Writes are not safe under load.** The claims maps have no lock.
     Concurrent writes can crash the stub, so drive the claims demo one
     invocation at a time.
-  - **Cardholders are a fixed list in `identitydata.go`.** A caller
-    `verify_identity` doesn't know is refused.
+  - **The card system knows members by email.** `identitydata.go` holds five
+    members, keyed by the email the runtime forwards on every tool call
+    (`X-Omnia-User-Email`, the verified user the edge asserted). The card
+    tools take no arguments, so they act on that member's card and nobody
+    else's. A call with no member is refused with 401, and an unknown member
+    with 404. No tool takes an SSN, date of birth or card number: identity is
+    the portal's job.
   - **Freezing is real, within the stub.** `freeze_card` and `unfreeze_card`
-    (`cards.go`) change the status `verify_identity` reports, so a card frozen
-    in one conversation is frozen in the next, until the stub restarts. They
-    take the customer reference, never the SSN. Before they existed, card
-    support told callers their card was frozen with no tool to freeze it:
-    give an agent the tools for what it is asked to do, or it will pretend.
+    (`cards.go`) change the status `get_card_status` reports, so a card frozen
+    in one conversation is frozen in the next, until the stub restarts. Before
+    they existed, card support told callers their card was frozen with no tool
+    to freeze it: give an agent the tools for what it is asked to do, or it
+    will pretend.
   - **Limits are deliberately not enforced here.** The stubs leave the controls
     under demonstration to the platform: the claims system does not enforce
     the £500 delegated-authority limit, because the ToolPolicy does. Do not add

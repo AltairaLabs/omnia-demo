@@ -8,9 +8,14 @@ import (
 	"testing"
 )
 
-func post(t *testing.T, srv *httptest.Server, path, body string) (int, map[string]any) {
+// cardCall POSTs to a card route as member email ("" sends no member).
+func cardCall(t *testing.T, srv *httptest.Server, path, email string) (int, map[string]any) {
 	t.Helper()
-	resp, err := http.Post(srv.URL+path, "application/json", strings.NewReader(body))
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(`{}`))
+	if email != "" {
+		req.Header.Set("X-Omnia-User-Email", email)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,39 +25,55 @@ func post(t *testing.T, srv *httptest.Server, path, body string) (int, map[strin
 	return resp.StatusCode, out
 }
 
-// A card frozen in one conversation is frozen in the next: verify_identity
-// reports the desk's status, and freezing twice says nothing changed.
-func TestFreezeIsWhatVerifyReports(t *testing.T) {
+const ellen = "ellen.whitcomb@example.com"
+
+// The card is the signed-in member's: the runtime forwards their email on
+// the tool call, and a freeze shows in the next status check.
+func TestFreezeIsThePortalMembers(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
-	ellen := `{"ssn":"123-45-6789","dob":"1988-03-14"}`
 
-	if _, got := post(t, srv, "/verify-identity", ellen); got["card_status"] != "active" {
+	if _, got := cardCall(t, srv, "/card-status", ellen); got["card_status"] != "active" || got["card_last4"] != "4471" {
 		t.Fatalf("before: %v", got)
 	}
-	code, got := post(t, srv, "/card-freeze", `{"customer_ref":"MEM-4471-889"}`)
+	code, got := cardCall(t, srv, "/card-freeze", ellen)
 	if code != http.StatusOK || got["card_status"] != "frozen" || got["changed"] != true {
 		t.Fatalf("freeze: %d %v", code, got)
 	}
-	if _, got := post(t, srv, "/verify-identity", ellen); got["card_status"] != "frozen" {
+	if _, got := cardCall(t, srv, "/card-status", ellen); got["card_status"] != "frozen" {
 		t.Fatalf("after freeze: %v", got)
 	}
-	if _, got := post(t, srv, "/card-freeze", `{"customer_ref":"MEM-4471-889"}`); got["changed"] != false {
+	if _, got := cardCall(t, srv, "/card-freeze", ellen); got["changed"] != false {
 		t.Fatalf("second freeze: %v", got)
 	}
-	if _, got := post(t, srv, "/card-unfreeze", `{"customer_ref":"MEM-4471-889"}`); got["card_status"] != "active" || got["changed"] != true {
+	if _, got := cardCall(t, srv, "/card-unfreeze", ellen); got["card_status"] != "active" || got["changed"] != true {
 		t.Fatalf("unfreeze: %v", got)
 	}
 }
 
-// The freeze tools take a customer reference only, and refuse one they do not
-// know.
-func TestFreezeNeedsAKnownReference(t *testing.T) {
+// One member's freeze never touches another's card.
+func TestMembersAreSeparate(t *testing.T) {
 	srv := httptest.NewServer(newServer())
 	defer srv.Close()
-	for _, body := range []string{`{}`, `{"customer_ref":"MEM-0000-000"}`, `{"ssn":"123-45-6789"}`} {
-		if code, _ := post(t, srv, "/card-freeze", body); code != http.StatusNotFound {
-			t.Errorf("%s: status %d", body, code)
+	if code, _ := cardCall(t, srv, "/card-freeze", ellen); code != http.StatusOK {
+		t.Fatalf("freeze: %d", code)
+	}
+	if _, got := cardCall(t, srv, "/card-status", "tomasz.brennan@example.com"); got["card_status"] != "active" || got["card_last4"] != "2041" {
+		t.Fatalf("Tomasz: %v", got)
+	}
+}
+
+// A call with no verified member, or an unknown one, acts on no card.
+func TestNoMemberNoCard(t *testing.T) {
+	srv := httptest.NewServer(newServer())
+	defer srv.Close()
+	for _, path := range []string{"/card-status", "/card-freeze", "/card-unfreeze"} {
+		code, got := cardCall(t, srv, path, "")
+		if code != http.StatusUnauthorized || got["error"] != "no verified member on this call" {
+			t.Errorf("%s with no member: %d %v", path, code, got)
+		}
+		if code, _ := cardCall(t, srv, path, "someone@else.example"); code != http.StatusNotFound {
+			t.Errorf("%s for an unknown member: %d", path, code)
 		}
 	}
 }

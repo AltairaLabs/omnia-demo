@@ -6,29 +6,24 @@ import { Badge } from "../../components/core/Badge.jsx";
 import { Input } from "../../components/forms/Input.jsx";
 
 // Suggested openers, shown before the member has said anything. None of them
-// carries personal data: the member opens by saying what is wrong, and the
-// agent asks for identification on its own turn.
+// carries personal data. The member is signed in, so the assistant knows who
+// they are and never asks.
 //
-// The upstream kit's openers (premiums, dividends, deductibles) belonged to an
-// insurance assistant with canned answers. This panel now talks to the
-// card-support agent, so they would go unanswered.
+// Each is something the member assistant can actually do with its tools: look
+// up the card, freeze or unfreeze it. An opener it had no tool for would teach
+// the audience it pretends.
 const OPENERS = [
-  { label: "I've lost my card", text: "Hi, I've lost my card." },
+  { label: "I've lost my card", text: "Hi, I think I've lost my card." },
   { label: "Is my card still active?", text: "Is my card still active?" },
-  { label: "When is my next payment due?", text: "When is my next payment due?" },
+  { label: "A payment I don't recognise", text: "There's a payment on my card I don't recognise." },
 ];
 
-// There is deliberately NO chip that fills in the member's own details, and
-// none that closes the call for them.
+// There is deliberately NO chip that closes the conversation for the member: a
+// canned mid-conversation reply reads as staged the moment it is on camera.
+// Suggested OPENERS are a real pattern and stay; canned answers are not.
 //
-// Both existed and both were cut: a portal that offers to type your Social
-// Security number for you is not a thing any real product does, and a canned
-// mid-conversation reply reads as staged the moment it is on camera. Suggested
-// OPENERS are a real pattern and stay; canned answers are not.
-//
-// So the member's verification details and their sign-off get typed. For the
-// recording that is the point — the audience watches a person put an SSN into
-// a chat box, which is exactly the thing the rest of the demo is about.
+// What the member types is theirs. In the redaction beat they paste a full card
+// number anyway, and the stored record keeps it only as [REDACTED_...].
 
 function Chip({ label, onClick }) {
   return (
@@ -114,13 +109,9 @@ export function AssistantLauncher({ onClick, open }) {
 
 export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
   const [thread, setThread] = useState([
-    // A plain greeting. The AGENT asks for identification, on its own second
-    // turn, after the member has said what they want — see the turn note in
-    // the deterministic demo script. It must not be asked here:
-    // a demo where the member volunteers an SSN into a chat box unprompted is
-    // demonstrating the wrong thing, and an agent that verified someone who had
-    // never been asked would be worse.
-    { from: "bot", text: "Morning, Ellen. I look after cards on your Larkmere account — reporting one lost, checking its status, ordering a replacement. What can I do?" },
+    // A plain greeting, rendered by the page, not the agent. The member is
+    // signed in, so there is no identification step at all.
+    { from: "bot", text: "Morning, Ellen. I can help with your Larkmere card: freezing it if it's lost, checking its status, or explaining what happens next. What can I do?" },
   ]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);

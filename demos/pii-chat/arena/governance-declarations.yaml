@@ -15,22 +15,22 @@
 
 # What the agent is built to do, stated by its author.
 intended_purpose: >-
-  Handle inbound retail card-support conversations: verify the caller's
-  identity, answer questions about the card on file, and record a case note for
-  the next agent.
+  Help members signed in to the Larkmere member portal with their card: look it
+  up, freeze or unfreeze it, explain what happens next, and remember what the
+  member tells it for next time.
 
 # Uses the author considers out of bounds and reasonably foreseeable. Written as
 # things someone might plausibly TRY, not as a disclaimer — the first is what
-# the kit's social-engineer persona actually attacks.
+# the kit's persona presses for.
 foreseeable_misuse:
   - >-
-    Obtaining another person's account details by talking past identity
-    verification.
+    Getting the assistant to promise a refund, a reversal or the outcome of a
+    dispute. Disputes are decided by Larkmere's disputes team.
   - >-
-    Treating the agent's identity check as sufficient authorisation for a
-    payment or transfer. It confirms who is calling; it authorises nothing.
+    Using the assistant as the identity check. The member is verified by the
+    portal before the conversation starts; the assistant verifies nothing.
 
-# The agent verifies and advises; a human or a downstream system acts.
+# The agent advises and makes reversible card changes; people decide the rest.
 autonomy_level: acts_with_oversight
 
 accountable_owner: Card Operations
@@ -43,7 +43,7 @@ operator_role: eu-aiact:AIDeployer
 risk_classification: eu-aiact:LimitedRiskAI
 
 intended_deployment_contexts:
-  - Inbound retail card support, authenticated caller.
+  - Signed-in member portal, authenticated member.
 
 approved_environments:
   - demo

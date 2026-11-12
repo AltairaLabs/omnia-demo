@@ -1,27 +1,33 @@
 package main
 
 import (
+	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 	"sync"
 )
 
-// cardDesk is the card system behind card support: who holds which card, and
-// whether it is frozen. verify_identity reads the status from here, so a card
-// frozen in one conversation is reported frozen in the next.
+// cardDesk is the card system behind Larkmere's member assistant: the signed-in
+// member's card, and whether it is frozen.
 //
-// Before it existed, card support had only verify_identity, and a live model
-// asked to freeze a card said "your card has been frozen" with nothing to
-// freeze it with; the next conversation found it active. A stand-in that
-// cannot do what the agent is asked to do teaches the agent to pretend
+// The member is the one Omnia's runtime names on the tool call: it forwards the
+// email the edge asserted for the verified user (X-Omnia-User-Email; see
+// wren.go for why the email, not X-Omnia-User-Id, which is a pseudonym). No
+// argument the model writes selects the member, so the agent can act only on
+// the card of the person it is talking to. A call with no member acts on no
+// card at all.
+//
+// The routes take no arguments for the same reason. Before they existed, card
+// support said "your card has been frozen" with nothing to freeze it with: give
+// an agent the tools for what it is asked to do, or it will pretend
 // (docs/stand-ins.md).
 //
 // State is in memory, per server, like the other stubs: a restart unfreezes
 // every card.
 type cardDesk struct {
-	mu sync.Mutex
-	// status by customer reference; a reference not here has its default
-	// status from cardholders.
-	status map[string]string
+	mu     sync.Mutex
+	status map[string]string // by member email; absent means the default
 }
 
 func newCardDesk() *cardDesk {
@@ -29,83 +35,58 @@ func newCardDesk() *cardDesk {
 }
 
 func (d *cardDesk) register(mux *http.ServeMux) {
-	mux.HandleFunc("/verify-identity", jsonTool("verify_identity", d.verifyIdentity))
-	mux.HandleFunc("/card-freeze", jsonTool("freeze_card", d.freeze))
-	mux.HandleFunc("/card-unfreeze", jsonTool("unfreeze_card", d.unfreeze))
+	mux.HandleFunc("/card-status", d.handle("get_card_status", ""))
+	mux.HandleFunc("/card-freeze", d.handle("freeze_card", "frozen"))
+	mux.HandleFunc("/card-unfreeze", d.handle("unfreeze_card", "active"))
 }
 
-// cardStatusResponse is what freeze_card and unfreeze_card return.
+// cardStatusResponse is what every card route returns.
 type cardStatusResponse struct {
-	CustomerRef string `json:"customer_ref"`
-	CardLast4   string `json:"card_last4"`
-	CardStatus  string `json:"card_status"`
-	// Changed is false when the card was already in the requested state, so
-	// the agent can say so rather than claim it did something.
+	FullName   string `json:"full_name"`
+	CardLast4  string `json:"card_last4"`
+	CardStatus string `json:"card_status"`
+	// Changed is false when the card was already in the requested state (and
+	// always for get_card_status), so the agent can say so rather than claim
+	// it did something.
 	Changed bool `json:"changed"`
 }
 
-// holderByRef finds a cardholder by customer reference: the freeze tools take
-// the reference verify_identity returned, never the SSN, so the SSN travels
-// through one tool call only.
-func holderByRef(ref string) (cardholder, bool) {
-	for _, h := range cardholders {
-		if h.CustomerRef == ref {
-			return h, true
+// handle serves one card route. set is the status it sets; empty only reads.
+func (d *cardDesk) handle(tool, set string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
 		}
+		email := strings.ToLower(strings.TrimSpace(r.Header.Get("X-Omnia-User-Email")))
+		// Logged by card, never by email: the log is on camera.
+		status, body := d.serve(email, set)
+		log.Printf("tool response: tool=%s status=%d", tool, status)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		_ = json.NewEncoder(w).Encode(body)
 	}
-	return cardholder{}, false
 }
 
-func (d *cardDesk) statusOf(h cardholder) string {
-	if s, ok := d.status[h.CustomerRef]; ok {
-		return s
+func (d *cardDesk) serve(email, set string) (int, any) {
+	if email == "" {
+		return http.StatusUnauthorized, errorBody("no verified member on this call")
 	}
-	return h.CardStatus
-}
-
-// verifyIdentity is the card-support demo's identity check. It requires BOTH
-// the SSN and the date of birth, so the agent genuinely has to put the SSN in
-// the tool call rather than merely mention it in conversation — the recorded
-// tool-call arguments are half of what the demo shows.
-//
-// Note what is missing: a log line naming the subject. jsonTool logs
-// req.ref(), which is empty here, and that is deliberate. The only identifier
-// this endpoint receives is an SSN, and a demo about not persisting SSNs must
-// not print one into a container log that someone may well open on camera.
-func (d *cardDesk) verifyIdentity(req toolRequest) (any, int) {
-	h, ok := cardholders[req.SSN]
+	h, ok := cardholders[email]
 	if !ok {
-		// Same answer for an unknown SSN and a mismatched DOB. Distinguishing
-		// them would turn this into an oracle that confirms whether a given
-		// SSN is on file.
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	if req.DOB != h.DOB {
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	d.mu.Lock()
-	status := d.statusOf(h)
-	d.mu.Unlock()
-	return identityResponse{
-		Verified:    true,
-		CustomerRef: h.CustomerRef,
-		FullName:    h.FullName,
-		CardLast4:   h.CardLast4,
-		CardStatus:  status,
-	}, http.StatusOK
-}
-
-func (d *cardDesk) freeze(req toolRequest) (any, int)   { return d.set(req, "frozen") }
-func (d *cardDesk) unfreeze(req toolRequest) (any, int) { return d.set(req, "active") }
-
-func (d *cardDesk) set(req toolRequest, status string) (any, int) {
-	h, ok := holderByRef(req.CustomerRef)
-	if !ok {
-		return errorBody("no card for that customer reference; verify the caller first"), http.StatusNotFound
+		return http.StatusNotFound, errorBody("no card on file for this member")
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	changed := d.statusOf(h) != status
-	d.status[h.CustomerRef] = status
-	return cardStatusResponse{CustomerRef: h.CustomerRef, CardLast4: h.CardLast4, CardStatus: status, Changed: changed}, http.StatusOK
+	current, ok := d.status[email]
+	if !ok {
+		current = h.CardStatus
+	}
+	changed := set != "" && set != current
+	if set != "" {
+		d.status[email] = set
+		current = set
+	}
+	log.Printf("tool request served: card=%s", h.CardLast4)
+	return http.StatusOK, cardStatusResponse{FullName: h.FullName, CardLast4: h.CardLast4, CardStatus: current, Changed: changed}
 }

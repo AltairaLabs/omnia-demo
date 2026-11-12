@@ -1,18 +1,20 @@
 {{- if .Values.piiChat.enabled }}
 {{- $ns := .Values.namespace }}
 ---
-# The identity check, which needs the SSN, and the card system, which takes the
-# customer reference the check returns.
+# The member assistant's card system (demos/mortgage-underwriting/cards.go):
+# look up, freeze and unfreeze the signed-in member's card.
 #
-# That is the design, not an oversight. The demo's claim is that a sensitive
-# value is redacted everywhere it comes to rest, and session-api redacts
-# `content` on /messages and `arguments` on /tool-calls through the same policy
-# but by different code paths. A tool that took only a customer reference would
-# prove half of it.
+# No tool takes an argument that names the member. The runtime sends the
+# verified member's email on every tool call (X-Omnia-User-Email), and the card
+# system acts on that member's card only, so nothing the model writes can point
+# a tool at someone else's account.
 #
-# Both arguments are required, so the model cannot satisfy the call with the
-# SSN alone and leave the DOB in conversation — the backend enforces it too
-# (demos/mortgage-underwriting/server.go, verifyIdentity).
+# The description and schemas here are NOT what the model reads: PromptKit
+# builds its tool descriptors from the PACK, so the tool as the LLM sees it is
+# demos/pii-chat/arena/tools/<tool>.tool.yaml. This registry contributes the
+# BINDING (the http handler) and the identity the ToolPolicy selects on. They
+# are kept in step anyway: a drifted schema here breaks dispatch while the model
+# carries on believing the pack's version. Change both.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolRegistry
 metadata:
@@ -22,69 +24,26 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 spec:
   handlers:
-    - name: verify-identity-handler
-      type: http
-      timeout: 30s
-      # The description and schemas below are NOT what the model reads.
-      #
-      # PromptKit builds its descriptor registry from the PACK
-      # (ToToolRepository, in the PromptKit SDK), so the tool as the LLM
-      # sees it is demos/pii-chat/arena/tools/verify-identity.tool.yaml. What
-      # this registry contributes is the BINDING — the http handler below — and
-      # the identity the ToolPolicy selects on.
-      #
-      # They are kept in step anyway: a drifted schema here breaks dispatch
-      # while the model carries on believing the pack's version, which is a
-      # miserable failure to diagnose. Change both.
-      tool:
-        name: verify_identity
-        description: "Confirm a cardholder's identity from their Social Security number and date of birth before discussing or acting on their account. Returns the customer reference, the cardholder's name, the last four digits of the card on file, and the card's current status."
-        inputSchema:
-          type: object
-          properties:
-            ssn:
-              type: string
-              description: "The cardholder's Social Security number, as they gave it, e.g. 123-45-6789."
-            dob:
-              type: string
-              description: "The cardholder's date of birth in YYYY-MM-DD form."
-          required: ["ssn", "dob"]
-        outputSchema:
-          type: object
-          properties:
-            verified: { type: boolean }
-            customer_ref: { type: string }
-            full_name: { type: string }
-            card_last4:
-              type: string
-              description: "The last four digits only. The full card number is never returned by this service."
-            card_status: { type: string }
-      httpConfig:
-        endpoint: http://pii-chat-identity.{{ $ns }}:8080/verify-identity
-        method: POST
-        contentType: application/json
-    # The card system (demos/mortgage-underwriting/cards.go). The model reads
-    # demos/pii-chat/arena/tools/{freeze,unfreeze}-card.tool.yaml; keep these
-    # in step with them.
-    {{- range $t := list (dict "name" "freeze_card" "path" "card-freeze" "verb" "Freeze") (dict "name" "unfreeze_card" "path" "card-unfreeze" "verb" "Unfreeze") }}
+    {{- range $t := list
+          (dict "name" "get_card_status" "path" "card-status" "desc" "Look up the member's card: their name, the card's last four digits and its status (active or frozen).")
+          (dict "name" "freeze_card" "path" "card-freeze" "desc" "Freeze the member's card so no new payments go through, for example when it is lost or stolen. Returns the card's last four digits and new status; changed is false if it was already frozen.")
+          (dict "name" "unfreeze_card" "path" "card-unfreeze" "desc" "Unfreeze the member's card so it works again, for example when they have found it. Returns the card's last four digits and new status; changed is false if it was not frozen.") }}
     - name: {{ replace "_" "-" $t.name }}-handler
       type: http
       timeout: 30s
       tool:
         name: {{ $t.name }}
-        description: "{{ $t.verb }} the cardholder's card. Only after verify_identity has verified the caller: pass the customer_ref it returned. Returns the card's new status; changed is false if it was already in that state."
+        description: {{ $t.desc | quote }}
         inputSchema:
           type: object
-          properties:
-            customer_ref:
-              type: string
-              description: "The customer reference verify_identity returned, e.g. MEM-4471-889."
-          required: ["customer_ref"]
+          properties: {}
         outputSchema:
           type: object
           properties:
-            customer_ref: { type: string }
-            card_last4: { type: string }
+            full_name: { type: string }
+            card_last4:
+              type: string
+              description: "The last four digits only. The full card number is never returned by this service."
             card_status: { type: string }
             changed: { type: boolean }
       httpConfig:
@@ -99,18 +58,12 @@ spec:
 # enterprise is on, Cedar is default-deny, and the broker denies any call that
 # no ToolPolicy selects — `deniedBy: no-matching-permit`, "no ToolPolicy
 # permits this call". So an agent with a ToolRegistry and no ToolPolicy gets
-# every tool refused. Observed exactly that: verify_identity was recorded as a
-# tool call, never reached the identity service, and the conversation carried
-# on as though the model had simply chosen not to call anything.
-#
-# That failure is quiet from the outside. The stream shows no tool call (server
-# tools are never forwarded over the WebSocket), the transcript looks like a
-# model that did not bother, and only the broker's log names the cause. Read
+# every tool refused, and quietly: server tools are never forwarded over the
+# WebSocket, so it looks like a model that chose not to call anything. Read
 # the sidecar, not the agent, when a tool silently does nothing.
 #
-# The selector covers the WHOLE registry, which here is one tool. Naming a
-# subset denies the rest with the same no-matching-permit — see the longer note
-# on the mortgage policy, where narrowing it to one tool killed the other six.
+# The selector covers the WHOLE registry. Naming a subset denies the rest with
+# the same no-matching-permit (see the note on the mortgage policy).
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: ToolPolicy
 metadata:
@@ -124,10 +77,10 @@ spec:
   mode: enforce
   onFailure: deny
   policy: |
-    // The identity check is permitted. This demo's subject is redaction, not
-    // egress control — the interesting question here is what the RECORD keeps,
-    // not whether the call may happen. The mortgage demo is where a ToolPolicy
-    // refuses a call on its payload; keep the two demos making one point each.
-    @id("permit-identity-check")
+    // The card tools are permitted. Which card they touch is the card
+    // system's decision, from the verified member on the call. The mortgage
+    // demo is where a ToolPolicy refuses a call on its payload; keep the two
+    // demos making one point each.
+    @id("permit-card-tools")
     permit (principal, action == Action::"invoke", resource);
 {{- end }}

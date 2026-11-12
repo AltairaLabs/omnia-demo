@@ -59,15 +59,6 @@ type toolRequest struct {
 	Note           string `json:"note"`
 	Recommendation string `json:"recommendation"`
 
-	// SSN and DOB belong to verify_identity, in the card-support demo. They
-	// are the only PII this service accepts, and they are never logged — see
-	// verifyIdentity.
-	SSN string `json:"ssn"`
-	DOB string `json:"dob"`
-	// CustomerRef is what freeze_card and unfreeze_card take: the reference
-	// verify_identity returned, so the SSN is sent once.
-	CustomerRef string `json:"customer_ref"`
-
 	// ClaimRef, AmountPence and Reason belong to claims triage.
 	//
 	// AmountPence is an int, and the ToolPolicy reads the same field off the
@@ -108,8 +99,6 @@ func (r toolRequest) ref() string {
 		return r.CaseRef
 	case r.ApplicantRef != "":
 		return r.ApplicantRef
-	case r.CustomerRef != "":
-		return r.CustomerRef
 	case r.Service != "":
 		return r.Service
 	case r.Namespace != "":
@@ -145,7 +134,7 @@ func newServer() http.Handler {
 	mux.HandleFunc("/valuation", jsonTool("property_valuation", valueProperty))
 	mux.HandleFunc("/aml-screen", jsonTool("aml_screen", screenAML))
 	mux.HandleFunc("/case-note", jsonTool("case_note_write", writeCaseNote))
-	// Card support: the identity check and the card system (cards.go).
+	// The member assistant's card system (cards.go).
 	newCardDesk().register(mux)
 	// Claims triage. claim_settle is the one the ToolPolicy guards; the other
 	// three are the reads and the escape hatch that make the refusal

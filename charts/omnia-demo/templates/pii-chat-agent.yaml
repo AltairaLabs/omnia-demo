@@ -51,14 +51,10 @@ spec:
 {{- end }}
 {{- end }}
 ---
-# The identity-check backend. One Deployment, not two: this demo has no trust
-# boundary to draw — unlike mortgageUnderwriting, where the split into
-# case-systems and income-verify IS the argument. Here the tool exists so the
-# SSN travels through a tool call as well as a message, and one Service is
-# enough to make that true.
-#
-# Same image as the mortgage stubs, which is why the repository value reads as
-# mortgage-specific.
+# The card system behind the member assistant (cards.go in the mortgage stubs'
+# image, which is why the repository value reads as mortgage-specific). Named
+# pii-chat-identity from when it was an identity check; the name is kept so the
+# Service and its callers don't churn.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -137,7 +133,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
-    app.kubernetes.io/component: card-support
+    app.kubernetes.io/component: member-assistant
 {{- if $pc.deterministic }}
   # The runtime reads these from the AgentRuntime, not from an env var: the
   # operator does stamp OMNIA_MOCK_PROVIDER onto the container, but nothing

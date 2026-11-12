@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
 #
-# Source of truth for the card-support agent's behaviour.
+# Source of truth for Larkmere's member assistant (the agent is still named
+# pii-chat, and its prompt keyed card_support).
 #
 # This directory is the editable source for the example pack.
 #
@@ -25,7 +26,7 @@ spec:
   # by the SDK when spec.memory.enabled is set on the AgentRuntime, not pack
   # tools. Declaring them would be describing something the pack does not own.
   tools:
-    - file: tools/verify-identity.tool.yaml
+    - file: tools/get-card-status.tool.yaml
     - file: tools/freeze-card.tool.yaml
     - file: tools/unfreeze-card.tool.yaml
 
