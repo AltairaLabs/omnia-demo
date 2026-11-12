@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -388,14 +389,11 @@ func assistantProxy(agentURL string, m member, iss *demoidp.Issuer) (http.Handle
 			pr.Out.Header.Set("x-user-email", m.email)
 			pr.Out.Header.Set("x-user-roles", m.roles)
 			// The member's token, as a real edge forwards the IdP's: the
-			// browser's own Authorization (it has none) never passes.
+			// browser's own Authorization (it has none) never passes. It was
+			// signed before the proxy ran (below), so the headers above never
+			// go without it.
 			pr.Out.Header.Del("Authorization")
-			if iss != nil {
-				tok, err := iss.Sign(m.id, m.email, memberTokenTTL)
-				if err != nil {
-					log.Printf("assistant: signing the member token: %v", err)
-					return
-				}
+			if tok, ok := pr.In.Context().Value(memberTokenKey{}).(string); ok {
 				pr.Out.Header.Set("Authorization", "Bearer "+tok)
 			}
 		},
@@ -417,9 +415,26 @@ func assistantProxy(agentURL string, m member, iss *demoidp.Issuer) (http.Handle
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+		// With an issuer the site is the member's identity provider, and the
+		// asserted member goes to the agent only with a token for them. A token
+		// that can't be signed refuses the connection: forwarding the headers
+		// alone would hand the agent's tools a member nobody verified.
+		if iss != nil {
+			tok, err := iss.Sign(m.id, m.email, memberTokenTTL)
+			if err != nil {
+				log.Printf("assistant: signing the member token: %v", err)
+				http.Error(w, "assistant unavailable", http.StatusBadGateway)
+				return
+			}
+			r = r.WithContext(context.WithValue(r.Context(), memberTokenKey{}, tok))
+		}
 		proxy.ServeHTTP(w, r)
 	}), nil
 }
+
+// memberTokenKey carries the member's signed token from the handler to the
+// proxy's Rewrite.
+type memberTokenKey struct{}
 
 // memberTokenTTL bounds a member token. Nothing Omnia mints from it outlives
 // it, and a conversation re-exchanges it on every message, so it covers the

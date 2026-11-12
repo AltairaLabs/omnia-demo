@@ -387,6 +387,35 @@ func TestMyDataNeedsIssuer(t *testing.T) {
 	}
 }
 
+// With an issuer, the identity headers go only WITH a token for the member: a
+// token that can't be signed refuses the connection, rather than sending the
+// asserted member with nothing to verify them by.
+func TestAssistantRefusesWithoutAToken(t *testing.T) {
+	called := false
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer agent.Close()
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := brands["larkmere-mutual"]
+	b.who.id = "" // demoidp refuses to sign a token for no one
+	h, err := newServer(b, agent.URL, "", iss, endUserPlane{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	if code := do(t, http.MethodGet, srv.URL+assistantPath, nil); code != http.StatusBadGateway {
+		t.Fatalf("status %d", code)
+	}
+	if called {
+		t.Fatal("the agent was reached with identity headers and no token")
+	}
+}
+
 func TestAccountRoutesOffWithoutBackend(t *testing.T) {
 	srv := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
 	if resp, _ := get(t, srv.URL+receiptsPath); resp.StatusCode != http.StatusNotFound {

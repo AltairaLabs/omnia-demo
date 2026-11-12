@@ -39,8 +39,8 @@ history is card support's); the portal calls it the member assistant.
   TENANTS=larkmere-mutual`), which sets `piiChat.portal.enabled`, ambient memory
   (`piiChat.memory.retrieval`) and the portal's issuer in the operator's
   `delegation.trustedIssuers` (omnia-azure `values-azure.yaml`). Without the
-  trusted issuer the conversation has no verified user: no memory, and the card
-  tools refuse.
+  trusted issuer the conversation has no verified user, and so no memory. The
+  card tools still act on the member the portal asserts: see Gotchas.
 - The portal, forwarded:
   ```bash
   kubectl --context aks-omnia-demo -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
@@ -141,15 +141,18 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
 
 ## Gotchas
 
-- **The card tools act on the member the runtime names.** Omnia sends the
-  verified member's email on every tool call (`X-Omnia-User-Email`), and the
+- **The card tools act on the member the edge asserts.** Omnia sends the
+  email the portal asserted on every tool call (`X-Omnia-User-Email`), and the
   card system (`demos/mortgage-underwriting/cards.go`) acts on that member's
-  card. A call with no member is refused (401). If every card tool fails, check
-  the conversation has a verified user (below).
-- **No verified user, no memory.** If the portal's token is missing or its
-  issuer untrusted, the conversation opens but the runtime logs "no verified
-  user on this conversation", registers no memory tools, and the card tools
-  refuse. See `docs/stand-ins.md`, Front doors.
+  card. A call with no member is refused (401). Omnia forwards that email
+  whether or not the member's token was verified, and tells tools nothing about
+  which, so the card system trusts the edge exactly as far as edgeTrust does.
+  That's why the portal asserts a member only together with a token for them:
+  if it can't sign one, it refuses the connection.
+- **No verified user, no memory.** If the token is missing or its issuer
+  untrusted, the conversation opens but the runtime logs "no verified user on
+  this conversation" and registers no memory tools. See `docs/stand-ins.md`,
+  Front doors.
 - **A ToolPolicy is mandatory, and its absence is silent.** Cedar is
   default-deny under enterprise, so a registry with no ToolPolicy has every
   tool refused with `no-matching-permit`, and the transcript just looks like a

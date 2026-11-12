@@ -12,10 +12,10 @@
 // It connects the way the member portal does (demos/demo-sites, assistantProxy):
 // in-cluster, to the agent's Service, asserting the signed-in member in the
 // edge-trust headers and forwarding a token for them. The members are already
-// signed in, as at the portal, so nobody proves who they are in the chat. With
-// --issuer-url the callers are an identity provider of their own
-// (demos/demoidp), trusted by the install like the portal; without it the
-// conversation has no verified user, no memory, and the card tools refuse.
+// signed in, as at the portal, so nobody proves who they are in the chat. The
+// callers are an identity provider of their own (--issuer-url, demos/demoidp),
+// trusted by the install like the portal, and they assert a member only
+// together with a token for them: without --issuer-url they refuse to start.
 // Each conversation is its own WebSocket, so the mesh routes it to one version
 // and it stays there.
 package main
@@ -100,15 +100,21 @@ func main() {
 	pause := flag.Duration("pause", 20*time.Second, "wait between conversations")
 	turnTimeout := flag.Duration("turn-timeout", 90*time.Second, "longest wait for one reply")
 	count := flag.Int("count", 0, "conversations to hold, then exit (0: until stopped)")
-	issuerURL := flag.String("issuer-url", "", "sign a token for each caller as this issuer; empty: headers only")
+	issuerURL := flag.String("issuer-url", "", "sign a token for each caller as this issuer (required)")
 	addr := flag.String("addr", ":8080", "where the issuer's JWKS is served, with --issuer-url")
 	flag.Parse()
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
+	// A member asserted in headers with no token is one nobody verified: Omnia
+	// still forwards the asserted email to the card tools, so the callers never
+	// send one without the other.
+	if *issuerURL == "" {
+		log.Fatal("--issuer-url is required: the callers assert a member only with a token for them")
+	}
 	var iss *demoidp.Issuer
-	if *issuerURL != "" {
+	{
 		var err error
 		if iss, err = demoidp.New(*issuerURL); err != nil {
 			log.Fatalf("issuer: %v", err)

@@ -44,7 +44,14 @@ Add a row when you add a stand-in.
     tools and logs "no verified user on this conversation". An agent whose
     prompt uses memory tools will misbehave: card support, when it still
     checked identity in chat, looped on `verify_identity` until it was
-    aborted. The card tools also see no member and refuse.
+    aborted.
+  - **The card tools trust the asserted member, verified or not.** Omnia
+    forwards the asserted email on every tool call (`X-Omnia-User-Email`)
+    whether or not the token was exchanged, and sends tools no signal of
+    which. So the sites assert a member only together with a token for them:
+    with `--issuer-url`, a token that can't be signed refuses the connection,
+    and the card callers won't start without `--issuer-url`. Anyone who can
+    reach the agent's port directly can still assert any member, as below.
   - **The key is not persisted.** It is generated at start, so a restart
     rotates it. The mint refetches the JWKS when it meets an unknown key id.
   - **The site cannot be trusted further than its network.** Anyone who can

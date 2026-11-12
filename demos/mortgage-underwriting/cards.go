@@ -12,11 +12,16 @@ import (
 // member's card, and whether it is frozen.
 //
 // The member is the one Omnia's runtime names on the tool call: it forwards the
-// email the edge asserted for the verified user (X-Omnia-User-Email; see
-// wren.go for why the email, not X-Omnia-User-Id, which is a pseudonym). No
-// argument the model writes selects the member, so the agent can act only on
-// the card of the person it is talking to. A call with no member acts on no
-// card at all.
+// email the edge asserted (X-Omnia-User-Email; see wren.go for why the email,
+// not X-Omnia-User-Id, which is a pseudonym). No argument the model writes
+// selects the member, so the agent can act only on the card of the person the
+// edge says it is talking to. A call with no member acts on no card at all.
+//
+// The email is the EDGE's assertion, not a verified user: Omnia forwards it
+// whether or not the member's token was exchanged for a subject proof, and
+// sends tools no signal of which. So this card system trusts the edge exactly
+// as far as edgeTrust does, and the edges (demo-sites, card-callers) assert a
+// member only together with a token for them (docs/stand-ins.md).
 //
 // The routes take no arguments for the same reason. Before they existed, card
 // support said "your card has been frozen" with nothing to freeze it with: give
@@ -70,7 +75,7 @@ func (d *cardDesk) handle(tool, set string) http.HandlerFunc {
 
 func (d *cardDesk) serve(email, set string) (int, any) {
 	if email == "" {
-		return http.StatusUnauthorized, errorBody("no verified member on this call")
+		return http.StatusUnauthorized, errorBody("no member on this call")
 	}
 	h, ok := cardholders[email]
 	if !ok {

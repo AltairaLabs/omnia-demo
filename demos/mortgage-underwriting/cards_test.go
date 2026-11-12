@@ -69,7 +69,7 @@ func TestNoMemberNoCard(t *testing.T) {
 	defer srv.Close()
 	for _, path := range []string{"/card-status", "/card-freeze", "/card-unfreeze"} {
 		code, got := cardCall(t, srv, path, "")
-		if code != http.StatusUnauthorized || got["error"] != "no verified member on this call" {
+		if code != http.StatusUnauthorized || got["error"] != "no member on this call" {
 			t.Errorf("%s with no member: %d %v", path, code, got)
 		}
 		if code, _ := cardCall(t, srv, path, "someone@else.example"); code != http.StatusNotFound {
