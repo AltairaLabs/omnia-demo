@@ -29,11 +29,15 @@ name=$(basename "${file}")
 run="reingest-$(date +%s)"
 
 base=$(k get job omnia-demo-memory-ingest -o json)
-bucket=$(jq -r '.spec.template.spec.containers[0].env[] | select(.name=="S3_BUCKET") | .value' <<< "${base}")
-prefix=$(jq -r '.spec.template.spec.containers[0].env[] | select(.name=="S3_PREFIX") | .value' <<< "${base}")
-[[ -n "${bucket}" && "${bucket}" != null ]] || { echo "the ingest Job has no S3_BUCKET: is memory.objectStore enabled?" >&2; exit 1; }
+: "An absent variable, or one set by valueFrom, reads as empty, never as null."
+envval() { jq -r --arg n "$1" '[.spec.template.spec.containers[0].env[]? | select(.name==$n) | .value // empty][0] // ""' <<< "${base}"; }
+bucket=$(envval S3_BUCKET)
+prefix=$(envval S3_PREFIX)
+[[ -n "${bucket}" ]] || { echo "the ingest Job has no S3_BUCKET: is memory.objectStore enabled?" >&2; exit 1; }
 
 k create configmap "${run}" --from-file="${name}=${file}" >/dev/null
+: "The ConfigMap goes whatever happens; a failed Job keeps its pod for its logs."
+trap 'k delete configmap "${run}" --ignore-not-found >/dev/null' EXIT
 
 : "The init step does what the chart's does (make the bucket, mirror the"
 : "fixtures, which the in-cluster gateway loses on a restart), then puts the"
@@ -56,12 +60,17 @@ jq --arg run "${run}" --arg name "${name}" --arg bucket "${bucket}" --arg prefix
 ' <<< "${base}" | k apply -f - >/dev/null
 
 echo "==> ${name} -> s3://${bucket}/${prefix}${name}; ingesting (job ${run})"
-: "Never restarts and keeps a failed pod, so its logs can be read."
-if ! k wait --for=jsonpath='{.status.conditions[0].status}'=True "job/${run}" --timeout=300s >/dev/null \
-   || [[ "$(k get "job/${run}" -o jsonpath='{.status.succeeded}')" != 1 ]]; then
+: "Never restarts and keeps a failed pod, so its logs can be read. Wait on the"
+: "counts, not on a condition: a failing Job sets FailureTarget before Failed."
+state=""
+for _ in $(seq 150); do
+  state=$(k get "job/${run}" -o jsonpath='{.status.succeeded}/{.status.failed}')
+  [[ "${state}" == 1/* || "${state}" == */1 ]] && break
+  sleep 2
+done
+if [[ "${state}" != 1/* ]]; then
   k logs "job/${run}" --all-containers --tail=20 >&2 || true
-  echo "re-ingest failed" >&2
+  echo "re-ingest failed (succeeded/failed: ${state:-none} after 300s)" >&2
   exit 1
 fi
 k logs "job/${run}" -c ingest --tail=5
-k delete configmap "${run}" >/dev/null

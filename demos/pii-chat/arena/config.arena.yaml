@@ -21,7 +21,7 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # The identity check and the card system. memory__remember and memory__recall
+  # The card system, acting on the signed-in member. memory__remember and memory__recall
   # are NOT declared here: they are PromptKit platform capabilities registered
   # by the SDK when spec.memory.enabled is set on the AgentRuntime, not pack
   # tools. Declaring them would be describing something the pack does not own.

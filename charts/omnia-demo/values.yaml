@@ -201,17 +201,16 @@ mortgageUnderwriting:
   deterministic: false
 
 # ---------------------------------------------------------------------------
-# piiChat — the PII redaction demo (card support chat)
+# piiChat — Larkmere's member assistant (demos 6, 7 and 9)
 #
-# A chat agent that is GIVEN sensitive data and a tool that legitimately needs
-# it, so the SessionPrivacyPolicy has something real to redact in two places:
-# the stored message content, and the stored tool-call arguments.
+# A signed-in member's assistant: card tools that act on that member, user
+# memory, and a SessionPrivacyPolicy that strips a pasted card number from the
+# stored transcript.
 #
 # What this demo does NOT show, and must not be narrated as showing: inbound
-# redaction. The user's text reaches the model intact and the SSN is dispatched
-# to the tool intact. Omnia has no control that strips PII before the model —
-# the redaction is on the write path into session-api. See
-# demos/pii-chat/RUNBOOK.md.
+# redaction. The member's text reaches the model intact. Omnia has no control
+# that strips PII before the model; the redaction is on the write path into
+# session-api. See demos/pii-chat/RUNBOOK.md.
 #
 # Requires Omnia Enterprise CRDs for the runtime and privacy policy.
 # ---------------------------------------------------------------------------
@@ -222,8 +221,8 @@ piiChat:
   providerRef: ""
   enabled: false
 
-  # The identity-check backend. Same image and same Go binary as the mortgage
-  # stubs — it serves /verify-identity alongside that demo's seven endpoints.
+  # The card system's backend. Same image and same Go binary as the mortgage
+  # stubs: it serves the card endpoints alongside that demo's seven.
   #
   # The repository name reads as mortgage-specific because it is shared, not
   # because this demo is part of that one. A second image would have to be
@@ -260,12 +259,11 @@ piiChat:
     redact: true
     # -- replace | mask | hash
     #
-    # replace -> [REDACTED_SSN]; mask -> *******6789; hash -> [HASH_SSN:a1b2...].
+    # replace -> [REDACTED_CC]; mask -> ************4471; hash -> [HASH_CC:a1b2...].
     #
     # replace is the one to film. The token names the KIND of thing that was
-    # removed, so the record alone tells a viewer "an SSN was here and the
-    # policy took it". mask shows that something was scrubbed but not what, and
-    # *******6789 beside *******4471 is two anonymous runs of stars.
+    # removed, so the record alone tells a viewer "a card number was here and
+    # the policy took it". mask shows that something was scrubbed but not what.
     #
     # It also matches the Omnia chart's global default policy, which matters
     # beyond taste: memory-api resolves its policy with an EMPTY agent name, so
@@ -323,9 +321,12 @@ piiChat:
   # identifiers and genuinely calling the tool, and with a key that is what you
   # get.
   #
+  # OUT OF DATE: the script still replays the retired SSN-in-chat conversation.
+  # Rewrite it before turning this on.
+  #
   # Turn it ON to capture. Deterministic mode needs no API key and fixes the
-  # exact three-turn conversation, while the tool call, the identity service,
-  # the privacy policy and the session record all stay live. The ONLY thing
+  # exact conversation, while the tool calls, the card system, the privacy
+  # policy and the session record all stay live. The ONLY thing
   # faked is the assistant's words. It always uses the demo's own mock
   # Provider, whatever llm.providerRef says.
   #
@@ -346,7 +347,7 @@ piiChat:
   # default posture and rejects unauthenticated callers.
   #
   # Why a portal at all: the dashboard Console is an OPERATOR surface, and
-  # filming a cardholder typing their SSN into admin tooling implies customers
+  # filming a cardholder typing their card number into admin tooling implies customers
   # can reach your ops console. It is also the only place an EU AI Act Art. 50
   # disclosure is actually DELIVERED to a person — the panel renders it from
   # `connected.ai_disclosure` on the wire rather than hardcoding it, which is
