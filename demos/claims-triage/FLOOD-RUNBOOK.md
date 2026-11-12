@@ -1,7 +1,8 @@
 # What members ask that we can't answer (demo 11)
 
 **Held**: the agent half needs an Omnia fix (functions get no institutional
-memory through retrieval, below). The Galaxy half runs today.
+memory through retrieval, below). The Galaxy half needs no Omnia change, but
+hasn't yet been walked through on camera against the 10k corpus.
 
 The head of claims looks for gaps in the society's guidance. The Memory
 Galaxy shows a large cluster of members asking about flood and no flood
