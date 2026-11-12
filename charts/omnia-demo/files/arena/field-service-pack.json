@@ -63,16 +63,16 @@
   },
   "compilation": {
     "compiled_with": "packc-dev",
-    "created_at": "2026-11-12T20:34:33Z",
+    "created_at": "2026-11-12T20:43:13Z",
     "schema": "v1"
   },
   "metadata": {
     "observed": {
-      "source_commit": "8e3aeb7b98bb943c5ea9e977aaf08fb1da69de22",
+      "source_commit": "fb2c00b73b3b3124d7a1ad8d1659b7912c5b9c37",
       "working_tree_clean": true,
       "source_author": "Charlie Holland <charlie@hollandtech.net>",
-      "source_committed_at": "2026-11-12T20:34:32Z",
-      "source_describe": "8e3aeb7"
+      "source_committed_at": "2026-11-12T20:43:11Z",
+      "source_describe": "fb2c00b-dirty"
     },
     "asserted": {
       "domain": "energy-utilities",
