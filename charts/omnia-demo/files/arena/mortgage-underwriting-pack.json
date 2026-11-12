@@ -343,17 +343,17 @@
     }
   },
   "compilation": {
-    "compiled_with": "packc-1.5.2",
-    "created_at": "2026-11-09T15:18:15Z",
+    "compiled_with": "packc-dev",
+    "created_at": "2026-11-12T20:07:00Z",
     "schema": "v1"
   },
   "metadata": {
     "observed": {
-      "source_commit": "b3393327a709d7de1bae0fa2c0e78d337d9777ed",
+      "source_commit": "74160b991fe308656f7964c92b11fbf961a9db4b",
       "working_tree_clean": true,
       "source_author": "Charlie Holland <charlie@hollandtech.net>",
-      "source_committed_at": "2026-11-09T15:18:10Z",
-      "source_describe": "b339332-dirty"
+      "source_committed_at": "2026-11-12T20:06:58Z",
+      "source_describe": "74160b9-dirty"
     },
     "asserted": {
       "domain": "financial-services",
