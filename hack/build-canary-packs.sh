@@ -25,7 +25,8 @@ SRC="${ROOT}/demos/pii-chat/canary"
 # run of 2.0 passes partly on the first run's scores. Bump it for a clean run.
 # `make canary` refuses an id that already has results.
 # r7: the member assistant; the judge checks for promised outcomes.
-EVAL_REVISION=r7
+# r8: the same judge, after the base prompt's memory guidelines changed.
+EVAL_REVISION=r8
 
 for ver in 2.0 2.1; do
   out="${ARENA}/pii-chat-pack-v${ver}.json"

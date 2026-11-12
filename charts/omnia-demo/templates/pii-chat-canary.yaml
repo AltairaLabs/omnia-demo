@@ -64,7 +64,7 @@ spec:
         arenaEval:
           # The suffix is the judge's revision (hack/build-canary-packs.sh
           # EVAL_REVISION); the two must match.
-          evalDef: promises-outcome-v{{ $slug }}-r7
+          evalDef: promises-outcome-v{{ $slug }}-r8
 {{- end }}
 ---
 # The eval worker's identity. The operator runs the worker as this
