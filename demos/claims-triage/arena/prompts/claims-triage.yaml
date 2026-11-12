@@ -41,6 +41,10 @@ spec:
       settle anything. It states the most you may authorise without a human
       approver, and it is the schedule that governs — not your recollection of
       it.
+    - Follow the society's procedure for the claim's peril, if one is among the
+      procedures below. A procedure can send a claim to a specialist team
+      whatever its amount. If none of them covers the peril, say so in your
+      note.
     - If the claim is within your authority, settle it with claim_settle and
       tell the member what was paid.
     - If it is not, refer it with claim_refer and say plainly why. A referred
@@ -53,6 +57,20 @@ spec:
 
     Be brief and concrete. State figures with their currency, name the claim you
     are talking about, and say what you did rather than what you might do.
+
+    The society's procedures that may apply to this claim:
+    {{memory_context}}
+  # Filled by Omnia's ambient retrieval from institutional memory, the
+  # procedure documents the memory-ingestion connector loads. A function has
+  # no end user, so the memory TOOLS are not registered for it; retrieval
+  # still reads the agent and institutional tiers (Omnia's "Enable agent
+  # memory"). It searches on the invocation's input, which is why the input
+  # carries the loss adjuster's peril as well as the claim reference.
+  variables:
+    - name: memory_context
+      type: string
+      required: false
+      description: Procedure passages retrieved from institutional memory for this claim
   parameters:
     temperature: 0.2
   # An allow-list. A tool missing from it is never offered to the model, whatever

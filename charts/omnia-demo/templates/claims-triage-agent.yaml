@@ -159,6 +159,23 @@ spec:
       claim_ref:
         type: string
         description: "Claim reference, e.g. LM-40718."
+      peril:
+        type: string
+        description: "The loss adjuster's assessed cause, e.g. Flood, Escape of water. The claims system sends it with the claim; it is what the society's procedures are looked up by."
+{{- if $ct.procedures }}
+  # The society's procedures, from institutional memory (memory.enabled: the
+  # memory-ingestion connector loads them), retrieved into the prompt's
+  # memory_context variable for each invocation. A function has no end user,
+  # so Omnia registers no memory tools for it; ambient retrieval still reads
+  # the institutional tier, and searches on the input: the claim reference and
+  # the loss adjuster's peril.
+  memory:
+    enabled: true
+    tools:
+      enabled: false
+    retrieval:
+      enabled: true
+{{- end }}
   outputFormat: json_schema
   outputSchema:
     type: object

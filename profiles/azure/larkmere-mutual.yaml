@@ -11,6 +11,14 @@ mortgageUnderwriting:
 
 claimsTriage:
   enabled: true
+  # The agent reads the society's procedures from institutional memory.
+  procedures: true
+
+# The society's procedure documents (files/fixtures/memory-s3), loaded into
+# institutional memory by the memory-ingestion connector. There is no flood
+# procedure among them: that's the gap demo 11 closes on stage.
+memory:
+  enabled: true
 
 piiChat:
   enabled: true

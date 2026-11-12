@@ -427,6 +427,11 @@ claimsTriage:
   # length, stream timeout), which a shared Provider does not carry.
   providerRef: ""
   enabled: false
+  # -- The agent looks up the society's procedure for each claim's peril in
+  # institutional memory (memory__recall). Needs memory.enabled for the
+  # documents. The flood gap demo (demo 11) adds the flood procedure on stage:
+  # demos/claims-triage/RUNBOOK.md.
+  procedures: false
 
   # The claims system stub. Same image and same Go binary as the mortgage
   # stubs — it serves /claim, /claim-policy, /claim-settle and /claim-refer
@@ -514,6 +519,18 @@ incidentAgent:
 #
 # Requires Omnia Enterprise CRDs for the runtime, policy and schedule.
 # ---------------------------------------------------------------------------
+# -- Halvern Partners' research function (demo 10, research on a budget).
+#
+# One client matter per invocation, run in batches (hack/research-batch.sh)
+# under the workspace's daily budget (workspace.costControls). It runs on a
+# mock Provider, at a fraction of a cent a run, against a cap of fractions of a
+# cent: spending real money to show that spending stops would be burning it.
+# Put it in a workspace of its own (profiles/azure/halvern-research.yaml): a
+# budget covers every agent in its workspace, and reaching it would block them
+# all.
+researchFunction:
+  enabled: false
+
 dataAnalyst:
   # -- A Provider in the namespace for this demo alone. Wins over
   # llm.providerRef.
