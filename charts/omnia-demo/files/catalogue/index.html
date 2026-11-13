@@ -60,7 +60,7 @@
 <header>
   <h1>Omnia demo catalogue</h1>
   <p>Every demo on this install, by tenant. Each tenant is its own Omnia workspace, so the same person has different pseudonyms in each, nothing is shared between them, and each has its own budget. Links open the dashboard scoped to that workspace.</p>
-  <p>The numbers are an order to show them in, from familiar ground to what only a platform does: 1–2 an agent run properly, 3–5 guardrails you can't prompt your way to, 6–8 it knows your customers safely, 9–10 change it without breaking it, 11 learn from it. Held means built and waiting on an Omnia fix.</p>
+  <p>The numbers are an order to show them in, from familiar ground to what only a platform does: 1–2 an agent run properly, 3–5 guardrails you can't prompt your way to, 6–8 it knows your customers safely, 9–10 change it without breaking it, 11 learn from it, 12 build your own. Held means built and waiting on an Omnia fix.</p>
 </header>
 
 <section class="tenant" id="larkmere-mutual">
@@ -175,6 +175,12 @@
   <table>
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
+      <tr>
+        <td class="name"><span class="step">12</span><a href="/projects?workspace=halvern-partners">Build, test and ship an agent</a></td>
+        <td>A Halvern engineer builds a supplier contract triage agent for Larkmere's in-house legal team, all in the dashboard. Try it on three contracts, catch the one it misses (an uncapped indemnity), add a scenario that fails, fix the prompt by hand, and run again until every scenario passes. Then deploy it as a versioned agent, and ship the next change gradually. Runs and deploys build only from pushed commits, so what was tested is what ships.</td>
+        <td><span class="cap">Try it</span><span class="cap">Evaluation runs</span><span class="cap">Projects as git</span><span class="cap">Deploy</span></td>
+        <td class="status live">Live</td>
+      </tr>
       <tr>
         <td class="name"><a href="/projects?workspace=halvern-partners">Arena builder</a></td>
         <td>Describe an agent and the builder agrees a brief, writes the PromptArena project in a sandbox, validates it and runs it on real models.</td>
