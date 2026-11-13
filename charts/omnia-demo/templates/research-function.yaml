@@ -1,8 +1,7 @@
 {{- if .Values.researchFunction.enabled }}
 ---
 # Halvern Partners' research function (demo 10, "research on a budget"): one
-# client matter per invocation, run in batches by the knowledge team
-# (hack/research-batch.sh), under the workspace's daily budget.
+# client matter per invocation, under the workspace's daily budget.
 #
 # A MOCK Provider. The demo's point is that spend stops at the cap, and
 # spending real money to show that would be burning it: the mock answers with
@@ -83,10 +82,8 @@ spec:
       port: 8080
       async:
         enabled: false
-  # The knowledge team's batch job calls the function with a client key,
-  # minted with Omnia's hack/mint-client-key.sh: a Secret owned by this
-  # AgentRuntime holding the key's hash, never the key, and never in a CR.
-  # hack/research-batch.sh sends it as a bearer token.
+  # Admits only callers holding a client key (Omnia's hack/mint-client-key.sh).
+  # The demo mints none: the function is invoked from the dashboard.
   externalAuth:
     clientKeys: {}
   inputSchema:

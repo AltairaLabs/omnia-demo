@@ -1,10 +1,10 @@
 # Research on a budget (demo 10)
 
-Halvern Partners' knowledge team runs a research function in batches: one
-client matter per call, asking what a regulatory change means for it. The
-workspace has a daily budget with `block`. Partway through a batch the budget
-is spent, and the rest of the batch is refused rather than spent; cost
-analytics shows what used it.
+Halvern Partners' knowledge team runs a research function once per client
+matter, asking what a regulatory change means for it. The workspace has a
+daily budget with `block`. Partway through the matters the budget is spent,
+and the rest are refused rather than spent; cost analytics shows what used
+it.
 
 The function runs in a workspace of its own, `halvern-research`, because a
 budget covers every agent in its workspace: reaching it here blocks nothing
@@ -25,34 +25,22 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
 
 1. Show the budget (dashboard, Costs, Halvern Partners Research): $0.005 a
    day, `block`.
-2. Start the batch. From the dashboard as the operator, or with a client key:
-   ```bash
-   kubectl --context aks-omnia-demo -n halvern-research port-forward svc/research 8895:8080
-   # from a checkout of the Omnia repository, in a second terminal:
-   RESEARCH_KEY=$(hack/mint-client-key.sh --context aks-omnia-demo \
-     --namespace halvern-research --agent research --id knowledge-team) \
-     ../omnia-demo/hack/research-batch.sh 20 30
-   ```
-   There is no dashboard page for client keys: Omnia's `hack/mint-client-key.sh`
-   prints the token once and stores only its hash. Revoke it afterwards with
-   `kubectl --context aks-omnia-demo -n halvern-research delete secret agent-research-clientkey-knowledge-team`.
-   Each call prints `served`, until the budget is spent; after that, `refused,
-   budget exceeded`. The last line counts both.
+2. Run the function from the dashboard (Functions, research), one matter at
+   a time. Each run is served until the budget is spent; after that it is
+   refused with `budget_exceeded`.
 3. Show cost analytics: the runs that used the budget, and the workspace's
    `WithinBudget` condition false.
 
 Verified live 2026-11-12, 20 calls 30 seconds apart from the dashboard as the
 operator: 10 served, then 10 refused with `budget_exceeded`; the workspace's
 `WithinBudget` condition went false (`DailyBudgetExceeded`, $0.0084 spent).
-`hack/research-batch.sh` makes the same calls with a client key; it has not yet
-been run against the cluster.
 
 ## Gotchas
 
 - **Refusals start up to about 5½ minutes after the cap is reached.** The
   operator reads spend from session-api about every five minutes, and the
-  facade refuses from what it last heard. A batch fired all at once is served
-  in full before the block lands, so pace it: 20 calls 30 seconds apart.
+  facade refuses from what it last heard. Runs fired all at once are all
+  served before the block lands, so pace them: 20 runs 30 seconds apart.
 - **Reset for the next take:** the budget is daily, so the next day's batch
   starts afresh. To run again the same day, raise `dailyBudget` and
   `make demos TENANTS=halvern-research`.

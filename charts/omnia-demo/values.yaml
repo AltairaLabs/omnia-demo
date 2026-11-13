@@ -538,8 +538,7 @@ incidentAgent:
 # ---------------------------------------------------------------------------
 # -- Halvern Partners' research function (demo 10, research on a budget).
 #
-# One client matter per invocation, run in batches (hack/research-batch.sh)
-# under the workspace's daily budget (workspace.costControls). It runs on a
+# One client matter per invocation, under the workspace's daily budget (workspace.costControls). It runs on a
 # mock Provider, at a fraction of a cent a run, against a cap of fractions of a
 # cent: spending real money to show that spending stops would be burning it.
 # Put it in a workspace of its own (profiles/azure/halvern-research.yaml): a
