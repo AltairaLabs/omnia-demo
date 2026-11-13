@@ -68,8 +68,7 @@ history is card support's); the portal calls it the member assistant.
    is.
 2. Then: *"Thanks. And in future please text me rather than call, I'm in
    meetings most of the day."* It records a case note (`memory__remember`).
-3. **Wait at least 30 seconds** (the runtime caches a member's profile for 30
-   seconds, Omnia #3991), close the panel, and open a new conversation: *"Hi, I
+3. Close the panel, reload the page, and open a new conversation: *"Hi, I
    found my card. Can you unfreeze it, and how will you let me know if anything
    else comes up?"* It unfreezes the card and says it will text her.
 4. Operator side: open the second session and show its system prompt. Under
@@ -80,10 +79,10 @@ conversation saved "Ellen prefers to be contacted by text rather than calls"
 as a preference; 36 seconds later the second said "I'll make sure to contact
 you via text, as that's your preferred method".
 
-**Ask the second question only after 30 seconds.** Asked sooner, the
-assistant can't see the note yet (#3991); a take on 2026-11-12 asked after 13
-seconds, and the assistant saved the member's question as a new "preference",
-replacing the real one.
+There is no wait any more: on Omnia main `896d399a7eea` a save clears the
+runtime's profile cache (#3991). Re-checked 2026-11-13: a new conversation
+opened about 15 seconds after the save said "Since you prefer to be contacted
+by text rather than calls, we'll send you a text message".
 
 ## Demo 7: people type things they shouldn't
 
@@ -220,7 +219,7 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
 ## Related
 
 - [`CONSENT-RUNBOOK.md`](CONSENT-RUNBOOK.md), demo 8: Ellen's consent and
-  erasure on Your data (held on Omnia #3984 and #3991).
+  erasure on Your data (withdrawal held on Omnia #4088).
 - [`../mortgage-underwriting/RUNBOOK.md`](../mortgage-underwriting/RUNBOOK.md):
   a ToolPolicy refusing a call on its payload, the honest answer when someone
   asks for inbound redaction.
