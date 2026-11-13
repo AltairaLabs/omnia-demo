@@ -66,6 +66,12 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
   Quillon's unilateral changes. So the flaw, the failing test and the fix
   need the **seed** prompt; use the builder only to show drafting, or skip
   it.
+- **The seed path, verified on Foundry** (project `contract-triage-seed`):
+  with the seed's files and the imported Provider, the first evaluation run
+  failed `uncapped-indemnity` on both assertions and passed
+  `data-protection`; after the beat 4 fix, both passed. The seed's "flag
+  only clauses that fail one of these checks" is what makes it miss: an
+  earlier wording let gpt-4o flag the indemnity anyway.
 - **Try it** has **Save as scenario**: it turns the conversation into a
   scenario, which is beat 3 without pasting a file.
 
@@ -86,8 +92,10 @@ every change except `out/`, commit ("feat: first draft from the builder")
 and **Sync**.
 
 **Fallback (the builder is slow or unusable):** create the project and add
-the files in `seed/` instead (prompt and one scenario), then Import >
-Provider... the workspace's Foundry Provider.
+the files in `seed/` instead (`config.arena.yaml`, the prompt and one
+scenario), then Import > Provider... `azure-foundry-gpt-4o` (it writes
+`providers/halvern-partners-azure-foundry-gpt-4o.provider.yaml`, the file the
+seed's config names). Commit and **Sync**.
 
 ### 2. Try it
 

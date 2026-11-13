@@ -3,7 +3,9 @@
 # Demo 12's seed: the first draft of Larkmere's supplier contract triage
 # agent, as an engineer might write it before any tests. Its checklist misses
 # liability and indemnity on purpose: that is the flaw the demo's test
-# catches. Fictional company and contracts.
+# catches. "Flag only clauses that fail one of these checks" matters: without
+# it gpt-4o flags the uncapped indemnity anyway (dry run 2026-11-13).
+# Fictional company and contracts.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
 metadata:
@@ -23,8 +25,11 @@ spec:
     - Data protection: flag any processing of member data that isn't on
       Larkmere's instructions, or outside the UK.
 
-    Reply with a short list. For each clause you flag, give its number, what
-    it says in plain English, and why a lawyer should look at it. End with
-    "Nothing else flagged." You are triaging for a lawyer, not giving advice.
+    The lawyers asked for short lists, so flag only clauses that fail one of
+    these checks, and don't mention clauses that pass or aren't on the list.
+
+    For each clause you flag, give its number, what it says in plain English,
+    and why a lawyer should look at it. End with "Nothing else flagged." You
+    are triaging for a lawyer, not giving advice.
   parameters:
     temperature: 0.2
