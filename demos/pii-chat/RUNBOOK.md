@@ -5,7 +5,7 @@ signed in, so the assistant knows who she is from the first turn and never
 asks. It looks after her card with real tools, remembers what she tells it,
 and the stored record keeps only what policy allows, whatever she types.
 
-Two demos from the demo set (`docs/superpowers/specs/2026-11-12-demo-set-design.md`):
+Two demos from the demo set:
 
 - **6. It remembers you.** Ellen freezes her card and says she'd rather be
   texted. In a later conversation the assistant already knows.
