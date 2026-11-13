@@ -34,6 +34,31 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
    `contract-triage` (Agents) if a previous take left them.
 3. Open the three contracts in `contracts/` ready to paste.
 
+## Dry run 2026-11-13 (what to expect)
+
+- **New project, Generate with AI** is the builder. It asks three questions
+  (what the agent does, which scenarios, tone), writes a brief, and **Build**
+  writes and validates the kit in about 30 seconds. It bound the deploy to
+  `azure-foundry-gpt-4o` but gave the kit a **mock** provider for runs: a run
+  tests the prompt only after **Import > Provider...** of a Foundry Provider
+  (or ask the builder to run on the real provider).
+- **Every new agent needs a federated credential before it can call
+  Foundry.** The dev agent (named after the project and you) and a deployed
+  `contract-triage` each get a new service account, and AKS workload identity
+  refuses it ("an internal error occurred", `AADSTS700213` in the pod log)
+  until it is federated. Right after **Try it** shows the agent, and again
+  right after **Deploy**, run:
+  ```bash
+  make -C ../omnia-azure workspace-identity WS=halvern-partners
+  ```
+  then wait about 30 seconds and start a **New session**. (omnia-azure gap: it
+  federates only the agents that exist when it runs.)
+- On the builder's draft, Brightpost's indemnity **was** flagged (gpt-4o).
+  Use Fernside and Quillon next; whichever is missed is the flaw. If none,
+  use the seed.
+- **Try it** has **Save as scenario**: it turns the conversation into a
+  scenario, which is beat 3 without pasting a file.
+
 ## The beats
 
 ### 1. Draft (builder)
