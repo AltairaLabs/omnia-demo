@@ -173,6 +173,20 @@ canary-reset:
 	$(KUBECTL) -n $(CANARY_NS) rollout status deploy/$(CANARY_AGENT) --timeout=300s >/dev/null; \
 	echo "==> $(CANARY_AGENT) back on 1.0.0, no rollout, callers stopped"
 
+# Halvern's research run on a budget (demo 10): the ScheduledFunction
+# research-run fires the function every 30s until the workspace's daily budget
+# refuses it. Explicitly suspended at rest, so the budget isn't spent early.
+RESEARCH_NS ?= halvern-research
+
+.PHONY: research-start research-stop
+research-start:
+	@$(KUBECTL) -n $(RESEARCH_NS) patch scheduledfunction research-run --type merge -p '{"spec":{"suspend":false}}' >/dev/null; \
+	echo "==> research-run firing every 30s; watch Costs (Halvern Partners Research). Stop: make research-stop"
+
+research-stop:
+	@$(KUBECTL) -n $(RESEARCH_NS) patch scheduledfunction research-run --type merge -p '{"spec":{"suspend":true}}' >/dev/null; \
+	echo "==> research-run suspended"
+
 builder:
 	@$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" builder BUILDER_TARGETS="$(BUILDER_TENANT):$(BUILDER_PROVIDER)"
 

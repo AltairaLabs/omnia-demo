@@ -123,4 +123,33 @@ spec:
     - name: default
       providerRef:
         name: research-mock
+---
+# The knowledge team's research run: the function on a schedule, one matter
+# a fire, until the workspace's budget refuses it. Paced (`every`) because the
+# operator reads spend about every five minutes: fired all at once, every run
+# would be served before the block lands. Suspended until `make research-start`,
+# so the day's budget isn't spent before the take.
+{{- $s := .Values.researchFunction.schedule }}
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ScheduledFunction
+metadata:
+  name: research-run
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: research
+spec:
+  functionRef:
+    name: research
+  # A stable per-schedule system principal (system:schedule:<ws>/research-run).
+  runAs:
+    systemUser: {}
+  schedule:
+    cron: "@every {{ $s.every }}"
+    concurrencyPolicy: Forbid
+  suspend: {{ $s.suspend }}
+  timeoutSeconds: 60
+  input:
+    matter_ref: "M-17"
+    change: "The Consumer Duty extended to closed-book products"
 {{- end }}

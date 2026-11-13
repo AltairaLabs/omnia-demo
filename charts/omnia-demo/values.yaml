@@ -546,6 +546,11 @@ incidentAgent:
 # all.
 researchFunction:
   enabled: false
+  # The research run (ScheduledFunction research-run). Explicitly suspended
+  # until `make research-start`; `make research-stop` suspends it again.
+  schedule:
+    every: 30s
+    suspend: true
 
 dataAnalyst:
   # -- A Provider in the namespace for this demo alone. Wins over
