@@ -51,8 +51,10 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
   ```bash
   make -C ../omnia-azure workspace-identity WS=halvern-partners
   ```
-  then wait about 30 seconds and start a **New session**. (omnia-azure gap: it
-  federates only the agents that exist when it runs.)
+  then wait about 30 seconds and start a **New session**. A stopgap: the
+  target federates only the agents that exist when it runs, and Azure has no
+  wildcard subject. The fix is upstream, Omnia #4052 (one cloud identity per
+  workspace for Provider calls, separate from each agent's own).
 - On the builder's draft, Brightpost's indemnity **was** flagged (gpt-4o).
   Use Fernside and Quillon next; whichever is missed is the flaw. If none,
   use the seed.
