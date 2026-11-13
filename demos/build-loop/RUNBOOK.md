@@ -54,9 +54,18 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
   target federates only the agents that exist when it runs, and Azure has no
   wildcard subject. The fix is upstream, Omnia #4052 (one cloud identity per
   workspace for Provider calls, separate from each agent's own).
-- On the builder's draft, Brightpost's indemnity **was** flagged (gpt-4o).
-  Use Fernside and Quillon next; whichever is missed is the flaw. If none,
-  use the seed.
+- **The builder does not commit.** Its files sit in **Source control** as
+  changes, and a Deploy of the uncommitted project fails at **Compile** with
+  "no prompts found in registry": the snapshot is the empty initial commit.
+  Commit the draft (everything except `out/`, which holds the builder's own
+  validation runs) and **Sync** first. After that, Deploy went Snapshot,
+  Compile, Publish, Agent ready (`... is running 1.0.1`), and the deployed
+  agent answered on Foundry once `workspace-identity` had federated it.
+- **The builder's draft catches all three traps** (gpt-4o, deployed agent):
+  Brightpost's indemnity, Fernside's 36-month renewal on 9 months' notice and
+  Quillon's unilateral changes. So the flaw, the failing test and the fix
+  need the **seed** prompt; use the builder only to show drafting, or skip
+  it.
 - **Try it** has **Save as scenario**: it turns the conversation into a
   scenario, which is beat 3 without pasting a file.
 
@@ -72,7 +81,9 @@ Projects, **New project**, hosted, name `contract-triage`. In the editor,
 > look at, and says why. Include two or three test scenarios.
 
 Select **Build**. The builder writes the prompt, scenarios and
-`config.arena.yaml`, and commits.
+`config.arena.yaml`, but does not commit them. **Source control**: select
+every change except `out/`, commit ("feat: first draft from the builder")
+and **Sync**.
 
 **Fallback (the builder is slow or unusable):** create the project and add
 the files in `seed/` instead (prompt and one scenario), then Import >
@@ -121,8 +132,8 @@ every scenario passes.
 
 ### 5. Review
 
-**Source control**: the history shows the builder's commits (with its
-`Co-authored-by: Omnia builder` trailer), the test and the fix, each as you.
+**Source control**: the history shows the draft, the test and the fix, each
+as you.
 Open the fix commit's diff.
 
 ### 6. Deploy
