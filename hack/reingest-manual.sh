@@ -6,10 +6,12 @@ set -euo pipefail
 # again. Nothing is redeployed, and the agent is not touched. That is demo 2's
 # point: the copilot's knowledge lives in the documents.
 #
-# Usage: hack/reingest-manual.sh <file> [namespace]
+# Usage: hack/reingest-manual.sh <file> [namespace] [folder]
 #   <file>       the edited document; its basename is its key in the bucket,
 #                so it replaces the fixture of the same name
 #   [namespace]  default wrenmoor-energy
+#   [folder]     a folder under the bucket's prefix to put it in, such as
+#                member-guidance (claims triage reads only that folder)
 #
 # It derives a one-off Job from the chart's ingest Job (omnia-demo-memory-ingest):
 # the same image, identity, bucket and memory-api, but an init step that copies
@@ -21,6 +23,7 @@ set -euo pipefail
 
 file=${1:?usage: hack/reingest-manual.sh <file> [namespace]}
 ns=${2:-wrenmoor-energy}
+folder=${3:+${3%/}/}
 ctx=${KUBE_CONTEXT:-aks-omnia-demo}
 k() { kubectl --context "${ctx}" -n "${ns}" "$@"; }
 
@@ -43,7 +46,7 @@ trap 'k delete configmap "${run}" --ignore-not-found >/dev/null' EXIT
 : "fixtures, which the in-cluster gateway loses on a restart), then puts the"
 : "edited file over its fixture. Uploading only the edited file would leave"
 : "the bucket holding one document, and the connector would forget the rest."
-jq --arg run "${run}" --arg name "${name}" --arg bucket "${bucket}" --arg prefix "${prefix}" '
+jq --arg run "${run}" --arg name "${name}" --arg bucket "${bucket}" --arg prefix "${prefix}" --arg folder "${folder}" '
   {apiVersion: "batch/v1", kind: "Job",
    metadata: {name: $run, namespace: .metadata.namespace},
    spec: {backoffLimit: 0, ttlSecondsAfterFinished: 600,
@@ -54,12 +57,12 @@ jq --arg run "${run}" --arg name "${name}" --arg bucket "${bucket}" --arg prefix
            "until s3 s3 ls >/dev/null 2>&1; do sleep 2; done; " +
            "s3 s3 mb s3://" + $bucket + " 2>/dev/null || true; " +
            "s3 s3 sync /fixtures/ s3://" + $bucket + "/" + $prefix + " --delete --exclude \"*\" --include \"*.md\" --exclude \"..*\"; " +
-           "s3 s3 cp /doc/" + $name + " s3://" + $bucket + "/" + $prefix + $name]
+           "s3 s3 cp /doc/" + $name + " s3://" + $bucket + "/" + $prefix + $folder + $name]
        | .initContainers[0].volumeMounts += [{name: "doc", mountPath: "/doc"}]
        | .volumes += [{name: "doc", configMap: {name: $run}}])}}}
 ' <<< "${base}" | k apply -f - >/dev/null
 
-echo "==> ${name} -> s3://${bucket}/${prefix}${name}; ingesting (job ${run})"
+echo "==> ${name} -> s3://${bucket}/${prefix}${folder}${name}; ingesting (job ${run})"
 : "Never restarts and keeps a failed pod, so its logs can be read. Wait on the"
 : "counts, not on a condition: a failing Job sets FailureTarget before Failed."
 state=""

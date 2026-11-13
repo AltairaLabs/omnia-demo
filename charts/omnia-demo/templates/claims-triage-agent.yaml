@@ -163,18 +163,27 @@ spec:
         type: string
         description: "The loss adjuster's assessed cause, e.g. Flood, Escape of water. The claims system sends it with the claim; it is what the society's procedures are looked up by."
 {{- if $ct.procedures }}
-  # The society's procedures, from institutional memory (memory.enabled: the
-  # memory-ingestion connector loads them), retrieved into the prompt's
-  # memory_context variable for each invocation. A function has no end user,
-  # so Omnia registers no memory tools for it; ambient retrieval still reads
-  # the institutional tier, and searches on the input: the claim reference and
-  # the loss adjuster's peril.
+  # The society's guidance for members, from institutional memory
+  # (memory.enabled: the memory-ingestion connector loads it), retrieved into
+  # the prompt's memory_context variable for each invocation. A function has no
+  # end user, so Omnia registers no memory tools for it; ambient retrieval
+  # still reads the institutional tier, and searches on the input: the claim
+  # reference and the loss adjuster's peril.
+  #
+  # The access filter keeps only documents under member-guidance/ in the
+  # bucket. The same tier holds the society's claims-handling rules (the £500
+  # authority, in claims-handling.md and the Galaxy corpus), and an assessor
+  # that read them would obey them, never reaching the ToolPolicy that is the
+  # control. Rules are the ToolPolicy's; what the assessor reads is what it may
+  # tell a member. An item with no source_ref (the Galaxy's) is dropped too.
   memory:
     enabled: true
     tools:
       enabled: false
     retrieval:
       enabled: true
+      accessFilter:
+        denyCEL: '!(has(metadata.source_ref) && metadata.source_ref.contains("/member-guidance/"))'
 {{- end }}
   outputFormat: json_schema
   outputSchema:

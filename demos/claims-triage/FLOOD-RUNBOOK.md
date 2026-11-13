@@ -41,8 +41,10 @@ memory through retrieval).
    upgrade` re-runs the chart's ingest Job, which mirrors the chart's fixtures
    and so forgets the guidance.
    ```bash
-   hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual
+   hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
    ```
+   It must go under `member-guidance/`: the assessor's retrieval keeps only
+   that folder (see Setup).
    Restart `claims-systems` too, as in step 2.
 5. **After.** Invoke again. The assessor tries to settle; the broker refuses
    with `deny-flood-settlement`; the assessor refers the claim, and the claims
@@ -66,6 +68,12 @@ Put it back after: `--set claimsTriage.floodRule=false`, and restart
 - `claimsTriage.procedures` (Larkmere profile): memory retrieval on, the prompt
   renders `memory_context`, and the function's input takes the adjuster's
   `peril`, which retrieval searches on with the claim reference.
+- The assessor's retrieval has an access filter (`denyCEL`) that keeps only
+  documents under `member-guidance/`. The same tier holds the society's
+  claims-handling rules, including the £500 authority; an assessor that read
+  them would refer a £990 claim on its own and never reach the ToolPolicy,
+  which is demo 3's whole point. Rules belong to the ToolPolicy; what the
+  assessor reads is what it may tell a member.
 - `memory.enabled` (Larkmere profile): the society's documents
   (`charts/omnia-demo/files/fixtures/memory-s3`) ingested at install. None of
   them covers flood.
