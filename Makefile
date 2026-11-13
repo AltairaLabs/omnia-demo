@@ -187,6 +187,31 @@ research-stop:
 	@$(KUBECTL) -n $(RESEARCH_NS) patch scheduledfunction research-run --type merge -p '{"spec":{"suspend":true}}' >/dev/null; \
 	echo "==> research-run suspended"
 
+# Build, test and ship an agent (demo 12): put Halvern back as it was before a
+# take. Deletes the take's project (hosted, id contract-triage-<8 chars>, so
+# not the contract-triage-dryrun or -seed fallbacks), everything Omnia made
+# for it (dev agent, deployed packs, all labelled with the project id), and the
+# deployed agent contract-triage, then prunes the agents' cloud trust. The
+# same as Delete Project and deleting the agent in the dashboard.
+BUILD_LOOP_NS    ?= halvern-partners
+BUILD_LOOP_AGENT ?= contract-triage
+
+.PHONY: build-loop-reset
+build-loop-reset:
+	@set -euo pipefail; \
+	ids=$$($(KUBECTL) -n $(BUILD_LOOP_NS) get arenaprojects -o name | sed 's|.*/||' | grep -E '^$(BUILD_LOOP_AGENT)-[a-z0-9]{8}$$' || true); \
+	for id in $$ids; do \
+	  echo "==> deleting project $$id and what Omnia made for it"; \
+	  $(KUBECTL) -n $(BUILD_LOOP_NS) delete agentruntime,promptpacksource,promptpack -l "omnia.altairalabs.ai/arena-project=$$id" --ignore-not-found >/dev/null; \
+	  $(KUBECTL) -n $(BUILD_LOOP_NS) delete arenaproject "$$id" --ignore-not-found >/dev/null; \
+	done; \
+	if $(KUBECTL) -n $(BUILD_LOOP_NS) get agentruntime $(BUILD_LOOP_AGENT) >/dev/null 2>&1; then \
+	  echo "==> deleting agent $(BUILD_LOOP_AGENT)"; \
+	  $(KUBECTL) -n $(BUILD_LOOP_NS) delete agentruntime $(BUILD_LOOP_AGENT) >/dev/null; \
+	fi; \
+	$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" workspace-identity WS=$(BUILD_LOOP_NS); \
+	echo "==> $(BUILD_LOOP_NS) ready for a take"
+
 builder:
 	@$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" builder BUILDER_TARGETS="$(BUILDER_TENANT):$(BUILDER_PROVIDER)"
 

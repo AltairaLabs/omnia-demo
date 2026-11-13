@@ -29,8 +29,15 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
 
 1. Sign in to `https://omnia-demo.azure.altairalabs.ai` and switch to the
    **Halvern Partners** workspace.
-2. Reset: delete the project `contract-triage` (Projects) and the agent
-   `contract-triage` (Agents) if a previous take left them.
+2. Reset, if a previous take left anything:
+   ```bash
+   make build-loop-reset
+   ```
+   It deletes the take's project (`contract-triage-<id>`), its dev agent and
+   packs, and the agent `contract-triage`, then prunes their federated
+   credentials (an identity holds at most 20, and each take adds two). The
+   `contract-triage-dryrun` and `-seed` fallbacks are kept. Verified
+   2026-11-13.
 3. Open the three contracts in `contracts/` ready to paste.
 
 ## Dry run 2026-11-13 (what to expect)
@@ -157,6 +164,12 @@ Repeat 3 and 4 for the next miss (Fernside's renewal, or Quillon's
 variation clause). Then **Deploy…**, **Update a deployment**,
 `contract-triage`, **Gradual**. **Deployments** lists both versions. Demo 9
 is what happens next: the canary judged on live conversations.
+
+**Gradual does not roll out gradually on beta.23.** Dry run 2026-11-13: the
+update set the agent straight to the new version (`1.0.1` to `1.0.2`) and
+wrote the 10%/50%/100% steps with no candidate, so no rollout started and no
+canary pods came up. Use **Switch now**, and show a gradual rollout with
+demo 9 instead.
 
 ## Gotchas
 
