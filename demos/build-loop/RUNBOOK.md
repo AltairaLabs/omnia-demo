@@ -3,8 +3,7 @@
 A Halvern Partners engineer builds a supplier contract triage agent for
 Larkmere Mutual's in-house legal team, and takes it from first draft to a
 deployed, versioned agent, all in the dashboard: draft, try, catch a flaw,
-test it, fix it, push, deploy. Design:
-`docs/superpowers/specs/2026-11-13-build-loop-demo-design.md`.
+test it, fix it, push, deploy.
 
 Everything is live: the builder, the dev agent, the runs on the real Provider
 and the deploy. Nothing is replayed. Contracts and companies are fictional.
