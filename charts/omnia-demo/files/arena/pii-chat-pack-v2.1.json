@@ -146,7 +146,7 @@
   },
   "evals": [
     {
-      "id": "promises-outcome-v2-1-r10",
+      "id": "promises-outcome-v2-1-r11",
       "type": "llm_judge_session",
       "trigger": "on_session_complete",
       "params": {

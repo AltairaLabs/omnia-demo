@@ -108,8 +108,8 @@ Ellen's 4471.
 
 The canary rolls a new version of the member assistant out to 20%, 50% and
 then every member, and an LLM judge decides at each step. Scripted members
-(`demos/card-callers`, four of them, signed in like Ellen) give it traffic; one
-conversation in three disputes a payment.
+(`demos/card-callers`, four of them, signed in like Ellen, two conversations
+at a time) give it traffic; every third conversation disputes a payment.
 
 ```bash
 make canary VERSION=2.0   # adds "what happens next" on a freeze: promotes
@@ -135,8 +135,20 @@ make canary-status        # at any point
 - **Reset waits for the stable Deployment.** A canary started while card
   support was still rolling back from 2.0.0 to 1.0.0 raced it.
 
-Verified live 2026-11-12 on r7: 2.0 promoted through every gate; 2.1 was
-rolled back at 20% about four minutes in, on its own conversations.
+- **The judge shares gpt-4o's quota with the agent.** On beta.23 a judge
+  error (a 429) is stored as a score of 0 and counts against the candidate
+  (Omnia #4086). r9, with four callers at a 5s pause, rolled back the good
+  2.0 on 429s alone. The callers now hold two conversations at once with a
+  15s pause; don't raise them without checking the judge's results for
+  `details.error`.
+- **Takes:** 2.0 takes about 19 minutes to reach 100% (three gates 3 minutes
+  apart at each step). 2.1 is rolled back at 20% in about 3–4 minutes.
+
+Verified live 2026-11-13 on r10: 2.0 promoted through every gate on 100
+judged conversations, none failed and none errored; 2.1 was rolled back at
+20% after 5 judged conversations, two of them refund promises. (r8 passed
+2.1 at 20%: the callers ran each script four times in a row, so that step
+saw only lost-card calls. They now interleave.)
 
 ## Who sees what
 
