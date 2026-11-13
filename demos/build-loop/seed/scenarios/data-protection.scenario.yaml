@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Passes on the seed: offshore hosting of member data gets flagged.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: data-protection
+spec:
+  task_type: contract_triage
+  description: A hosting contract that moves member data outside the UK.
+  turns:
+    - role: user
+      content: |
+        Please triage this.
+
+        HOSTING AGREEMENT (fictional). Between Larkmere Mutual and Tarnley Cloud.
+        1. Services. Tarnley will host Larkmere's member portal.
+        2. Fees. £3,000 a month, payable within 30 days of invoice.
+        3. Term. 24 months; either party may end it on 3 months' notice.
+        4. Data. Tarnley may store and process member data in any country where it operates.
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["clause 4", "Clause 4", "4.", "Data"]
+          message: "The agent flags the data clause"
+        - type: contains_any
+          params:
+            patterns: ["UK", "outside", "country", "countries"]
+          message: "The agent says where the data could go"
