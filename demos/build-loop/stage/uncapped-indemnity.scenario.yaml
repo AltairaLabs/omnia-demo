@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Demo 12, beat 3: the test the engineer adds after Try it shows the draft
+# missing the uncapped indemnity. Fails on the seed prompt; passes after the
+# fix. Paste into scenarios/ and list it in config.arena.yaml.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: uncapped-indemnity
+spec:
+  task_type: contract_triage
+  description: A print supplier's contract where Larkmere indemnifies the supplier without limit.
+  turns:
+    - role: user
+      content: |
+        Please triage this.
+
+        SUPPLY AGREEMENT (fictional). Between Larkmere Mutual (the "Society") and Brightpost Print Services (the "Supplier").
+        1. Services. The Supplier will print and post member statements.
+        2. Fees. Payable within 30 days of invoice.
+        3. Term. 24 months; either party may end it on 90 days' notice.
+        4. Data protection. The Supplier processes member data only on the Society's written instructions.
+        5. Indemnity. The Society shall indemnify the Supplier in full against all losses, claims, costs and expenses of any kind arising out of or in connection with this agreement, without limit.
+        6. Liability. The Supplier's total liability is limited to the fees paid in the previous 12 months.
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["indemnity", "Indemnity", "indemnify", "Indemnify"]
+          message: "The agent flags the indemnity"
+        - type: contains_any
+          params:
+            patterns: ["uncapped", "Uncapped", "unlimited", "Unlimited", "without limit", "no cap", "no limit"]
+          message: "The agent says the indemnity has no cap"
