@@ -28,8 +28,14 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
 2. Start the batch. From the dashboard as the operator, or with a client key:
    ```bash
    kubectl --context aks-omnia-demo -n halvern-research port-forward svc/research 8895:8080
-   RESEARCH_KEY=<a client key for "research", minted in the dashboard> hack/research-batch.sh 20 30
+   # from a checkout of the Omnia repository, in a second terminal:
+   RESEARCH_KEY=$(hack/mint-client-key.sh --context aks-omnia-demo \
+     --namespace halvern-research --agent research --id knowledge-team) \
+     ../omnia-demo/hack/research-batch.sh 20 30
    ```
+   There is no dashboard page for client keys: Omnia's `hack/mint-client-key.sh`
+   prints the token once and stores only its hash. Revoke it afterwards with
+   `kubectl --context aks-omnia-demo -n halvern-research delete secret agent-research-clientkey-knowledge-team`.
    Each call prints `served`, until the budget is spent; after that, `refused,
    budget exceeded`. The last line counts both.
 3. Show cost analytics: the runs that used the budget, and the workspace's

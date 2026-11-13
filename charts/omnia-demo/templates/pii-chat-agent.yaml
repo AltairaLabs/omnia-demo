@@ -214,8 +214,9 @@ spec:
   # deployment has behind an API gateway or an Istio RequestAuthentication.
   #
   # This is the honest shape for a demo AND avoids the alternatives: clientKeys
-  # are minted in the dashboard UI and never live in a CR, so they cannot be
-  # chart-managed, and pointing the portal at the management-plane twin would
+  # are minted out of band (Omnia's hack/mint-client-key.sh) and never live in
+  # a CR, so they cannot be chart-managed, and pointing the portal at the
+  # management-plane twin would
   # have a customer-facing page holding an operator credential.
   #
   # The defaults are what the portal sends (x-user-id, x-user-email,

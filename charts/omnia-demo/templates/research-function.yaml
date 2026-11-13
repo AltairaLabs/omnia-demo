@@ -83,9 +83,10 @@ spec:
       port: 8080
       async:
         enabled: false
-  # The knowledge team's batch job calls the function with a client key minted
-  # in the dashboard (the key never lives in a CR). hack/research-batch.sh
-  # sends it as a bearer token.
+  # The knowledge team's batch job calls the function with a client key,
+  # minted with Omnia's hack/mint-client-key.sh: a Secret owned by this
+  # AgentRuntime holding the key's hash, never the key, and never in a CR.
+  # hack/research-batch.sh sends it as a bearer token.
   externalAuth:
     clientKeys: {}
   inputSchema:

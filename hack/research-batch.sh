@@ -15,9 +15,18 @@ set -euo pipefail
 #                  (kubectl --context aks-omnia-demo -n halvern-research
 #                   port-forward svc/research 8895:8080)
 #
-# RESEARCH_KEY is a client key for the `research` agent, minted in the
-# dashboard (Agents, research, Connectivity). It is sent as a bearer token and
-# never written anywhere.
+# RESEARCH_KEY is a client key for the `research` AgentRuntime, minted with
+# Omnia's hack/mint-client-key.sh (there is no dashboard page for client
+# keys). The script prints the token once and stores only its hash, so pipe it
+# straight in, from a checkout of the Omnia repository:
+#
+#   RESEARCH_KEY=$(hack/mint-client-key.sh --context aks-omnia-demo \
+#     --namespace halvern-research --agent research --id knowledge-team) \
+#     ../omnia-demo/hack/research-batch.sh
+#
+# Revoke it afterwards: kubectl --context aks-omnia-demo -n halvern-research \
+#   delete secret agent-research-clientkey-knowledge-team
+# It is sent as a bearer token and never written anywhere.
 #
 # Prints one line per matter and a final `served=<a> refused=<b> failed=<c>`.
 # Exits 0 when every call was either served or refused by the budget.
