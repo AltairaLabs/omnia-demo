@@ -198,6 +198,15 @@ spec:
       # changed every turn.
       strategy: semantic
       limit: 4
+      # Only what the member told the assistant. Recall reads every tier the
+      # scope can see, so without this the Galaxy's institutional card
+      # guidance ("we will usually correct your account") lands under "What
+      # you know about this member": the wrong label, and a refund promise the
+      # assistant may repeat, which is what demo 9's judge fails. A member's
+      # own memories are user_requested; institutional and agent-tier rows are
+      # not, and a row with no source_type is dropped too.
+      accessFilter:
+        denyCEL: '!(has(metadata.source_type) && metadata.source_type == "user_requested")'
 {{- end }}
   facades:
     - type: websocket
