@@ -32,6 +32,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -97,7 +98,8 @@ func main() {
 	agentURL := flag.String("agent-url", "http://pii-chat:8080", "the agent's in-cluster URL")
 	agent := flag.String("agent", "pii-chat", "AgentRuntime name")
 	namespace := flag.String("namespace", os.Getenv("POD_NAMESPACE"), "the agent's namespace")
-	pause := flag.Duration("pause", 20*time.Second, "wait between conversations")
+	pause := flag.Duration("pause", 20*time.Second, "wait between conversations, on each line")
+	parallel := flag.Int("parallel", 1, "conversations held at once")
 	turnTimeout := flag.Duration("turn-timeout", 90*time.Second, "longest wait for one reply")
 	count := flag.Int("count", 0, "conversations to hold, then exit (0: until stopped)")
 	issuerURL := flag.String("issuer-url", "", "sign a token for each caller as this issuer (required)")
@@ -129,21 +131,56 @@ func main() {
 		}()
 	}
 
-	for n := 0; *count == 0 || n < *count; n++ {
-		c, s := callers[n%len(callers)], scripts[(n/len(callers))%len(scripts)]
-		start := time.Now()
-		turns, err := converse(ctx, *agentURL, *agent, *namespace, c, s, *turnTimeout, iss)
-		if err != nil {
-			log.Printf("conversation %d (%s, %s): after %d turns: %v", n+1, c.name, s.name, turns, err)
-		} else {
-			log.Printf("conversation %d (%s, %s): %d turns in %s", n+1, c.name, s.name, turns, time.Since(start).Round(time.Second))
+	// Conversations are numbered across all lines, so with --parallel the
+	// scripts still interleave: next hands out the next number.
+	var mu sync.Mutex
+	next := 0
+	take := func() (int, bool) {
+		mu.Lock()
+		defer mu.Unlock()
+		if *count != 0 && next >= *count {
+			return 0, false
 		}
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(*pause):
-		}
+		next++
+		return next - 1, true
 	}
+
+	var wg sync.WaitGroup
+	for range max(*parallel, 1) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				n, ok := take()
+				if !ok || ctx.Err() != nil {
+					return
+				}
+				c, s := assignment(n)
+				start := time.Now()
+				turns, err := converse(ctx, *agentURL, *agent, *namespace, c, s, *turnTimeout, iss)
+				if err != nil {
+					log.Printf("conversation %d (%s, %s): after %d turns: %v", n+1, c.name, s.name, turns, err)
+				} else {
+					log.Printf("conversation %d (%s, %s): %d turns in %s", n+1, c.name, s.name, turns, time.Since(start).Round(time.Second))
+				}
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(*pause):
+				}
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// assignment is conversation n's member and script. The scripts interleave
+// (one in every three conversations is a disputed payment), and because
+// there are four members and three scripts, every member meets every script.
+// Blocks of one script let the canary's first gate see only lost-card calls,
+// where 2.1 has nothing to promise (r8).
+func assignment(n int) (caller, script) {
+	return callers[n%len(callers)], scripts[n%len(scripts)]
 }
 
 // converse holds one conversation and reports how many turns completed.

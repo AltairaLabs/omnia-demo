@@ -64,7 +64,7 @@ spec:
         arenaEval:
           # The suffix is the judge's revision (hack/build-canary-packs.sh
           # EVAL_REVISION); the two must match.
-          evalDef: promises-outcome-v{{ $slug }}-r8
+          evalDef: promises-outcome-v{{ $slug }}-r9
 {{- end }}
 ---
 # The eval worker's identity. The operator runs the worker as this
@@ -121,6 +121,7 @@ spec:
             - --agent-url=http://pii-chat.{{ .Values.namespace }}:8080
             - --namespace={{ .Values.namespace }}
             - --pause={{ $cn.callers.pause }}
+            - --parallel={{ $cn.callers.parallel }}
             # Larkmere's telephony channel verifies a caller before connecting
             # them, so the callers are an identity provider of their own,
             # trusted like the portal (docs/stand-ins.md).

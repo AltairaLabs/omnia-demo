@@ -398,18 +398,26 @@ piiChat:
     # demos/pii-chat/canary/eval.jq).
     # The gate: the candidate's average judge score, measured `count` times,
     # `interval` apart, each at least minScore.
+    # The gate has no minimum sample (beta.23): it decides on whatever the
+    # candidate has had. At 20% with the callers below, 2m apart gives each
+    # step about four disputed payments on the candidate; at 90s with one
+    # caller, r8's 20% step saw only lost-card calls and passed 2.1.
     gate:
       minScore: "0.8"
       count: 3
-      interval: 90s
+      interval: 2m
     # The eval worker runs as this ServiceAccount, with the runtime identity's
     # annotations, so the judge can reach a keyless Provider. omnia-azure's
     # `make workspace-identity` federates it.
     evalWorkerServiceAccount: eval-worker
     # Scripted callers (demos/card-callers, in the sites image). Scaled to 0
     # until `make canary` starts them.
+    # Stand-in for live traffic, so it must be enough for the gate to judge:
+    # `parallel` conversations at once in the one pod (the pod signs the
+    # callers' tokens with its own key, so it can't be scaled out).
     callers:
-      pause: 20s
+      pause: 5s
+      parallel: 4
 
 # ---------------------------------------------------------------------------
 # claimsTriage — Larkmere Mutual claims triage, the delegated-authority demo
