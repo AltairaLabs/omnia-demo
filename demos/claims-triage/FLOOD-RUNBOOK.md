@@ -12,18 +12,18 @@ in a real insurer:
   (`demos/claims-triage/flood-claims.md`). Ingested as institutional memory;
   the assessor uses it to tell the member what happens next.
 
-**Partly held.** The rule half works on beta.23. The guidance half needs Omnia
-#4009: a function gets no institutional memory through retrieval yet, so the
-assessor can't read the guidance. The Galaxy half hasn't yet been walked
-through on camera against the 10k corpus.
+Live on Omnia main `896d399a7eea` (#4009: a function now gets institutional
+memory through retrieval).
 
 ## The beats
 
 1. **The gap.** Dashboard, Memories, the Memory Galaxy for Larkmere Mutual: the
-   flood cluster (members worried about flood zones, flood and the mortgage
-   valuation, whether the policy covers flooding) with no institutional
-   procedure near it. The corpus plants it (`demos/memory-galaxy/taxonomy.yaml`,
-   "Planted finding 1").
+   cluster labelled **flood · surface** (members worried about flood zones,
+   flood and the mortgage valuation, whether the policy covers flooding). The
+   few blue institutional points in it are what the policy covers and the
+   Flood claim type's definition; no procedure says what happens to a flood
+   claim. The corpus plants it (`demos/memory-galaxy/taxonomy.yaml`, "Planted
+   finding 1").
 2. **Before.** Invoke claims triage on the flood claim (dashboard, Functions,
    `claims-triage`, Test): `{"claim_ref": "LM-40751", "peril": "Flood"}`. £420
    payable, within the £500 limit, and no rule says otherwise: `SETTLED`.
@@ -37,19 +37,26 @@ through on camera against the 10k corpus.
    larkmere-mutual get toolpolicy claims-triage-policy -o yaml`): it asks the
    claims system for the claim's peril and refuses a payment on a flood claim.
    A policy change takes effect on the next invocation.
-4. **Add the guidance.** Ingest it:
+4. **Add the guidance.** Ingest it, **after** the upgrade: every `helm
+   upgrade` re-runs the chart's ingest Job, which mirrors the chart's fixtures
+   and so forgets the guidance.
    ```bash
    hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual
    ```
+   Restart `claims-systems` too, as in step 2.
 5. **After.** Invoke again. The assessor tries to settle; the broker refuses
    with `deny-flood-settlement`; the assessor refers the claim, and the claims
-   system routes it to Flood Response. With #4009, the assessor's note also
-   tells the member what happens next and what to do now, from the guidance.
+   system routes it to Flood Response. The note tells the member what happens
+   next, from the guidance. Show it in the session's system prompt: under "The
+   society's guidance" are the flood-claims passages.
 
-Verified live 2026-11-12 (rule half): with `floodRule=true`, `LM-40751`'s
-`claim_settle` was refused by `deny-flood-settlement` after the policy's peril
-lookup (`policy lookup claim-peril … peril="Flood"` in the claims system's
-log), and the assessor referred it under CP-7.
+Verified live 2026-11-13 on main: before, `LM-40751` settled at £420; after,
+`claim_settle` was refused by `deny-flood-settlement`, the claim was referred
+to Flood Response, and the note said the team "will contact the member within
+one working day", from the guidance. Each section of `flood-claims.md` names
+flood claims on its own, because retrieval searches on the claim reference and
+peril and returns passages, not the document: a section that says only "the
+team contacts the member" is not found.
 
 Put it back after: `--set claimsTriage.floodRule=false`, and restart
 `claims-systems`.

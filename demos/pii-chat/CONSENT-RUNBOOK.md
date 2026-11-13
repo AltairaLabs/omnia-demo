@@ -1,7 +1,7 @@
 # Ellen controls her data (demo 8)
 
-**Held** on Omnia #3984 and #3991. Everything below is built; two beats can't
-be shown honestly until those are fixed.
+**Held** on Omnia #4088. #3984 and #3991 are fixed on main; the withdrawal
+beat still can't be shown honestly.
 
 On the Larkmere portal's **Your data** page, Ellen sees what the assistant
 remembers about her, withdraws consent for a category (its memories go at
@@ -14,25 +14,26 @@ picks the subject from that token and nothing else.
 
 1. Ellen grants **Health and accessibility**, then tells the assistant she has
    a hearing disability and would rather be texted.
-2. **Your data** lists the memory. *Blocked by #3984:* the end-user plane
-   lists only memories saved with no agent, and every memory the assistant
-   saves is agent-scoped, so the list is empty.
-3. She withdraws the category. The memory is deleted at once (memory-api
-   writes `memory_consent_prune`), and the next conversation's
-   `memory_context` no longer has it. *Blocked by #3991:* the runtime caches a
-   member's profile for 30 seconds and the revocation doesn't clear it, so the
-   deleted memory can still reach the model for up to 30 seconds.
+2. **Your data** lists the memory, with its category. **Forget** removes it,
+   and the next conversation no longer knows it.
+3. She withdraws the category. The memory should be deleted at once
+   (memory-api writes `memory_consent_prune`). *Blocked by #4088:* the
+   assistant files "texts, because of a hearing disability" as
+   **Preferences**, and Omnia's classifier, which detects health, is
+   overruled by that claim when the memory is stored. Withdrawing Health then
+   leaves it. The page shows the wrong tag, so don't take this beat.
 4. She requests erasure. The request goes `pending`, then `completed`, with
-   the number of conversations deleted.
+   the number of conversations deleted, and the memory list empties.
 
-Verified 2026-11-12 without the blocked parts: consent grant and revoke
-through the page's routes; `memory_consent_prune` on revocation; erasure
-completed in under a second, deleting Ellen's two sessions.
+Verified 2026-11-13 on Omnia main `896d399a7eea`: the list shows the
+assistant's agent-scoped memories (#3984); a memory forgotten on the page did
+not reach a conversation started seconds later (#3991); erasure completed and
+emptied the list. Withdrawal is blocked on #4088.
 
-## When the fixes land
+## When the fix lands
 
-Upgrade the install to the Omnia release with #3984 and #3991, run the four
-beats live, and update this page and the catalogue row.
+Rebuild on the Omnia commit with #4088 (`hack/omnia-dev.sh build` in
+omnia-azure), take beat 3, and update this page and the catalogue row.
 
 ## How it's wired
 
