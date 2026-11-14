@@ -169,7 +169,8 @@ Gradual stages the new version as the rollout's candidate and keeps the agent
 on the old one: 10%, a 2-minute pause, 50%, a 5-minute pause, then 100%.
 Verified 2026-11-14 on Omnia main `6359a66ac480` (#4087, fixed by #4099):
 updating `contract-triage` from `1.0.1` left the pin at `1.0.1`, staged
-`1.0.2` as the candidate, and brought up `contract-triage-canary` at 10%.
+`1.0.2` as the candidate, brought up `contract-triage-canary` at 10%, and
+promoted to `1.0.2` after the last step.
 The canary runs as the agent's own service account, so it calls Foundry once
 `workspace-identity` has federated the deployed agent (Before the take). The
 canary pods need room: on two nodes the autoscaler added a third first.
