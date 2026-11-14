@@ -594,6 +594,38 @@ dataAnalyst:
     initialCursor: ""
 
 # ---------------------------------------------------------------------------
+# analystWorkbench — Wrenmoor Energy's analyst workbench: code in a sandbox
+#
+# A console agent that answers generation questions by writing and running
+# Python, in a sandbox of its own. The sandbox is the control, not the prompt:
+# its own VM (a Kata RuntimeClass), no service-account token, no DNS, and no
+# network except the generation data service (wrenmoor-grid-data, from
+# dataAnalyst, which must be enabled too). Requires Omnia's sandbox support
+# (SandboxClass, a ToolRegistry sandbox handler, AgentRuntime spec.sandbox).
+# ---------------------------------------------------------------------------
+analystWorkbench:
+  # -- A Provider in the namespace for this demo alone. Wins over
+  # llm.providerRef.
+  providerRef: ""
+  enabled: false
+  # -- The sandbox image: Omnia's codegen sandbox plus Python, pandas and
+  # matplotlib (demos/analyst-sandbox).
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-analyst-sandbox
+    # Empty: the chart's appVersion.
+    tag: ""
+  # -- The RuntimeClass the sandbox runs under, and how it reaches those
+  # nodes. Empty runtimeClassName: the cluster default (runc), with no VM
+  # boundary; say so if you demo it that way.
+  runtimeClassName: ""
+  nodeSelector: {}
+  tolerations: []
+  # -- How many sandboxes the agent may hold at once, and how long an unused
+  # one lives.
+  maxConcurrent: 2
+  idleTimeout: 20m
+
+# ---------------------------------------------------------------------------
 # fieldService — Wrenmoor Energy's field-service copilot: institutional memory
 #
 # A chat agent that answers engineers' questions about switching, isolation

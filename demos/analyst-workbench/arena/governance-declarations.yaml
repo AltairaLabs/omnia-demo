@@ -1,0 +1,28 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh. ASSERTED, not evidence.
+
+intended_purpose: >-
+  Answer Wrenmoor Energy's generation analysts' questions by writing and
+  running Python analyses over the half-hourly site data.
+
+foreseeable_misuse:
+  - Asking it to send data, or anything else, outside Wrenmoor; its sandbox reaches only the generation data service
+  - Treating a gap in export readings as lost generation, or a still day as a fault
+  - Using its figures for settlement or billing, which run from metered data it does not see
+
+autonomy_level: suggests
+
+accountable_owner: Wrenmoor Energy Generation Analytics
+
+operator_role: eu-aiact:AIDeployer
+
+risk_classification: eu-aiact:RiskLevelMinimal
+
+intended_deployment_contexts:
+  - Generation and operations reporting, internal
+
+approved_environments:
+  - demo
+
+# Its users are Wrenmoor's own analysts, in the dashboard console.
+requires_ai_disclosure: false

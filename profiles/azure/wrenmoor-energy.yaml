@@ -21,6 +21,16 @@ wren: { enabled: true }
 wrenmoorSite: { enabled: true }
 incidentAgent: { enabled: true }
 dataAnalyst: { enabled: true }
+# The analyst workbench. Its sandboxes are meant for omnia-azure's Kata pool
+# (bicep/modules/sandbox-pool.bicep), each pod its own VM:
+#   runtimeClassName: kata-vm-isolation
+#   tolerations: [{ key: workload, operator: Equal, value: sandbox, effect: NoSchedule }]
+# but a Kata pod in an ambient-mesh namespace is unreachable, and a sandbox
+# can't opt out of the mesh yet (Omnia #4112). On runc it starts, but its one
+# allowed egress (the grid data) goes via the waypoint on :15008, which the
+# sandbox's NetworkPolicy drops (#4112, second comment). Off until #4112.
+analystWorkbench:
+  enabled: false
 fieldService: { enabled: true }
 # The field manuals, ingested as institutional memory for the copilot.
 memory:

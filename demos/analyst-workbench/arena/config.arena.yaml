@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Wrenmoor Energy's analyst workbench: an analyst that answers a question by
+# writing and running Python in a sandbox of its own, against the generation
+# data. Its tools (files, a shell) come from the sandbox's ToolRegistry, not
+# from this kit.
+#
+# Regenerate with: hack/build-packs.sh analyst-workbench
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: analyst-workbench
+spec:
+  prompt_configs:
+    - id: analyst-workbench
+      file: prompts/analyst-workbench.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # The sandbox's own tools. Omnia takes a sandbox tool's schema from the pack
+  # (internal/runtime/tools_registration.go), so each is declared here exactly
+  # as the sandbox's MCP server describes it; one the pack only names in
+  # allowed_tools reaches the model with no schema, which OpenAI refuses.
+  tools:
+    - file: tools/read.tool.yaml
+    - file: tools/write.tool.yaml
+    - file: tools/edit.tool.yaml
+    - file: tools/bash.tool.yaml
+
+  defaults:
+    temperature: 0.1
+    max_tokens: 2000
+    output:
+      dir: out
+      formats: ["json"]
