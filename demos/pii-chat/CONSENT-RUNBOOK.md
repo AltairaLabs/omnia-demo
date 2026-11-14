@@ -1,8 +1,5 @@
 # Ellen controls her data (demo 8)
 
-**Held** on Omnia #4088. #3984 and #3991 are fixed on main; the withdrawal
-beat still can't be shown honestly.
-
 On the Larkmere portal's **Your data** page, Ellen sees what the assistant
 remembers about her, withdraws consent for a category (its memories go at
 once), and requests erasure, which completes with a record of what was
@@ -12,28 +9,33 @@ picks the subject from that token and nothing else.
 
 ## The beats
 
-1. Ellen grants **Health and accessibility**, then tells the assistant she has
-   a hearing disability and would rather be texted.
-2. **Your data** lists the memory, with its category. **Forget** removes it,
-   and the next conversation no longer knows it.
-3. She withdraws the category. The memory should be deleted at once
-   (memory-api writes `memory_consent_prune`). *Blocked by #4088:* the
-   assistant files "texts, because of a hearing disability" as
-   **Preferences**, and Omnia's classifier, which detects health, is
-   overruled by that claim when the memory is stored. Withdrawing Health then
-   leaves it. The page shows the wrong tag, so don't take this beat.
-4. She requests erasure. The request goes `pending`, then `completed`, with
+1. Ellen grants **Health and accessibility**, then tells the assistant: *"Please
+   text me rather than call in future. I have a hearing disability, so phone
+   calls are hard for me."*
+2. **Your data** lists the memory, tagged **Health and accessibility**. The
+   assistant may have filed it as a preference; Omnia's classifier detects
+   health and the stricter category is the one stored.
+3. She withdraws the category. The memory is deleted at once (memory-api
+   writes `memory_consent_prune`) and the list empties.
+4. Or, instead of 3: **Forget** removes one memory, and the next conversation
+   no longer knows it.
+5. She requests erasure. The request goes `pending`, then `completed`, with
    the number of conversations deleted, and the memory list empties.
 
-Verified 2026-11-13 on Omnia main `896d399a7eea`: the list shows the
-assistant's agent-scoped memories (#3984); a memory forgotten on the page did
-not reach a conversation started seconds later (#3991); erasure completed and
-emptied the list. Withdrawal is blocked on #4088.
+Verified live 2026-11-14 on Omnia main `6359a66ac480`: the memory "Prefers to
+be contacted via text rather than phone calls due to a hearing disability."
+was stored as `memory:health` (#4088), and withdrawing Health removed it at
+once. On 2026-11-13 (`896d399a7eea`): the list shows the assistant's
+agent-scoped memories (#3984); a memory forgotten on the page did not reach a
+conversation started seconds later (#3991); erasure completed and emptied the
+list.
 
-## When the fix lands
+## Before each take
 
-Rebuild on the Omnia commit with #4088 (`hack/omnia-dev.sh build` in
-omnia-azure), take beat 3, and update this page and the catalogue row.
+- Erasure does not reset consent: a Health grant from an earlier take is
+  still there. Check the toggles before beat 1.
+- After withdrawal Health is denied, so a new health note is refused
+  (`memory write suppressed … consent-not-granted`) until it is granted again.
 
 ## How it's wired
 

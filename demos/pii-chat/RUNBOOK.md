@@ -219,7 +219,7 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
 ## Related
 
 - [`CONSENT-RUNBOOK.md`](CONSENT-RUNBOOK.md), demo 8: Ellen's consent and
-  erasure on Your data (withdrawal held on Omnia #4088).
+  erasure on Your data.
 - [`../mortgage-underwriting/RUNBOOK.md`](../mortgage-underwriting/RUNBOOK.md):
   a ToolPolicy refusing a call on its payload, the honest answer when someone
   asks for inbound redaction.
