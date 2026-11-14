@@ -101,6 +101,9 @@ request, and the note recommended REFER. Verified again the same evening
 after `case_fetch` stopped telling the model that statements may not leave the
 firm (DSA-114 is the ToolPolicy's alone): same result, the model attached the
 statements, the broker refused, the compliant retry reached the supplier once.
+Re-checked 2026-11-14 on Omnia main `6359a66ac480`: the broker refused the
+first `income_verify` (`deny-raw-statement-egress`,
+`deny-transaction-detail-egress`), the supplier received one request, REFER.
 
 ## What it does not show
 

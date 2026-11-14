@@ -30,7 +30,7 @@ The agent is an internal tool, so drive it from the dashboard console
    # get_alerts, get_deploy_history, get_logs, rollback_deploy; no delete_namespace
    ```
 
-Verified live 2026-11-12.
+Verified live 2026-11-12, and again 2026-11-14 on Omnia main `6359a66ac480`.
 
 ## Gotchas
 

@@ -165,11 +165,14 @@ variation clause). Then **Deploy…**, **Update a deployment**,
 `contract-triage`, **Gradual**. **Deployments** lists both versions. Demo 9
 is what happens next: the canary judged on live conversations.
 
-**Gradual does not roll out gradually on beta.23.** Dry run 2026-11-13: the
-update set the agent straight to the new version (`1.0.1` to `1.0.2`) and
-wrote the 10%/50%/100% steps with no candidate, so no rollout started and no
-canary pods came up. Use **Switch now**, and show a gradual rollout with
-demo 9 instead.
+Gradual stages the new version as the rollout's candidate and keeps the agent
+on the old one: 10%, a 2-minute pause, 50%, a 5-minute pause, then 100%.
+Verified 2026-11-14 on Omnia main `6359a66ac480` (#4087, fixed by #4099):
+updating `contract-triage` from `1.0.1` left the pin at `1.0.1`, staged
+`1.0.2` as the candidate, and brought up `contract-triage-canary` at 10%.
+The canary runs as the agent's own service account, so it calls Foundry once
+`workspace-identity` has federated the deployed agent (Before the take). The
+canary pods need room: on two nodes the autoscaler added a third first.
 
 ## Gotchas
 

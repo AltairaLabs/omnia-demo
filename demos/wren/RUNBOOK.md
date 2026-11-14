@@ -35,6 +35,9 @@ create. On the take above Wren asked of its own accord, so the policy didn't
 need to fire; if it skips the question, the refusal is in the session and the
 broker log (`deny-write-without-consent`).
 
+Re-checked 2026-11-14 on Omnia main `6359a66ac480`: same four beats, `read_bill`
+and `quote_tariff` in the receipts, SW-8D28DAEC scheduled after the click.
+
 ## Gotchas
 
 - **What Wren reads varies.** On 2026-11-12 it answered from the bill alone; on
