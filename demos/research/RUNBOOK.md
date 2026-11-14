@@ -46,6 +46,11 @@ fires succeeded every 30 seconds, the workspace went `DailyBudgetExceeded`
 at 16:09, and from 16:09:57 every fire was skipped with
 `WorkspaceBudgetExceeded`.
 
+Re-checked 2026-11-14 on Omnia main `6359a66ac480`: started 11:57, the
+workspace went `DailyBudgetExceeded` ($0.0084) at 12:03, and the last fire ran
+at 12:02:59; every fire after was skipped (`status.lastSkipReason`) until
+`make research-stop`.
+
 ## Gotchas
 
 - **Refusals start up to about 5½ minutes after the cap is reached.** The

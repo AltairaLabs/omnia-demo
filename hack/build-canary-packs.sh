@@ -28,8 +28,8 @@ SRC="${ROOT}/demos/pii-chat/canary"
 # r8: the same judge, after the base prompt's memory guidelines changed.
 # r9: the same judge; a clean id for the run with interleaved, busier callers.
 # r10: the same judge; a clean id after r9's 429s.
-# r11: a clean id for the next take (r10 verified 2026-11-13).
-EVAL_REVISION=r11
+# r12: a clean id for the next take (r11 verified 2026-11-14).
+EVAL_REVISION=r12
 
 for ver in 2.0 2.1; do
   out="${ARENA}/pii-chat-pack-v${ver}.json"

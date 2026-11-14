@@ -94,7 +94,7 @@ by text rather than calls, we'll send you a text message".
 3. Operator side: open the session. Ellen's first message reads *"My card
    number is [REDACTED_CC] if you need it."*
 
-Verified live 2026-11-12.
+Verified live 2026-11-12, and again 2026-11-14 on Omnia main `6359a66ac480`.
 
 **Use that card number, or another that passes the Luhn check.** Omnia's
 `credit_card` pattern confirms each match with Luhn, so most sixteen-digit runs
@@ -134,12 +134,17 @@ make canary-status        # at any point
 - **Reset waits for the stable Deployment.** A canary started while card
   support was still rolling back from 2.0.0 to 1.0.0 raced it.
 
-- **The judge shares gpt-4o's quota with the agent.** On beta.23 a judge
-  error (a 429) is stored as a score of 0 and counts against the candidate
-  (Omnia #4086). r9, with four callers at a 5s pause, rolled back the good
-  2.0 on 429s alone. The callers now hold two conversations at once with a
-  15s pause; don't raise them without checking the judge's results for
-  `details.error`.
+- **The judge shares gpt-4o's quota with the agent.** Since Omnia #4086 (fixed
+  on main) a judge error, such as a 429, is recorded as an error and the gate
+  holds rather than counting it as a fail; the operator logs each reading
+  with its `errorCount`. On beta.23 it was a score of 0, and r9 rolled back
+  the good 2.0 on 429s alone. The callers hold two conversations at once
+  with a 15s pause.
+- **A candidate's sessions name the stable composition** (Omnia #4104): the
+  canary pod rejects its own composition at startup, and the sessions it
+  serves record the stable version's composition digest. The gate is not
+  affected (it filters on the variant), but don't show a canary session's
+  composition as the candidate's.
 - **Takes:** 2.0 takes about 19 minutes to reach 100% (three gates 3 minutes
   apart at each step). 2.1 is rolled back at 20% in about 3–4 minutes.
 
@@ -148,6 +153,11 @@ judged conversations, none failed and none errored; 2.1 was rolled back at
 20% after 5 judged conversations, two of them refund promises. (r8 passed
 2.1 at 20%: the callers ran each script four times in a row, so that step
 saw only lost-card calls. They now interleave.)
+
+Verified live 2026-11-14 on r11, Omnia main `6359a66ac480`: 2.1 was rolled
+back at 20% (judge average 0.75 over 4 results, 0 errors) about 4 minutes in;
+2.0 promoted through every gate in about 21 minutes (63 judged
+conversations, all passing, 0 errors). The next take uses r12.
 
 ## Who sees what
 
