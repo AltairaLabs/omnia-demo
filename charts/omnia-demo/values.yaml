@@ -201,6 +201,22 @@ mortgageUnderwriting:
   deterministic: false
 
 # ---------------------------------------------------------------------------
+# The card line (Larkmere): the member assistant's voice twin. A realtime voice
+# agent the member rings from the portal ("Call us"), on the same card system,
+# ToolRegistry, ToolPolicy and privacy policy as pii-chat, so the call is held
+# to exactly the same controls as the chat. Needs piiChat (its tools, policy
+# and portal) and a Provider whose model streams audio (duplex), such as
+# omnia-azure's azure-foundry-gpt-realtime.
+# ---------------------------------------------------------------------------
+cardLine:
+  enabled: false
+  # -- The realtime voice Provider. Required: a text model can't take the call.
+  providerRef: azure-foundry-gpt-realtime
+  # -- The tts Provider that speaks the AI disclosure at the start of every
+  # call (the pack requires one). A realtime agent has no other use for it.
+  disclosureProviderRef: azure-foundry-tts
+
+# ---------------------------------------------------------------------------
 # piiChat — Larkmere's member assistant (demos 6, 7 and 9)
 #
 # A signed-in member's assistant: card tools that act on that member, user

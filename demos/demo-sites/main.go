@@ -40,6 +40,8 @@ func main() {
 	name := flag.String("site", "larkmere-mutual", "which site to serve: "+strings.Join(brandNames(), ", "))
 	agent := flag.String("agent-url", "http://localhost:8080",
 		"base URL of the agent facade's external listener")
+	phone := flag.String("phone-agent-url", "",
+		"base URL of the voice agent's facade, served as the card line at "+phonePath+"; empty: no phone line")
 	backend := flag.String("backend-url", "",
 		"base URL of the account back end for the assistant's consent and receipt routes; empty: those routes are off")
 	var m member
@@ -68,7 +70,7 @@ func main() {
 			log.Fatalf("issuer: %v", err)
 		}
 	}
-	handler, err := newServer(b, *agent, *backend, iss, eu)
+	handler, err := newServer(b, *agent, *phone, *backend, iss, eu)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

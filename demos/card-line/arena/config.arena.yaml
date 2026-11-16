@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Larkmere's card line: the member assistant's voice twin,
+# a realtime voice agent (gpt-realtime) behind the same member portal.
+#
+# Same card system, same tools, same ToolPolicy, same redaction policy as the
+# chat (pii-chat): the tool definitions are pii-chat's own files, not copies,
+# so the two can't drift. What differs is the medium, so only the prompt is
+# its own.
+#
+# Regenerate with: hack/build-packs.sh card-line
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: card-line
+spec:
+  prompt_configs:
+    - id: card-line
+      file: prompts/card-line.yaml
+
+  providers:
+    - file: ../../pii-chat/arena/providers/mock.yaml
+
+  tools:
+    - file: ../../pii-chat/arena/tools/get-card-status.tool.yaml
+    - file: ../../pii-chat/arena/tools/freeze-card.tool.yaml
+    - file: ../../pii-chat/arena/tools/unfreeze-card.tool.yaml
+
+  defaults:
+    temperature: 0.6
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

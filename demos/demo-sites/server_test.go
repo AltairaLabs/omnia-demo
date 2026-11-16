@@ -18,7 +18,7 @@ func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, agentURL, backendURL, nil, endUserPlane{})
+	h, err := newServer(b, agentURL, "", backendURL, nil, endUserPlane{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +244,7 @@ func TestAssistantForwardsMemberToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := lookupBrand("larkmere-mutual", member{})
-	h, err := newServer(b, agent.URL, "", iss, endUserPlane{})
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -282,7 +282,7 @@ func myDataSite(t *testing.T) (*httptest.Server, *http.Request) {
 		t.Fatal(err)
 	}
 	b, _ := lookupBrand("larkmere-mutual", member{})
-	h, err := newServer(b, "http://127.0.0.1:1", "", iss,
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", iss,
 		endUserPlane{url: mgmt.URL, workspace: "larkmere-mutual", audience: "larkmere-members"})
 	if err != nil {
 		t.Fatal(err)
@@ -381,7 +381,7 @@ func TestDiscoveryServed(t *testing.T) {
 
 func TestMyDataNeedsIssuer(t *testing.T) {
 	b, _ := lookupBrand("larkmere-mutual", member{})
-	if _, err := newServer(b, "http://127.0.0.1:1", "", nil,
+	if _, err := newServer(b, "http://127.0.0.1:1", "", "", nil,
 		endUserPlane{url: "http://mgmt", workspace: "w", audience: "a"}); err == nil {
 		t.Fatal("My data without an issuer would forward no credential")
 	}
@@ -402,7 +402,7 @@ func TestAssistantRefusesWithoutAToken(t *testing.T) {
 	}
 	b := brands["larkmere-mutual"]
 	b.who.id = "" // demoidp refuses to sign a token for no one
-	h, err := newServer(b, agent.URL, "", iss, endUserPlane{})
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,5 +420,44 @@ func TestAccountRoutesOffWithoutBackend(t *testing.T) {
 	srv := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
 	if resp, _ := get(t, srv.URL+receiptsPath); resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("receipts without a backend: status %d", resp.StatusCode)
+	}
+}
+
+// The phone line is a second agent behind the same edge: the proxy asserts the
+// same member to it, and serves it at its own path.
+func TestPhoneProxyAssertsIdentity(t *testing.T) {
+	var got http.Header
+	var path string
+	phone := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, path = r.Header.Clone(), r.URL.Path
+	}))
+	defer phone.Close()
+	b, err := lookupBrand("larkmere-mutual", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", phone.URL, "", nil, endUserPlane{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+phonePath, nil)
+	req.Header.Set("x-user-email", "someone-else@example.com")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if path != "/ws" || got.Get("x-user-email") != b.who.email || got.Get("x-user-id") != b.who.id {
+		t.Fatalf("path %q, headers %v", path, got)
+	}
+}
+
+func TestPhoneOffWithoutAgent(t *testing.T) {
+	srv := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, srv.URL+phonePath); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("phone route with no phone agent: status %d", resp.StatusCode)
 	}
 }

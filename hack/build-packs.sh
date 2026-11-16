@@ -40,7 +40,7 @@ mkdir -p "${OUT}"
 if [[ $# -gt 0 ]]; then
   demos=("$@")
 else
-  demos=(mortgage-underwriting pii-chat claims-triage sharepoint-adapter
+  demos=(mortgage-underwriting pii-chat card-line claims-triage sharepoint-adapter
     incident-agent data-analyst field-service wren research)
 fi
 

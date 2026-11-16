@@ -175,6 +175,12 @@ func siteFS(b brand) (fs.FS, error) {
 // that held a credential would be handing it to every visitor.
 const assistantPath = "/api/assistant/ws"
 
+// phonePath is the card line: a voice agent behind the same edge, so the call
+// carries the same signed-in member as the chat. The browser sends and plays
+// audio over the socket (OMNI binary frames); the proxy is the same one, which
+// passes binary frames through untouched.
+const phonePath = "/api/phone/ws"
+
 // The two account-system routes the assistant panel uses besides the socket,
 // proxied to --backend-url (the stub that also backs the agent's tools):
 //
@@ -218,7 +224,9 @@ type endUserPlane struct {
 //
 // eu, when its url is set, serves My data at myDataPrefix. It needs iss: the
 // end-user plane takes nothing but the member's token.
-func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane) (http.Handler, error) {
+//
+// phoneURL, when set, serves the voice agent at phonePath; empty: no phone line.
+func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane) (http.Handler, error) {
 	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
@@ -259,6 +267,13 @@ func newServer(b brand, agentURL, backendURL string, iss *demoidp.Issuer, eu end
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.Handle(assistantPath, proxy)
+	if phoneURL != "" {
+		phone, err := assistantProxy(phoneURL, b.who, iss)
+		if err != nil {
+			return nil, err
+		}
+		mux.Handle(phonePath, phone)
+	}
 	if backendURL != "" {
 		account, err := accountProxy(backendURL, b.who)
 		if err != nil {

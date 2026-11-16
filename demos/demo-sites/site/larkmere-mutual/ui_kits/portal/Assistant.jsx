@@ -4,6 +4,7 @@ import { IconButton } from "../../components/core/IconButton.jsx";
 import { Icon } from "../../components/core/Icon.jsx";
 import { Badge } from "../../components/core/Badge.jsx";
 import { Input } from "../../components/forms/Input.jsx";
+import { CardLineCall } from "./CardLine.jsx";
 
 // Suggested openers, shown before the member has said anything. None of them
 // carries personal data. The member is signed in, so the assistant knows who
@@ -116,6 +117,9 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [disclosure, setDisclosure] = useState(null);
+  // On a call to the card line (CardLine.jsx) instead of chatting. The chat
+  // stays connected underneath; the call is its own session on its own agent.
+  const [calling, setCalling] = useState(false);
   const scrollRef = useRef(null);
   const sockRef = useRef(null);
   const sessionRef = useRef(null);
@@ -224,8 +228,13 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
             <span style={{ font: "var(--type-body-s)", color: "var(--green-200)" }}>Answers from your own accounts</span>
           </div>
         </div>
-        <IconButton icon="x" label="Close" onClick={onClose} style={{ color: "var(--sand-50)" }} />
+        {calling ? null : (
+          <IconButton icon="phone" label="Call the card line" onClick={() => setCalling(true)} style={{ color: "var(--sand-50)" }} />
+        )}
+        <IconButton icon="x" label="Close" onClick={() => { setCalling(false); onClose(); }} style={{ color: "var(--sand-50)" }} />
       </header>
+
+      {calling ? <CardLineCall onEnd={() => setCalling(false)} /> : (<>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
         {thread.map((m, i) => (
@@ -292,6 +301,7 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
           </div>
         ) : null}
       </footer>
+      </>)}
     </aside>
   );
 }

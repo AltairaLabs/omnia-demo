@@ -55,6 +55,12 @@ spec:
             - http://pii-chat.{{ .Values.namespace }}:8080
             - --issuer-url
             - {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" $) }}
+            {{- if .Values.cardLine.enabled }}
+            # The card line: the voice agent, behind the same edge, so the
+            # call carries the same verified member as the chat.
+            - --phone-agent-url
+            - http://card-line.{{ .Values.namespace }}:8080
+            {{- end }}
             {{- with .Values.piiChat.portal.myData }}
             {{- if .enabled }}
             # Your data: the member's consent, memories and erasure requests,

@@ -31,6 +31,11 @@ piiChat:
   canary:
     enabled: true
 
+# The card line: "Call the card line" in the portal's assistant, a realtime
+# voice agent on omnia-azure's azure-foundry-gpt-realtime, held to the chat's
+# tools, ToolPolicy, privacy policy and edge.
+cardLine: { enabled: true }
+
 # The memory Galaxy: the generated corpus (demos/memory-galaxy) seeded into
 # every tier, with the institutional knowledge graph and its MemoryPolicy.
 galaxy: { enabled: true }

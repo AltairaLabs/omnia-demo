@@ -1,0 +1,95 @@
+{{- if .Values.cardLine.enabled }}
+{{- $cl := .Values.cardLine }}
+{{- if not .Values.piiChat.enabled }}
+{{- fail "cardLine needs piiChat: it uses the member assistant's tools, ToolPolicy, privacy policy and portal" }}
+{{- end }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: card-line-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: card-line-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: card-line-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED from the kit at demos/card-line/arena (its tools are
+# pii-chat's own files). Regenerate with: hack/build-packs.sh card-line
+#
+# Its governance block declares requires_ai_disclosure: true, which on a call
+# is not a banner but audio: the runtime speaks the disclosure before the agent
+# can, and a prompt edit can't remove it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: card-line-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/card-line-pack.json" | indent 4 }}
+---
+# The card line: the member assistant's voice twin.
+#
+# Everything that controls what it may do is pii-chat's, by reference, not by
+# copy: the ToolRegistry (so pii-chat-policy, which selects that registry,
+# governs every tool call on the call as well), the privacy policy that
+# redacts the stored transcript, and the edge (the portal, with edgeTrust), so
+# the card it acts on is the signed-in member's and no one else's. A voice call
+# is a new medium, not a new set of rules.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: card-line
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: card-line
+spec:
+  promptPackRef:
+    name: card-line-pack
+  toolRegistryRef:
+    name: pii-chat-tools
+  privacyPolicyRef:
+    name: pii-chat-privacy
+  # Memory tools, but no ambient retrieval: a duplex session refuses a memory
+  # retriever (the realtime model takes its instructions once, when the call
+  # opens), so the line recalls with memory__recall and writes its case note
+  # with memory__remember, into the same member memory as the chat.
+  memory:
+    enabled: true
+    tools:
+      enabled: true
+    retrieval:
+      enabled: false
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+  # The portal is the edge, as for the chat (see pii-chat-agent.yaml).
+  externalAuth:
+    edgeTrust: {}
+  duplex:
+    enabled: true
+    mode: realtime
+    disclosure:
+      text: "You're speaking with Larkmere Mutual's AI assistant. You can ask for a person at any time."
+  providers:
+    - name: default
+      role: llm
+      providerRef:
+        name: {{ required "cardLine.providerRef: a realtime voice Provider" $cl.providerRef }}
+    - name: disclosure
+      role: tts
+      providerRef:
+        name: {{ required "cardLine.disclosureProviderRef: a tts Provider for the AI disclosure" $cl.disclosureProviderRef }}
+  runtime:
+    replicas: 1
+{{- end }}
