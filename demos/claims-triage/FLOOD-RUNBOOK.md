@@ -18,7 +18,7 @@ memory through retrieval).
 ## The beats
 
 1. **The gap.** Dashboard, Memories, the Memory Galaxy for Larkmere Mutual: the
-   cluster labelled **flood · surface** (members worried about flood zones,
+   flood cluster (labelled **flooding · flood** on the current seed; members worried about flood zones,
    flood and the mortgage valuation, whether the policy covers flooding). The
    few blue institutional points in it are what the policy covers and the
    Flood claim type's definition; no procedure says what happens to a flood

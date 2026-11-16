@@ -23,8 +23,9 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
 
 ## The beats
 
-1. Show the budget (dashboard, Costs, Halvern Partners Research): $0.005 a
-   day, `block`.
+1. Show the budget, $0.005 a day, `block`. The dashboard shows it on the
+   workspace in Topology, not on Costs; or show the Workspace:
+   `kubectl --context aks-omnia-demo get workspace halvern-research -o jsonpath='{.spec.costControls}'`.
 2. Start the research run, the function on a schedule (ScheduledFunction
    `research-run`, every 30 seconds):
    ```bash
@@ -34,8 +35,9 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
    `DailyBudgetExceeded`, and the schedule skips every fire with
    `WorkspaceBudgetExceeded` instead of spending. `make research-stop`
    suspends it again. It deploys suspended, and `make demos` suspends it.
-3. Show cost analytics: the runs that used the budget, and the workspace's
-   `WithinBudget` condition false.
+3. Show cost analytics (Costs): the runs that used the budget. The
+   workspace's `WithinBudget` condition false shows in Topology and on the
+   Workspace's status, not on Costs.
 
 Verified live 2026-11-12, 20 calls 30 seconds apart from the dashboard as the
 operator: 10 served, then 10 refused with `budget_exceeded`; the workspace's

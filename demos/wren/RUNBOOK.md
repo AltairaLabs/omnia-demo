@@ -38,6 +38,16 @@ broker log (`deny-write-without-consent`).
 Re-checked 2026-11-14 on Omnia main `6359a66ac480`: same four beats, `read_bill`
 and `quote_tariff` in the receipts, SW-8D28DAEC scheduled after the click.
 
+## Reset
+
+The account system keeps Amira's tariff in memory, so after a take that
+switched her she stays on Moor Flex, and the next take's "cheaper tariff?"
+answers differently. Put her back on Moor Steady:
+
+```bash
+kubectl --context aks-omnia-demo -n wrenmoor-energy rollout restart deploy/wren-account
+```
+
 ## Gotchas
 
 - **What Wren reads varies.** On 2026-11-12 it answered from the bill alone; on

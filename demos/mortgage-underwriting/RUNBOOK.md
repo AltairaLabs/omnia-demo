@@ -205,7 +205,8 @@ does not conform:
 The REST facade requires auth (the dashboard mints a management JWT), so the
 dashboard is the easy path. Against a port-forward with a token:
 
-This function runs **50-90 seconds** — seven tool calls, a policy refusal and a
+This function can run **up to 90 seconds** (about 15 on Omnia main
+e33940cd6) — seven tool calls, a policy refusal and a
 re-submission — so it is invoked **asynchronously**. A synchronous invocation is
 limited to 30s, deliberately: a caller must not hold a connection open for a
 minute and a half, and `?mode=async` returns immediately and runs the work on a

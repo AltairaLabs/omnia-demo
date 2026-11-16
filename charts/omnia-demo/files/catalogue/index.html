@@ -138,7 +138,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims
         <p>Nothing to reset: every run is a new invocation.</p>
         <h4>The beats</h4>
         <ol>
-          <li>Dashboard, <b>Functions</b>, <code>mortgage-underwriting</code>, <b>Test</b>. Enter <code>case_ref</code> <code>APP-2026-00417</code> (a self-employed applicant whose bank statements are on file) and run it. It takes 50–90 seconds.</li>
+          <li>Dashboard, <b>Functions</b>, <code>mortgage-underwriting</code>, <b>Test</b>. Enter <code>case_ref</code> <code>APP-2026-00417</code> (a self-employed applicant whose bank statements are on file) and run it. It takes about 15 seconds.</li>
           <li><b>Invocations</b> tab: open the run's session. Walk down the tool calls: case file, credit, valuation, affordability and AML all succeed.</li>
           <li>Point at <code>income_verify</code> with <code>evidence: [bank_statement]</code>, marked <b>denied</b> by <code>deny-raw-statement-egress</code>. Then the same call, seconds later, with <code>income_summary</code>, which succeeds. <span class="say">"Same tool, same supplier, same session. The only thing that changed is what it tried to send."</span></li>
           <li>The case note ends <b>REFER</b>, on affordability: the work got done, within policy.</li>
@@ -241,13 +241,14 @@ make canary-reset       # afterwards</pre></li>
         <p>Start with the flood rule off and no flood guidance: that's the state after <code>make demos</code>. Reset the claims system as in demo 3.</p>
         <h4>The beats</h4>
         <ol>
-          <li><b>The gap.</b> Dashboard, <b>Memories</b>, the Memory Galaxy for Larkmere Mutual. Find the cluster labelled <b>flood · surface</b>: members worried about flood zones, flood and their valuation, whether they're covered. The few institutional points in it say what the policy covers; nothing says what happens to a flood claim.</li>
+          <li><b>The gap.</b> Dashboard, <b>Memories</b>, the Memory Galaxy for Larkmere Mutual. Find the flood cluster (labelled <b>flooding · flood</b> on the current seed): members worried about flood zones, flood and their valuation, whether they're covered. The few institutional points in it say what the policy covers; nothing says what happens to a flood claim.</li>
           <li><b>Before.</b> <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>, with <code>{"claim_ref": "LM-40751", "peril": "Flood"}</code>. £420 is within the £500 limit, so it's <b>SETTLED</b>. Reset the claims system.</li>
           <li><b>The rule.</b> Turn on CP-7, every flood claim goes to Flood Response, as a ToolPolicy rule:
 <pre>helm --kube-context aks-omnia-demo -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
           <li><b>The guidance</b>, what a flooded member needs to know. Ingest it <i>after</i> the upgrade (an upgrade re-runs the ingest and would drop it), then reset the claims system again:
 <pre>hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems</pre></li>
+kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems</pre>
+            Wait about 25 seconds after it reports ready: the claims system's peril classifier answers 503 for a while after a restart, and the policy then refuses the call (fail-closed) instead of applying CP-7.</li>
           <li><b>After.</b> Run the same test. The settlement is refused (<code>deny-flood-settlement</code>), the claim is referred to Flood Response, and the note tells the member the team will contact them within one working day. Show the session's system prompt: the flood guidance is under "The society's guidance".</li>
         </ol>
         <h4>Reset</h4>
@@ -285,7 +286,11 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claim
           <li>Point at the receipts panel: <code>read_bill</code> and <code>quote_tariff</code>, each <i>read · allowed</i>. That's exactly what it looked at.</li>
           <li><span class="say">"Yes, switch me."</span> Wren asks with a <b>Switch me</b> button. The switch is scheduled only after she clicks it.</li>
         </ol>
-        <p>Nothing Wren reads tells it to ask first. Without her click, the ToolPolicy refuses the switch (<code>deny-write-without-consent</code>), and so does the account system. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/wren/RUNBOOK.md">Full runbook</a></p>
+        <p>Nothing Wren reads tells it to ask first. Without her click, the ToolPolicy refuses the switch (<code>deny-write-without-consent</code>), and so does the account system.</p>
+        <h4>Reset</h4>
+        <p>The account system keeps Amira's tariff in memory, so after a switch she stays on Moor Flex and the next take's "cheaper tariff?" gets a different answer. Put her back on Moor Steady:</p>
+<pre>kubectl --context aks-omnia-demo -n wrenmoor-energy rollout restart deploy/wren-account</pre>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/wren/RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
       <tr>
         <td class="name"><span class="step">5</span><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">Reversible yes, irreversible no</a></td>
@@ -327,7 +332,7 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
           <li>The safety team updates the manual:
 <pre>hack/reingest-manual.sh /path/to/your/edited/isolation-and-safety.md</pre>
             Wait a few seconds for it to embed.</li>
-          <li>Press <b>reset</b> in the console and ask the same question. The answer now has the photo step. No redeploy, no prompt change.</li>
+          <li>Start a new conversation and ask the same question. The answer now has the photo step. No redeploy, no prompt change. <b>Reload the console page</b> to start it: on the current Omnia build the console's reset button clears the screen but keeps the old conversation, so the answer would come from its history.</li>
         </ol>
         <h4>Reset</h4>
 <pre>hack/reingest-manual.sh charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/isolation-and-safety.md</pre>
@@ -405,14 +410,15 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
       </tr>
       <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
         <h4>Before the take</h4>
-        <p>The budget is daily, so this runs once a day. To run it again the same day, raise <code>dailyBudget</code> in <code>profiles/azure/halvern-research.yaml</code> and run <code>make demos TENANTS=halvern-research</code>. It takes about six minutes, so start it before you talk.</p>
+        <p>The budget is daily, so this runs once a day. To run it again the same day, raise <code>dailyBudget</code> in <code>profiles/azure/halvern-research.yaml</code> and run <code>make demos TENANTS=halvern-research</code>. It takes about four to six minutes, so start it before you talk.</p>
         <h4>The beats</h4>
         <ol>
-          <li>Dashboard, <b>Costs</b>, Halvern Partners Research: the budget is $0.005 a day, set to <code>block</code>.</li>
+          <li>The budget: $0.005 a day, set to <code>block</code>. It shows on the workspace in <b>Topology</b>, not on Costs; or show the Workspace itself:
+<pre>kubectl --context aks-omnia-demo get workspace halvern-research -o jsonpath='{.spec.costControls}'</pre></li>
           <li>Start the research run, one research call every 30 seconds:
 <pre>make research-start</pre></li>
           <li>Each run succeeds until the budget is spent, after about six minutes. Then the workspace goes <code>DailyBudgetExceeded</code> and every later run is skipped instead of spent.</li>
-          <li>Back in <b>Costs</b>: the runs that used the budget, and the workspace no longer within budget.</li>
+          <li><b>Costs</b>: the research runs that used the budget. That the workspace is over budget shows in <b>Topology</b> and on the Workspace's status (<code>DailyBudgetExceeded</code>), not on Costs.</li>
           <li>Stop it:
 <pre>make research-stop</pre></li>
         </ol>

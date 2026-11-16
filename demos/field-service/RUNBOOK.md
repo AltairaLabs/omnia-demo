@@ -27,8 +27,10 @@ The copilot is an internal tool: drive it from the dashboard console (Console,
    # ==> ... ingesting
    # {"msg":"sync complete", ... "documents":5, "accepted":5 ...}
    ```
-3. Press **reset** in the console (a new conversation) and ask the same
-   question. The answer now includes the photo step.
+3. Start a new conversation and ask the same question. The answer now
+   includes the photo step. Reload the console page to start it: on Omnia main
+   e33940cd6 the console's reset button clears the screen but keeps sending to
+   the old session, so the answer comes from that conversation's history.
 4. Put the manual back:
    ```bash
    hack/reingest-manual.sh charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/isolation-and-safety.md
