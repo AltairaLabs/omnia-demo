@@ -93,17 +93,43 @@ export function CardLineCall({ onEnd }) {
     let playAt = 0;
     let playing = [];
     let pending = new Int16Array(0);
-    let agentLine = null; // the agent's turn being transcribed
     let closed = false;
 
-    const addLine = (from, text) => setLines((ls) => [...ls, { from, text }]);
-    const setAgent = (text) => setLines((ls) => {
-      const copy = ls.slice();
-      if (agentLine === null) { agentLine = copy.length; copy.push({ from: "line", text }); }
-      else copy[agentLine] = { from: "line", text };
-      return copy;
-    });
-    let agentText = "";
+    // The transcript, in conversation order. A realtime model transcribes the
+    // caller asynchronously, so the caller's words arrive AFTER the agent has
+    // started answering them, and the wire carries no turn id to order by.
+    // So a caller line that arrives within a few seconds of an agent turn
+    // starting, before any other caller line has claimed that turn, goes in
+    // front of it.
+    const turns = [];
+    let agentTurn = null; // index of the agent turn being spoken
+    let unclaimed = null; // { index, at }: an agent turn no caller line precedes yet
+    const CLAIM_MS = 6000;
+    const publish = () => setLines(turns.slice());
+    const callerSaid = (text) => {
+      if (unclaimed && Date.now() - unclaimed.at < CLAIM_MS) {
+        turns.splice(unclaimed.index, 0, { from: "member", text });
+        if (agentTurn !== null && agentTurn >= unclaimed.index) agentTurn += 1;
+        unclaimed = null;
+      } else {
+        turns.push({ from: "member", text });
+      }
+      publish();
+    };
+    const agentSaid = (chunk) => {
+      if (agentTurn === null) {
+        agentTurn = turns.length;
+        turns.push({ from: "line", text: "" });
+        unclaimed = { index: agentTurn, at: Date.now() };
+      }
+      let prev = turns[agentTurn].text;
+      // A turn can hold two responses (before and after a tool call) with no
+      // space between them: "…right now.I'm sorry…".
+      if (/[.!?]$/.test(prev) && /^[^\s]/.test(chunk)) prev += " ";
+      turns[agentTurn] = { from: "line", text: prev + chunk };
+      publish();
+    };
+    const agentDone = () => { agentTurn = null; };
 
     const flushPlayback = () => {
       playing.forEach((src) => { try { src.stop(); } catch (e) { /* already ended */ } });
@@ -209,16 +235,11 @@ export function CardLineCall({ onEnd }) {
           flushPlayback();
           break;
         case "chunk":
-          if (msg.role === "user") {
-            addLine("member", msg.content || "");
-          } else {
-            agentText += msg.content || "";
-            setAgent(agentText);
-          }
+          if (msg.role === "user") callerSaid(msg.content || "");
+          else agentSaid(msg.content || "");
           break;
         case "done":
-          agentLine = null;
-          agentText = "";
+          agentDone();
           break;
         case "error":
           setStatus("failed");
