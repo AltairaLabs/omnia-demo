@@ -120,6 +120,14 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
   // On a call to the card line (CardLine.jsx) instead of chatting. The chat
   // stays connected underneath; the call is its own session on its own agent.
   const [calling, setCalling] = useState(false);
+  // Offered only when the site has a phone line (api/phone/status is 204).
+  const [phoneLine, setPhoneLine] = useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    fetch(new URL("../../api/phone/status", window.location.href))
+      .then((r) => setPhoneLine(r.status === 204))
+      .catch(() => setPhoneLine(false));
+  }, [open]);
   const scrollRef = useRef(null);
   const sockRef = useRef(null);
   const sessionRef = useRef(null);
@@ -228,7 +236,7 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
             <span style={{ font: "var(--type-body-s)", color: "var(--green-200)" }}>Answers from your own accounts</span>
           </div>
         </div>
-        {calling ? null : (
+        {calling || !phoneLine ? null : (
           <IconButton icon="phone" label="Call the card line" onClick={() => setCalling(true)} style={{ color: "var(--sand-50)" }} />
         )}
         <IconButton icon="x" label="Close" onClick={() => { setCalling(false); onClose(); }} style={{ color: "var(--sand-50)" }} />

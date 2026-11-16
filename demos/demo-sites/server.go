@@ -181,6 +181,10 @@ const assistantPath = "/api/assistant/ws"
 // passes binary frames through untouched.
 const phonePath = "/api/phone/ws"
 
+// phoneStatusPath answers 204 when the site has a phone line, so the page
+// offers a call only when one can connect; without one it is a 404.
+const phoneStatusPath = "/api/phone/status"
+
 // The two account-system routes the assistant panel uses besides the socket,
 // proxied to --backend-url (the stub that also backs the agent's tools):
 //
@@ -273,6 +277,9 @@ func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issu
 			return nil, err
 		}
 		mux.Handle(phonePath, phone)
+		mux.HandleFunc(phoneStatusPath, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
 	}
 	if backendURL != "" {
 		account, err := accountProxy(backendURL, b.who)

@@ -461,3 +461,24 @@ func TestPhoneOffWithoutAgent(t *testing.T) {
 		t.Fatalf("phone route with no phone agent: status %d", resp.StatusCode)
 	}
 }
+
+// The page asks whether there is a phone line before it offers a call.
+func TestPhoneStatus(t *testing.T) {
+	b, err := lookupBrand("larkmere-mutual", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "http://127.0.0.1:2", "", nil, endUserPlane{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := httptest.NewServer(h)
+	defer on.Close()
+	if resp, _ := get(t, on.URL+phoneStatusPath); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("phone line on: status %d", resp.StatusCode)
+	}
+	off := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, off.URL+phoneStatusPath); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("phone line off: status %d", resp.StatusCode)
+	}
+}
