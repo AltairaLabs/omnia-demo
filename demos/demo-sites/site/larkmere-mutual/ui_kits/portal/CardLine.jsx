@@ -221,6 +221,9 @@ export function CardLineCall({ onEnd }) {
         case "connected":
           sessionId = msg.session_id || null;
           // Read from the wire, as the chat's notice is: the pack declares it.
+          // This is the on-screen notice only. Whether the spoken disclosure
+          // played is the runtime's to say (ai.disclosure.sent with
+          // facadeType websocket-voice), so the page claims nothing about it.
           setDisclosure((msg.connected || {}).ai_disclosure === true);
           // The runtime counter-offers its capture format in session_config;
           // if none comes, it takes ours.
@@ -309,7 +312,7 @@ export function CardLineCall({ onEnd }) {
           <div style={{ display: "flex", alignItems: "flex-start", gap: "var(--space-3)" }}>
             <Badge tone="neutral">AI</Badge>
             <p style={{ font: "var(--type-body-s)", color: "var(--text-muted)", margin: 0 }}>
-              You are speaking with an AI assistant, not a person. It tells you so when the call starts.
+              You are speaking with an AI assistant, not a person.
             </p>
           </div>
         ) : null}
