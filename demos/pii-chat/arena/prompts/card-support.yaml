@@ -73,6 +73,47 @@ spec:
   parameters:
     temperature: 0.3
 
+  # The scope rule, enforced by a model that is not the agent. topic_policy asks
+  # a classifier (Jev, TypeSafe's System One model, bound to the pack's `guard`
+  # slot) whether the member's message is in scope, BEFORE the agent's model
+  # sees it: a refused request never reaches the model, so no amount of
+  # persuasion in the message can talk the agent round. The system prompt above
+  # says nothing about scope on purpose. Prompt is guidance; this is control.
+  #
+  # direction is written out although input is topic_policy's default: the pack
+  # readout shows "On the reply" for a guardrail with no direction (Omnia
+  # #4142). fail_on_violation is ignored by the runtime (validators always
+  # enforce) but the readout still sorts on it, so without it this guardrail is
+  # listed as audit-only.
+  #
+  # on_error and on_unknown are deny (their defaults, written out): if the
+  # classifier is unreachable the assistant refuses rather than runs unguarded.
+  # The chart strips this validator when piiChat.guardrail is off, so an
+  # install without the classifier is unguarded rather than refusing every
+  # turn.
+  validators:
+    - type: topic_policy
+      params:
+        direction: input
+        provider: guard
+        message: "I can only help with your Larkmere card and account here. For investment, tax or legal advice, please speak to a qualified adviser."
+        description: >-
+          Larkmere Mutual's member assistant, in the signed-in member portal.
+          It helps the member with their Larkmere card and account.
+        allowed:
+          - "the member's Larkmere card: its status, freezing or unfreezing it, a lost or stolen card, a declined payment"
+          - "the member's Larkmere account and how they like to be contacted"
+          - "what the assistant remembers about the member"
+        disallowed:
+          - "investment advice, including which shares, funds or crypto to buy"
+          - "tax advice"
+          - "legal advice"
+          - "anything unrelated to the member's Larkmere card or account"
+        small_talk: allow
+        on_unknown: deny
+        on_error: deny
+      fail_on_violation: true
+
   # The prompt's allow-list. memory__remember and memory__recall are listed for
   # documentation: PromptKit offers its implicit capabilities (memory__,
   # skill__, a2a__, workflow__) whatever this list says.

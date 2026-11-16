@@ -50,6 +50,54 @@ spec:
     maxTokens: {{ $pc.provider.maxTokens }}
 {{- end }}
 {{- end }}
+{{- if $pc.guardrail.enabled }}
+{{- $g := $pc.guardrail }}
+{{- if $g.clusterSecretStore }}
+---
+# The gateway key, from the platform's secret store. Never in the chart.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ $g.secretName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $g.clusterSecretStore }}
+  target:
+    name: {{ $g.secretName }}
+  data:
+    - secretKey: {{ $g.key }}
+      remoteRef:
+        key: {{ $g.keyVaultSecret }}
+{{- end }}
+---
+# The scope guardrail's classifier: Jev, TypeSafe's System One model, through
+# the Vercel AI Gateway. role inference: it answers a labelled choice with a
+# probability per label and never writes a reply, so it decides scope for the
+# agent without being the agent. An API key rather than workload identity:
+# inference Providers have no platform credential, and this one is not hosted
+# on Azure.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: jev
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: systemone
+  role: inference
+  baseURL: {{ $g.baseURL }}
+  model: {{ $g.model }}
+  credential:
+    secretRef:
+      name: {{ $g.secretName }}
+      key: {{ $g.key }}
+{{- end }}
 ---
 # The card system behind the member assistant (cards.go in the mortgage stubs'
 # image, which is why the repository value reads as mortgage-specific). Named
@@ -249,6 +297,14 @@ spec:
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
         name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef) }}{{ end }}
+{{- if $pc.guardrail.enabled }}
+    # The pack's `guard` slot: the classifier its topic_policy guardrail asks.
+    # Bound by slot name, which is what the guardrail's params.provider names.
+    - name: guard
+      role: inference
+      providerRef:
+        name: jev
+{{- end }}
 {{- if $pc.canary.enabled }}
   # Realtime evals, for the canary gate. 1.0.0 declares none; the candidate
   # packs declare the judge, and the eval worker (which runs llm_judge, and is

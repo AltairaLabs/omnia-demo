@@ -30,6 +30,12 @@ piiChat:
   # The eval-gated canary: `make canary VERSION=2.0` (promotes) or 2.1 (rolls back).
   canary:
     enabled: true
+  # The scope guardrail on Jev. The gateway key is in the persistent Key Vault
+  # (vercel-ai-gateway-api-key). Off until Omnia #4140: the Provider CRD
+  # rejects type systemone for role inference.
+  guardrail:
+    enabled: false
+    clusterSecretStore: azure-kv
 
 # The card line: "Call the card line" in the portal's assistant, a realtime
 # voice agent on omnia-azure's azure-foundry-gpt-realtime, held to the chat's

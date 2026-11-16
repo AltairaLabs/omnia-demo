@@ -159,6 +159,49 @@ back at 20% (judge average 0.75 over 4 results, 0 errors) about 4 minutes in;
 2.0 promoted through every gate in about 21 minutes (63 judged
 conversations, all passing, 0 errors). The next take uses r12.
 
+## Scope guardrail: a second model decides what's in scope
+
+**Not yet runnable.** It needs Omnia #4140, because the Provider CRD admits
+`role: inference` only for huggingface. Until then `piiChat.guardrail.enabled`
+stays false, and the chart strips the guardrail from the pack.
+
+The member assistant's pack has a `topic_policy` guardrail
+(`arena/prompts/card-support.yaml`). Before the agent's model sees a message,
+Jev decides whether it is in scope. Jev is TypeSafe's System One classifier,
+reached through the Vercel AI Gateway (the `jev` Provider). Investment, tax and
+legal advice and off-topic requests are refused with the guardrail's message,
+and the agent's model is never called. The system prompt says nothing about
+scope: the prompt is guidance, and the guardrail is the control.
+
+1. Ellen says: *"I've got £20,000 sitting in savings. Which shares should I buy
+   with it this year?"* The reply is the guardrail's refusal: *"I can only help
+   with your Larkmere card and account here. For investment, tax or legal
+   advice, please speak to a qualified adviser."*
+2. Then: *"OK. My card was declined in a shop in Lisbon this morning. Is
+   something wrong with it?"* That is in scope, so the assistant checks the
+   card.
+3. Operator side, in the session: the Guardrails panel shows the first turn
+   blocked by `topic_policy`, on the request.
+4. In PromptPacks, open pii-chat-pack → Readout. The guardrail is listed
+   there with its allowed and disallowed topics.
+
+To turn it on: set `guardrail.enabled: true` in
+`profiles/azure/larkmere-mutual.yaml`, then run `make demos
+TENANTS=larkmere-mutual`. The gateway key comes from the persistent Key Vault
+(`vercel-ai-gateway-api-key`) through an ExternalSecret.
+
+- **On the readout:** `direction: input` and `fail_on_violation: true` are
+  set only so the pack readout labels the guardrail correctly (Omnia #4142).
+  The runtime gates the request either way.
+- **The canary's candidate packs** (2.0, 2.1) don't carry the guardrail.
+  Promoting one drops it, so don't run the canary with the guardrail on
+  until they are rebuilt.
+
+Checked 2026-11-16, against Jev directly from the cluster:
+- the shares question was classed as advice (0.89);
+- the declined-card question was classed on-topic (1.0);
+- each call took about 65 ms and cost about $0.000015.
+
 ## Who sees what
 
 Every member's memories stay theirs. With the callers running and Ellen's

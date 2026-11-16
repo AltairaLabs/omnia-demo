@@ -355,6 +355,32 @@ piiChat:
   # tool call, the policy and the record are live" is a fine answer.
   deterministic: false
 
+  # -- The scope guardrail: a topic_policy validator in the pack
+  # (demos/pii-chat/arena/prompts/card-support.yaml), decided by Jev, TypeSafe's
+  # System One classifier, through the Vercel AI Gateway. It refuses investment,
+  # tax and legal advice and off-topic requests before the agent's model sees
+  # them.
+  #
+  # Off: the template strips the validator and its `guard` requirement from the
+  # pack, so the agent runs unguarded. It does NOT ship the validator unbound:
+  # an unbound topic_policy fails closed and would refuse every turn.
+  #
+  # On: renders the gateway key's ExternalSecret, the `jev` Provider (role
+  # inference), and binds it to the pack's `guard` slot. Needs Omnia #4140:
+  # until it ships, the Provider CRD admits role inference only for
+  # huggingface, and the install fails on the Provider.
+  guardrail:
+    enabled: false
+    baseURL: https://ai-gateway.vercel.sh/typesafe/v1
+    model: typesafe-ai/jev
+    # The Secret holding the gateway key, under `key`.
+    secretName: vercel-ai-gateway
+    key: api-key
+    # When set, an ExternalSecret materialises secretName from this
+    # ClusterSecretStore's `keyVaultSecret`. Empty: create the Secret yourself.
+    clusterSecretStore: ""
+    keyVaultSecret: vercel-ai-gateway-api-key
+
   # -- Larkmere Mutual member portal — the customer-facing surface.
   #
   # Off by default like every other demo component. When on, the AgentRuntime

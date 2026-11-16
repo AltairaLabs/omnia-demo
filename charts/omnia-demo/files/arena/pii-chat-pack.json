@@ -69,7 +69,34 @@
       },
       "parameters": {
         "temperature": 0.3
-      }
+      },
+      "validators": [
+        {
+          "type": "topic_policy",
+          "params": {
+            "allowed": [
+              "the member's Larkmere card: its status, freezing or unfreezing it, a lost or stolen card, a declined payment",
+              "the member's Larkmere account and how they like to be contacted",
+              "what the assistant remembers about the member"
+            ],
+            "description": "Larkmere Mutual's member assistant, in the signed-in member portal. It helps the member with their Larkmere card and account.",
+            "direction": "input",
+            "disallowed": [
+              "investment advice, including which shares, funds or crypto to buy",
+              "tax advice",
+              "legal advice",
+              "anything unrelated to the member's Larkmere card or account"
+            ],
+            "message": "I can only help with your Larkmere card and account here. For investment, tax or legal advice, please speak to a qualified adviser.",
+            "on_error": "deny",
+            "on_unknown": "deny",
+            "provider": "guard",
+            "small_talk": "allow"
+          },
+          "enabled": true,
+          "fail_on_violation": true
+        }
+      ]
     }
   },
   "tools": {
@@ -121,7 +148,7 @@
   },
   "compilation": {
     "compiled_with": "packc-dev",
-    "created_at": "2026-11-12T20:47:59Z",
+    "created_at": "2026-11-16T16:43:28Z",
     "schema": "v1"
   },
   "metadata": {
@@ -143,5 +170,20 @@
       ],
       "requires_ai_disclosure": true
     }
+  },
+  "requires": {
+    "providers": [
+      {
+        "key": "default",
+        "role": "llm",
+        "required": true
+      },
+      {
+        "key": "guard",
+        "role": "inference",
+        "required": true,
+        "description": "Topic classifier for the scope guardrail (Jev, TypeSafe System One)"
+      }
+    ]
   }
 }
