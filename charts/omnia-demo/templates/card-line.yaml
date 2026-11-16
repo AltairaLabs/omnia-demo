@@ -41,7 +41,8 @@ data:
 # Azure the synthesised disclosure fails (Omnia #4125) and the call would go
 # ahead with nothing said. Recorded once with the line's own tts model
 # (gpt-4o-mini-tts, voice sage) and checked in; it says the same words as the
-# text, which stays as the fallback if the clip can't be read.
+# text, which stays as the fallback if the clip can't be read. Normalised to
+# about the realtime voice's loudness (peak-limited, ~2 dB under it).
 apiVersion: v1
 kind: ConfigMap
 metadata:
