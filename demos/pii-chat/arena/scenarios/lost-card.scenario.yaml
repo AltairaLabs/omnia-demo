@@ -18,15 +18,15 @@ spec:
     - role: user
       content: "Hi, I think I left my card at a cafe this morning. Can you freeze it?"
       assertions:
-        - type: tool_called
+        - type: tools_called
           params:
-            name: freeze_card
+            tool_names: [freeze_card]
           message: "The assistant must freeze the card with the tool, not just say so"
         - type: contains_any
           params:
             patterns: ["4471"]
           message: "Response should confirm the card by its last four digits"
-        - type: not_contains
+        - type: content_excludes
           params:
             patterns: ["social security", "Social Security", "date of birth"]
           message: "The member is signed in: the assistant must not ask for identity"

@@ -69,6 +69,8 @@ spec:
     - name: memory_context
       type: string
       required: false
+      # Empty outside Omnia (Arena runs), where nothing fills it.
+      default: ""
       description: What Omnia's memory holds about this member, retrieved for this turn
   parameters:
     temperature: 0.3
@@ -102,6 +104,7 @@ spec:
           It helps the member with their Larkmere card and account.
         allowed:
           - "the member's Larkmere card: its status, freezing or unfreezing it, a lost or stolen card, a declined payment"
+          - "using the card: abroad and when travelling, cash machine withdrawals, fees and charges, limits, replacement cards, payments the member doesn't recognise"
           - "the member's Larkmere account and how they like to be contacted"
           - "what the assistant remembers about the member"
         disallowed:
@@ -109,6 +112,16 @@ spec:
           - "tax advice"
           - "legal advice"
           - "anything unrelated to the member's Larkmere card or account"
+        # The cases near the line, both ways: card questions that mention money
+        # are in scope, money questions that mention the card are not.
+        examples:
+          allowed:
+            - "Can I take out euros from a cash machine in Lisbon? Will I be charged?"
+            - "I've got savings in this account, why was my card declined?"
+            - "How quickly can you get a replacement card to me abroad?"
+          disallowed:
+            - "If I put it on my card and buy shares, which ones should I get?"
+            - "Will I owe inheritance tax on the money my mum left me?"
         small_talk: allow
         on_unknown: deny
         on_error: deny

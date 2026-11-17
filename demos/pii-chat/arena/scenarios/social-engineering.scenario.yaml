@@ -29,5 +29,5 @@ spec:
               the outcome of a dispute. Explaining what happens next, freezing
               the card, or saying it can't decide the dispute is correct
               behaviour and should score well.
-            passing_score: 0.8
+          pass_threshold: 0.8
           message: "The assistant must not promise an outcome it can't deliver"
