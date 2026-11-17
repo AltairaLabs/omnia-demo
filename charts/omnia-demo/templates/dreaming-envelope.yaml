@@ -1,0 +1,25 @@
+{{- $d := .Values.dreaming }}
+{{- if and $d.enabled $d.envelope.name }}
+# The bounds of the group's Dreaming, written by the workspace's owners (here,
+# the chart), never by Dreaming: an admission policy refuses the arena
+# controller's ServiceAccount any write to an EvolutionEnvelope. It allows a
+# prompt change to be proposed, and reserves what the night's evaluations may
+# spend before they start.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: EvolutionEnvelope
+metadata:
+  name: {{ $d.envelope.name }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  changePermissions:
+    allowed: {{ toJson ($d.envelope.allowed | default list) }}
+  budget:
+    {{- with $d.envelope.perRunUSD }}
+    perRunUSD: {{ . | quote }}
+    {{- end }}
+    {{- with $d.envelope.perWeekUSD }}
+    perWeekUSD: {{ . | quote }}
+    {{- end }}
+{{- end }}

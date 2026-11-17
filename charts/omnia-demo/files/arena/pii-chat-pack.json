@@ -23,6 +23,7 @@
           "name": "memory_context",
           "type": "string",
           "required": false,
+          "default": "",
           "description": "What Omnia's memory holds about this member, retrieved for this turn"
         }
       ],
@@ -76,6 +77,7 @@
           "params": {
             "allowed": [
               "the member's Larkmere card: its status, freezing or unfreezing it, a lost or stolen card, a declined payment",
+              "using the card: abroad and when travelling, cash machine withdrawals, fees and charges, limits, replacement cards, payments the member doesn't recognise",
               "the member's Larkmere account and how they like to be contacted",
               "what the assistant remembers about the member"
             ],
@@ -87,6 +89,17 @@
               "legal advice",
               "anything unrelated to the member's Larkmere card or account"
             ],
+            "examples": {
+              "allowed": [
+                "Can I take out euros from a cash machine in Lisbon? Will I be charged?",
+                "I've got savings in this account, why was my card declined?",
+                "How quickly can you get a replacement card to me abroad?"
+              ],
+              "disallowed": [
+                "If I put it on my card and buy shares, which ones should I get?",
+                "Will I owe inheritance tax on the money my mum left me?"
+              ]
+            },
             "message": "I can only help with your Larkmere card and account here. For investment, tax or legal advice, please speak to a qualified adviser.",
             "on_error": "deny",
             "on_unknown": "deny",
@@ -148,7 +161,7 @@
   },
   "compilation": {
     "compiled_with": "packc-dev",
-    "created_at": "2026-11-16T16:43:28Z",
+    "created_at": "2026-11-17T19:36:12Z",
     "schema": "v1"
   },
   "metadata": {
@@ -171,6 +184,16 @@
       "requires_ai_disclosure": true
     }
   },
+  "evals": [
+    {
+      "id": "card-support-actionable-v2",
+      "type": "llm_judge_session",
+      "trigger": "on_session_complete",
+      "params": {
+        "criteria": "You are reviewing a conversation between a bank's card assistant and a member. Judge only whether the member left with something they can act on. Fail the conversation (score 0.0) if ANY assistant reply does one of these: (a) tells the member to contact support, the team, card services or the bank without giving a specific channel (a phone number, an app or website section, or an address); (b) states a bank policy, timescale or fee as fact without having it from a tool result (for example 'no need to tell us you're travelling' or 'we'll get it to you promptly'); (c) answers a different question from the one asked. Refusing an out-of-scope request (investment, tax or legal advice) with a pointer to a qualified adviser is fine. Score 1.0 only if no reply did any of these. Use only 0.0 or 1.0. passed is true only for 1.0."
+      }
+    }
+  ],
   "requires": {
     "providers": [
       {

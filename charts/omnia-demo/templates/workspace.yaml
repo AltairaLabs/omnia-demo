@@ -63,6 +63,15 @@ spec:
     {{- if and $.Values.piiChat.enabled $.Values.piiChat.canary.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.evalWorker) }}
     {{- $_ := set $s "evalWorker" (dict "enabled" true "podOverrides" (dict "serviceAccountName" $.Values.piiChat.canary.evalWorkerServiceAccount "labels" ($.Values.workspace.runtimeIdentity.podLabels | default dict))) }}
     {{- end }}
+    {{- /* Dreaming on the demo's service group (values: dreaming). */}}
+    {{- $d := $.Values.dreaming }}
+    {{- if and $d.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.dreaming) }}
+    {{- $sel := dict "mode" $d.selection.mode "maxSessions" $d.selection.maxSessions "lookback" $d.selection.lookback "minTurns" $d.selection.minTurns }}
+    {{- with $d.selection.agents }}{{ $_ := set $sel "agents" . }}{{ end }}
+    {{- $dr := dict "enabled" true "schedule" $d.schedule "selection" $sel "providerRef" (dict "name" (required "dreaming.providerRef or llm.providerRef" (default $.Values.llm.providerRef $d.providerRef))) }}
+    {{- with $d.envelope.name }}{{ $_ := set $dr "envelopeRef" (dict "name" .) }}{{ end }}
+    {{- $_ := set $s "dreaming" $dr }}
+    {{- end }}
     {{- $services = append $services $s }}
     {{- end }}
     {{- toYaml $services | nindent 4 }}

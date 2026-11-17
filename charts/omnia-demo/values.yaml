@@ -876,6 +876,41 @@ galaxy:
     tag: ""
     pullPolicy: IfNotPresent
 
+# ---------------------------------------------------------------------------
+# Dreaming (Enterprise): each night the service group's recent conversations
+# become Arena scenarios, evaluated on a replay twin of each agent, and at most
+# one prompt change is proposed for a person to approve into the agent's
+# rollout. Set on workspace.serviceGroup as services[].dreaming, so it needs
+# workspace.create and a group with session and memory.
+#
+# The envelope is the bounds a person writes: what a night may propose and what
+# its evaluations may spend. Dreaming cannot write it (an admission policy
+# refuses the arena controller's ServiceAccount).
+# ---------------------------------------------------------------------------
+dreaming:
+  enabled: false
+  # Provider the orchestrator and compiler call, and the evaluations use as the
+  # simulated user and judge. Empty: llm.providerRef.
+  providerRef: ""
+  # Cron, UTC. Omnia's default is 03:17; a cluster that is powered off at night
+  # needs a time it is on.
+  schedule: "17 3 * * *"
+  selection:
+    mode: evalFailuresThenRecent
+    maxSessions: 10
+    lookback: 24h
+    minTurns: 2
+    # Agents whose sessions are studied. Empty: all.
+    agents: []
+  envelope:
+    # Empty: no envelope, so evaluations have no spend cap and no change can
+    # be proposed.
+    name: ""
+    # Kinds a night may propose a change to. PromptPack is the one kind.
+    allowed: [PromptPack]
+    perRunUSD: "2.00"
+    perWeekUSD: "10.00"
+
 # -- Every demo image at once, for dev builds (`make images`). `registry`
 # replaces the registry and organisation of each image's repository (its last
 # path segment is kept: ghcr.io/altairalabs/omnia-demo-sites becomes

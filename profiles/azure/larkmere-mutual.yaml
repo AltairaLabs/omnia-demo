@@ -37,6 +37,18 @@ piiChat:
     enabled: true
     clusterSecretStore: azure-kv
 
+# Dreaming on the member assistant: its failed conversations become Arena
+# scenarios each evening, and a candidate prompt goes to the canary's rollout
+# once a person approves it on the Dreams page. 18:17 UTC, not Omnia's 03:17:
+# omnia-azure's demo-power workflow stops the cluster at 21:00 UK time.
+dreaming:
+  enabled: true
+  schedule: "17 18 * * *"
+  selection:
+    agents: [pii-chat]
+  envelope:
+    name: larkmere-dreaming
+
 # The card line: "Call the card line" in the portal's assistant, a realtime
 # voice agent on omnia-azure's azure-foundry-gpt-realtime, held to the chat's
 # tools, ToolPolicy, privacy policy and edge. The call works, but off until
