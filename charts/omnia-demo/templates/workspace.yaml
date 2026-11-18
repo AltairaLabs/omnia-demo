@@ -72,6 +72,11 @@ spec:
     {{- with $d.envelope.name }}{{ $_ := set $dr "envelopeRef" (dict "name" .) }}{{ end }}
     {{- $_ := set $s "dreaming" $dr }}
     {{- end }}
+    {{- /* Claims triage holds an over-limit settlement for a claims handler
+           (values: claimsTriage.referral): the group needs its referral-api. */}}
+    {{- if and $.Values.claimsTriage.enabled $.Values.claimsTriage.referral.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.referral) }}
+    {{- $_ := set $s "referral" (dict) }}
+    {{- end }}
     {{- $services = append $services $s }}
     {{- end }}
     {{- toYaml $services | nindent 4 }}

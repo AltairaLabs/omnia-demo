@@ -492,6 +492,25 @@ claimsTriage:
   # society had no such rule. The policy asks the claims system for the claim's
   # peril (/policy/claim-peril); the assessor is never told the rule.
   floodRule: false
+  # -- DA-2 holds an over-limit settlement for a claims handler instead of
+  # refusing it (a ToolPolicy @refer). The handler approves through the
+  # group's referral-api and the original call runs; the invocation finishes
+  # without a new one. Turns on: referral-api on the demo's service group,
+  # async invocation and Redis conversation context on the agent (a held
+  # call has to outlive the request that raised it). Off: DA-2 refuses, as
+  # demo 3 always did.
+  referral:
+    enabled: false
+    # -- Who may approve, as namespace/name ServiceAccounts. referral-api
+    # takes no user approvers on this install yet (Omnia #4248), so the
+    # chart makes a claims-handler ServiceAccount and the runbook approves as
+    # it. Empty: just that one.
+    approverServiceAccounts: []
+    # -- How long a held settlement waits before it expires unapproved.
+    expiresAfter: 24h
+    # -- Redis for the held conversation, as a redis:// URL. The demo's shared
+    # Redis in the omnia namespace.
+    redisURL: redis://demo-redis.omnia.svc.cluster.local:6379
 
   # The claims system stub. Same image and same Go binary as the mortgage
   # stubs: it serves /claim, /claim-settle, /claim-refer and the policy's

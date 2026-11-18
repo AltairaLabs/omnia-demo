@@ -12,9 +12,14 @@ payable, and refers a claim when the platform refuses. So the refusal on
 screen is the platform's, not a well-behaved model's.
 
 1. **£180 settles.** The assessor reads the claim and pays it.
-2. **£990 is refused.** The assessor tries to pay what is payable. The policy
-   broker refuses `claim_settle` before the call reaches the claims system,
-   quoting DA-2, and the assessor refers the claim with that reason.
+2. **£990 waits for a person.** The assessor tries to pay what is payable. The
+   policy broker **holds** `claim_settle` before it reaches the claims system
+   and raises a referral to a claims handler. The handler approves, and that
+   same call runs: the claim settles with no new invocation, and the record
+   says who decided. If the handler rejects it, the assessor refers the claim.
+
+The hold is `claimsTriage.referral.enabled` (on in the Larkmere profile). With
+it off, DA-2 refuses outright, as this demo first did.
 
 ## Before each take
 
@@ -34,25 +39,47 @@ Invoke from the dashboard (Functions, `claims-triage`, Test, `claim_ref`).
 
 1. **`LM-40733`** (£180 payable): `SETTLED`. The claims system logs
    `claim_fetch`, `claim_settle`.
-2. **`LM-40718`** (£990 payable): `REFERRED`. The session shows the refused
-   `claim_settle` and the policy's message. The agent's runtime logs the
-   decision:
+2. **`LM-40718`** (£990 payable): the Test tab comes back straight away. The
+   broker held the settlement:
    ```bash
    kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
-   # claim_settle allowed=false deniedBy=deny-settlement-above-delegated-authority
+   # claim_settle outcome=refer deniedBy=refer-settlement-above-delegated-authority phase=hold
    ```
-   The claims system logs `claim_fetch`, `claim_refer`: no settlement reached
-   it.
+   The claims system has logged `claim_fetch` only. Nothing has been paid.
+3. **Be the claims handler.** List what's waiting, then approve it:
+   ```bash
+   demos/claims-triage/hack/handler.sh list
+   # ref_…  pending  claim_settle  {"amount_pence":99000,"claim_ref":"LM-40718"}  raised …
+   demos/claims-triage/hack/handler.sh approve ref_…
+   # ref_… approved by larkmere-mutual/claims-handler
+   ```
+   Within a few seconds the claims system logs `claim_settle`. In
+   **Invocations** the invocation is `Completed` (its latency includes the
+   wait), and its session shows `claim_settle` taking the length of the hold,
+   then `SETTLED`.
+4. **Or reject it** (`handler.sh reject ref_…`): the assessor refers the claim
+   (`claim_refer`), and nothing is paid.
 
-Verified live 2026-11-12 on the rule-free prompt: `LM-40733` settled;
-`LM-40718`'s `claim_settle` was refused by
-`deny-settlement-above-delegated-authority` and never reached the claims
-system, and the assessor referred it citing the refusal.
+Verified live 2026-11-18 on Omnia 5d9d48cac541: held, approved by
+`larkmere-mutual/claims-handler`, `claim_settle` ran and the invocation
+completed `SETTLED`. A second run was rejected and referred.
 
 **Show the prompt.** The session's system prompt has no limit in it. That is
 the point to make on camera: the model didn't know, and it didn't need to.
 
 ## Gotchas
+
+- **The Test tab says "Failed" on a held invocation**, with an HTTP 200. It
+  isn't failed: the invocation continues in its held record once decided.
+  Show **Invocations** instead, which reads `Completed` after the approval.
+- **The handler is a ServiceAccount**, `claims-handler`, and approving is a
+  script, not a page. Omnia has no console page for referrals and no user
+  approvers on this install yet (Omnia #4248). Say so on stage: the decision
+  and who made it are real, the page isn't there yet.
+- **Turning referral on rolls every agent** in the workspace's default group,
+  and on a full cluster the new pods wait for the autoscaler. Wait for
+  `kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims-triage`
+  before the take: until it finishes, the old pod refuses instead of holding.
 
 - **The function's facade takes no anonymous calls.** `curl` to
   `svc/claims-triage` answers 401; drive it from the dashboard, which calls

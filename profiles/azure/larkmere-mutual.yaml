@@ -13,6 +13,9 @@ claimsTriage:
   enabled: true
   # The agent reads the society's procedures from institutional memory.
   procedures: true
+  # Over £500 waits for a claims handler instead of being refused (demo 3).
+  referral:
+    enabled: true
 
 # The society's procedure documents (files/fixtures/memory-s3), loaded into
 # institutional memory by the memory-ingestion connector. There is no flood

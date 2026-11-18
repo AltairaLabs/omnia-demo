@@ -167,8 +167,21 @@ spec:
     //
     // So the condition is the money itself: any call carrying more than the
     // delegated limit is refused, whatever tool it is and whatever it declared.
+    {{- if .Values.claimsTriage.referral.enabled }}
+    //
+    // With referral on, the same forbid HOLDS the call instead of refusing
+    // it: a claims handler decides, and on approval this very call runs. The
+    // condition is unchanged; only the outcome moves from "no" to "a person
+    // says". @heldReply is what the invocation answers while it waits.
+    @id("refer-settlement-above-delegated-authority")
+    @refer("claims-handler")
+    @message("Above the £500 an automated assessor may settle without a human approver (Larkmere delegated authority schedule DA-2): held for a claims handler.")
+    @heldReply("This settlement is above the assessor's £500 authority and is waiting for a claims handler to approve it.")
+    @expiresAfter("{{ .Values.claimsTriage.referral.expiresAfter }}")
+    {{- else }}
     @id("deny-settlement-above-delegated-authority")
     @message("This is above the £500 an automated assessor may settle without a human approver, so it cannot be paid from here. Refer the claim — and do not part-pay it to bring a payment under the limit, which is the thing the limit exists to stop. (Larkmere delegated authority schedule DA-2.)")
+    {{- end }}
     forbid (principal, action == Action::"invoke", resource)
     when { context.aboveDelegatedLimit };
     {{- if .Values.claimsTriage.floodRule }}
@@ -184,6 +197,20 @@ spec:
     forbid (principal, action == Action::"invoke", resource)
     when { context.isPayment && context.claimPeril == "Flood" };
     {{- end }}
+  {{- if .Values.claimsTriage.referral.enabled }}
+  # Who may decide a held settlement. Only ServiceAccounts today: referral-api
+  # takes no user approvers on this install (Omnia #4248).
+  approverRoutes:
+    - role: claims-handler
+      approvers:
+        serviceAccounts:
+          - {{ $ns }}/claims-handler
+          {{- range .Values.claimsTriage.referral.approverServiceAccounts }}
+          - {{ . }}
+          {{- end }}
+      destination:
+        queue: {}
+  {{- end }}
   producers:
     # The limit, in pence, and never a float. Money that goes through a float64
     # arrives as 989.9999999 often enough to discredit a control a viewer is
@@ -209,4 +236,17 @@ spec:
         timeoutMs: 500
         onError: deny
     {{- end }}
+{{- if .Values.claimsTriage.referral.enabled }}
+---
+# The claims handler the runbook approves as (demo 3). A ServiceAccount, not a
+# person, until referral-api takes user approvers (Omnia #4248).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: claims-handler
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+automountServiceAccountToken: false
+{{- end }}
 {{- end }}

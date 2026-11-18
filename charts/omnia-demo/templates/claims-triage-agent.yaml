@@ -49,6 +49,20 @@ spec:
     maxTokens: {{ $ct.provider.maxTokens }}
 {{- end }}
 {{- end }}
+{{- if $ct.referral.enabled }}
+---
+# Where the held conversation lives (spec.context.storeRef reads key url).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: claims-triage-context
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  url: {{ $ct.referral.redisURL | quote }}
+{{- end }}
 ---
 # The claims systems stub.
 #
@@ -145,12 +159,22 @@ spec:
   facades:
     - type: rest
       port: 8080
-      # Synchronous, unlike the mortgage chain. This one is four tool calls and
-      # runs in a couple of seconds, so there is nothing to be gained from
-      # holding an invocation id — and a demo you can drive from the Test tab
-      # and watch finish is worth more than one you have to poll.
+      # Synchronous by default, unlike the mortgage chain: four tool calls in
+      # a couple of seconds, and a demo you can watch finish from the Test tab.
+      # With referral on it must be async: a held settlement waits for a
+      # claims handler, so the invocation outlives the request that raised it
+      # and answers 202 with its id and the held reply.
       async:
-        enabled: false
+        enabled: {{ $ct.referral.enabled }}
+{{- if $ct.referral.enabled }}
+  # A held call is resumed later, by another request: the conversation has to
+  # be somewhere other than this pod's memory.
+  context:
+    type: redis
+    ttl: 24h
+    storeRef:
+      name: claims-triage-context
+{{- end }}
   inputSchema:
     type: object
     required:
