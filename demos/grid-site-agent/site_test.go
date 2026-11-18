@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -26,6 +27,13 @@ func TestListAssetsHidesPointsAndCountsAlarms(t *testing.T) {
 	m := out.(map[string]any)
 	if !strings.Contains(m["summary"].(string), "5 assets and 2 active alarms") {
 		t.Fatalf("summary = %q", m["summary"])
+	}
+	b, err := json.Marshal(m["assets"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), `"points"`) || strings.Contains(string(b), `"value"`) {
+		t.Fatalf("list_assets carries readings: %s", b)
 	}
 }
 

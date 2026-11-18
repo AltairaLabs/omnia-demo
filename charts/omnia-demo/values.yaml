@@ -619,8 +619,8 @@ wren:
 # which accepts no inbound connections. Its tools (SCADA reads, work orders)
 # run there, next to the plant. It opens one outbound connection to this
 # AgentRuntime's dial-home relay, and Omnia sends it conversations over that
-# connection: the agent is in the console, its sessions are recorded, and its
-# evals run on them, like any other agent's.
+# connection: the agent is in the console and its conversations are recorded
+# as sessions, like any other agent's.
 #
 # This release deploys only Omnia's side: the AgentRuntime (a dial-home relay
 # in place of a runtime), its PromptPack and the ToolPolicy for the site's

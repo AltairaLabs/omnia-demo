@@ -54,6 +54,9 @@ func converse(t *testing.T, s *site, session, msg string) string {
 	if e.done == nil {
 		t.Fatalf("converse %q: no Done", msg)
 	}
+	if u := e.done.Usage; u != nil && u.CostUSD != 0 {
+		t.Fatalf("converse %q: the scripted model reported a cost of $%v", msg, u.CostUSD)
+	}
 	return e.done.Final
 }
 
@@ -95,8 +98,8 @@ func TestAnOrderAboveTheLimitIsRaisedUntilPolicyIsConsulted(t *testing.T) {
 	}
 }
 
-// A tool error reaches the engineer as a refusal, not as a made-up result.
-func TestAToolErrorIsReportedNotInvented(t *testing.T) {
+// An order with no usable cost is asked about, not raised with a guess.
+func TestAnOrderWithoutACostIsAskedForNotRaised(t *testing.T) {
 	s := newSite()
 	got := converse(t, s, "bad-cost", "Raise a work order to fix turbine 3, estimated 0 pounds")
 	if !strings.Contains(got, "What is the estimated cost") {

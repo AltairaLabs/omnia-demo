@@ -30,7 +30,7 @@ spec:
     name: grid-site-agent-pack
   framework:
     type: custom
-    image: {{ printf "%s:%s" $g.relay.image.repository $g.relay.image.tag }}
+    image: {{ printf "%s:%s" (dig "relay" "image" "repository" "ghcr.io/altairalabs/omnia-remote-runtime" $g) (dig "relay" "image" "tag" "main" $g) }}
   facades:
     - type: websocket
       port: 8080

@@ -1,5 +1,6 @@
 {{- if .Values.gridSite.enabled }}
 {{- $g := .Values.gridSite }}
+{{- $limit := int (default 25000 $g.workOrderLimitGBP) }}
 ---
 # THE CONTROL, as it will be enforced: a work order above the site's
 # delegated limit needs a human.
@@ -35,7 +36,7 @@ spec:
   producers:
     - name: aboveSiteLimit
       type: cel
-      cel: has(body.estimated_cost_gbp) && body.estimated_cost_gbp > {{ int $g.workOrderLimitGBP }}
+      cel: has(body.estimated_cost_gbp) && body.estimated_cost_gbp > {{ $limit }}
   policy: |
     // The site's tools are permitted. Cedar is default-deny, so without this
     // grant nothing runs, not even a SCADA read.
@@ -45,7 +46,7 @@ spec:
 
     // Wrenmoor Energy delegated authority WE-MNT-03.
     @id("deny-work-order-above-site-limit")
-    @message("This work order is above the £{{ int $g.workOrderLimitGBP }} the site assistant may commit without a human, so it was not raised. Ask the control engineer to raise it, and do not split it into smaller orders to bring each under the limit. (Wrenmoor Energy delegated authority WE-MNT-03.)")
+    @message("This work order is above the £{{ $limit }} the site assistant may commit without a human, so it was not raised. Ask the control engineer to raise it, and do not split it into smaller orders to bring each under the limit. (Wrenmoor Energy delegated authority WE-MNT-03.)")
     forbid (principal, action == Action::"invoke", resource)
     when { context.aboveSiteLimit };
 {{- end }}

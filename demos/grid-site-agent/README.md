@@ -9,17 +9,18 @@ site SCADA and raises maintenance work orders.
 The agent opens one outbound connection to Omnia, the
 [dial-home channel](https://github.com/AltairaLabs/omnia-dialhome), and Omnia
 treats it as one of its own agents: the console can talk to it, and its
-conversations are recorded as sessions, which evals run on.
+conversations are recorded as sessions. (The pack declares no evals; any
+workspace eval that reads sessions sees these like any other agent's.)
 
 ```
  Wrenmoor Edge operational network          |  Omnia (wrenmoor-energy namespace)
  (no inbound connections)                   |
                                             |
-  grid-site-agent  --- one outbound wss --->|-->  relay  ---  facade  <---  console
+  grid-site-agent  -- one outbound ws(s) -->|-->  relay  ---  facade  <---  console
    PromptKit pack                           |     (agent pod: grid-site-agent)
    list_assets, read_scada,                 |                    |
    raise_work_order run HERE                |                    v
-                                            |              session-api, evals
+                                            |                session-api
 ```
 
 ## What is in it
@@ -86,8 +87,13 @@ Say these plainly if asked; they are open work, not features.
 
 ```bash
 helm --kube-context <ctx> upgrade --install wrenmoor-energy charts/omnia-demo \
-  -n wrenmoor-energy --reuse-values --set gridSite.enabled=true
+  -n wrenmoor-energy --reset-then-reuse-values --set gridSite.enabled=true
 ```
+
+`--reset-then-reuse-values` (Helm 3.14+) takes this chart's defaults for the
+new `gridSite` block and keeps the release's own values; plain
+`--reuse-values` would drop the new defaults. Passing the tenant's profile
+files again with `-f` works too.
 
 The operator issues the site's key into Secret
 `grid-site-agent-dial-home-key` and exposes the relay as Service
@@ -104,7 +110,9 @@ image; pin it to the Omnia build you run.
 ### 2a. The site as a namespace (same cluster)
 
 The namespace plays the site: its NetworkPolicy lets nothing in, and lets the
-agent out only to the relay's port. Inside a cluster the in-cluster
+agent out only to the relay's port. If the Workspace isolates its namespace
+(`networkPolicy.isolate: true`), also allow ingress from
+`wrenmoor-edge-site` to port 9002 there. Inside a cluster the in-cluster
 `ws://…svc.cluster.local` address is allowed; anywhere else the URL must be
 `wss://`.
 
@@ -173,7 +181,9 @@ kubectl --context <ctx> -n wrenmoor-energy delete secret grid-site-agent-dial-ho
 ```
 
 The relay closes the site's connection and the agent goes NotReady. The site
-keeps re-dialling and is refused with 401 until it is given the new key.
+keeps re-dialling and is refused with 401 until it is given the new key: the
+operator issues one into the same Secret, so re-run step 2a's Secret and
+restart (or re-export the key for 2b).
 
 ## Clean up
 
@@ -189,7 +199,13 @@ helm --kube-context <ctx> upgrade wrenmoor-energy charts/omnia-demo -n wrenmoor-
 served over the channel: set `gridSite.providerRef` to a Provider whose
 credential the site can resolve itself (the relay withholds one keyed by a
 cluster Secret; give the site that configuration as `OMNIA_DIAL_HOME_CONFIG`).
-That spends real model money; the scripted model spends none.
+
+Only the Provider's *configuration* comes over the channel. The model calls
+go from the site straight to the provider's endpoint, so the site must be
+allowed out to it: in the namespace variant, add an egress rule for it to
+`site/kubernetes.yaml`, whose `dial-home-only` policy otherwise refuses every
+model call. That spends real model money; the scripted model spends none (it
+reports no cost).
 
 ## Develop
 

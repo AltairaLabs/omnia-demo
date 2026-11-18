@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/AltairaLabs/PromptKit/runtime/v2/providers"
@@ -60,7 +61,12 @@ func (p *scriptedProvider) PredictWithTools(ctx context.Context, req providers.P
 	tools providers.ProviderTools, toolChoice string,
 ) (providers.PredictionResponse, []types.MessageToolCall, error) {
 	p.script.observe(req.Messages)
-	return p.ToolProvider.PredictWithTools(ctx, req, tools, toolChoice)
+	resp, calls, err := p.ToolProvider.PredictWithTools(ctx, req, tools, toolChoice)
+	// The mock prices its made-up tokens; a script spends nothing, and a
+	// non-zero cost would be recorded on the session and count against the
+	// workspace's budget.
+	resp.CostInfo = nil
+	return resp, calls, err
 }
 
 // PredictStreamWithTools streams the scripted turn itself rather than through
@@ -72,7 +78,7 @@ func (p *scriptedProvider) PredictStreamWithTools(ctx context.Context, req provi
 	tools any, toolChoice string,
 ) (<-chan providers.StreamChunk, error) {
 	p.script.observe(req.Messages)
-	resp, calls, err := p.ToolProvider.PredictWithTools(ctx, req, tools, toolChoice)
+	resp, calls, err := p.PredictWithTools(ctx, req, tools, toolChoice)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +98,7 @@ func (p *scriptedProvider) PredictStreamWithTools(ctx context.Context, req provi
 		if len(calls) > 0 {
 			finish = types.FinishReasonToolUse
 		}
-		out <- providers.StreamChunk{Content: content, ToolCalls: calls, FinishReason: &finish, CostInfo: resp.CostInfo}
+		out <- providers.StreamChunk{Content: content, ToolCalls: calls, FinishReason: &finish}
 	}()
 	return out, nil
 }
@@ -253,7 +259,7 @@ func priorityIn(user string) string {
 }
 
 // workIn is the work a message describes: what follows "to" after "work
-// order", up to the asset or the cost, e.g. "Replace the blade B pitch motor".
+// order", up to the cost, e.g. "Replace the blade B pitch motor on WE-T07".
 func workIn(user, id string) string {
 	msg := user
 	if i := strings.Index(strings.ToLower(msg), "work order"); i >= 0 {
@@ -262,8 +268,8 @@ func workIn(user, id string) string {
 	if i := strings.Index(strings.ToLower(msg), " to "); i >= 0 {
 		msg = msg[i+len(" to "):]
 	}
-	for _, stop := range []string{",", " - ", "(", "£", " estimated", " for £", " at £"} {
-		if i := strings.Index(strings.ToLower(msg), strings.ToLower(stop)); i > 0 {
+	for _, stop := range []string{" for £", " at £", ",", " - ", "(", "£", " estimated"} {
+		if i := strings.Index(strings.ToLower(msg), strings.ToLower(stop)); i >= 0 {
 			msg = msg[:i]
 		}
 	}
@@ -271,7 +277,8 @@ func workIn(user, id string) string {
 	if msg == "" {
 		return "Investigate and repair " + id
 	}
-	return strings.ToUpper(msg[:1]) + msg[1:]
+	r, n := utf8.DecodeRuneInString(msg)
+	return string(unicode.ToUpper(r)) + msg[n:]
 }
 
 func containsAny(s string, cues []string) bool {
