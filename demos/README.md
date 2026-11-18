@@ -14,6 +14,7 @@ repository and do not access platform databases.
 | `field-service/` | Wrenmoor Energy field-service copilot Arena source | Omnia Enterprise institutional memory |
 | `pii-chat/` | Synthetic card-support Arena source and privacy-governance declarations | Omnia Enterprise for privacy policy behavior |
 | `claims-triage/` | Synthetic claims Arena source | Omnia Enterprise when policy enforcement is enabled |
+| `grid-site-agent/` | Wrenmoor Energy's on-site grid-operations agent: SCADA and work-order tools that run at the site, served to Omnia over an outbound-only dial-home connection, plus the site as a namespace or container | Omnia Enterprise (the dial-home relay) |
 | `demo-sites/` | The demo companies' customer-facing sites (Larkmere Mutual, Wrenmoor Energy) and assistant proxy, one image | The chat examples (piiChat, wren) |
 
 The public Helm chart currently deploys the memory-ingestion example and the

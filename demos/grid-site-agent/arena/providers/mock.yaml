@@ -1,0 +1,16 @@
+# Required by the Arena config schema, and used only when running this pack
+# through PromptArena locally. The on-site runtime chooses its own model: the
+# scripted mock in demos/grid-site-agent/script.go by default, or the
+# Provider Omnia serves over the dial-home channel.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+spec:
+  id: mock
+  type: mock
+  model: mock-grid-ops
+  defaults:
+    temperature: 0.0
+    top_p: 1.0
+    max_tokens: 1024

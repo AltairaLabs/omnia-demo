@@ -1,0 +1,51 @@
+{{- if .Values.gridSite.enabled }}
+{{- $g := .Values.gridSite }}
+---
+# THE CONTROL, as it will be enforced: a work order above the site's
+# delegated limit needs a human.
+#
+# NOT ENFORCED YET. The site's tools run at the site, and nothing on the
+# dial-home path asks Omnia's policy broker before one runs: the channel has
+# no policy decision to carry (omnia-dialhome#2), and the relay has none to
+# serve. Until it does, a £48,000 order is raised. The demo says so; do not
+# narrate this policy as having refused anything.
+#
+# It is here because it is the control the customer wants, written the way
+# every other demo's is, so the day the decision crosses the channel it is
+# this resource that decides. The site's tools are in no ToolRegistry (they
+# run where no registry reaches), so `grid-site-tools` names them as a group
+# for the selector and the permit; how a dial-home tool call is matched to a
+# registry name is part of that open work.
+#
+# The condition is the money, not the tool's name, for the reason the claims
+# demo gives: a name match governs one tool and misses the next one that
+# commits spend. Whole pounds, never a float.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: grid-site-policy
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: grid-site-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: aboveSiteLimit
+      type: cel
+      cel: has(body.estimated_cost_gbp) && body.estimated_cost_gbp > {{ int $g.workOrderLimitGBP }}
+  policy: |
+    // The site's tools are permitted. Cedar is default-deny, so without this
+    // grant nothing runs, not even a SCADA read.
+    @id("permit-site-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"grid-site-tools");
+
+    // Wrenmoor Energy delegated authority WE-MNT-03.
+    @id("deny-work-order-above-site-limit")
+    @message("This work order is above the £{{ int $g.workOrderLimitGBP }} the site assistant may commit without a human, so it was not raised. Ask the control engineer to raise it, and do not split it into smaller orders to bring each under the limit. (Wrenmoor Energy delegated authority WE-MNT-03.)")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.aboveSiteLimit };
+{{- end }}

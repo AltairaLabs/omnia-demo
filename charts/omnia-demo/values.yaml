@@ -613,6 +613,59 @@ wren:
   consentTimeout: 5m
 
 # ---------------------------------------------------------------------------
+# gridSite — Wrenmoor Energy's on-site grid-operations assistant: dial-home
+#
+# An agent that runs INSIDE the Wrenmoor Edge wind farm's operational network,
+# which accepts no inbound connections. Its tools (SCADA reads, work orders)
+# run there, next to the plant. It opens one outbound connection to this
+# AgentRuntime's dial-home relay, and Omnia sends it conversations over that
+# connection: the agent is in the console, its sessions are recorded, and its
+# evals run on them, like any other agent's.
+#
+# This release deploys only Omnia's side: the AgentRuntime (a dial-home relay
+# in place of a runtime), its PromptPack and the ToolPolicy for the site's
+# tools. The site itself is demos/grid-site-agent, run outside the cluster or
+# in a namespace of its own; see demos/grid-site-agent/README.md.
+#
+# Not yet true, and narrated as such: Omnia does not yet decide the site's
+# tool calls. The ToolPolicy below is the control as it will be enforced, but
+# nothing on the dial-home path asks Omnia before a site tool runs
+# (omnia-dialhome#2), and the calls are not on the session's tool calls
+# (omnia-dialhome#3). Memory does not reach the site either (omnia-dialhome#4).
+#
+# Requires Omnia Enterprise: the dial-home relay (omnia-remote-runtime) and
+# ToolPolicy are EE.
+# ---------------------------------------------------------------------------
+gridSite:
+  enabled: false
+
+  # The relay container Omnia runs in the agent pod in place of a runtime.
+  # This is OMNIA's image, published by the Omnia repository on ITS scheme
+  # (:main and :<sha>, no release tags yet), not one of this repository's.
+  # Pin it to the Omnia build you run.
+  relay:
+    image:
+      repository: ghcr.io/altairalabs/omnia-remote-runtime
+      tag: main
+
+  # -- A Provider for the site to run on, served over the channel when the
+  # site runs with SITE_AGENT_MODEL=omnia. llm.providerRef is deliberately NOT
+  # used: the tenant's shared Provider is usually keyed to the cluster's own
+  # identity, which a site does not have. Empty: the agent lists no Provider,
+  # and the site runs on its scripted mock (the default), with no model and no
+  # key.
+  #
+  # The relay serves a Provider only when its credential needs no cluster
+  # Secret (a platform identity, or a credential the site holds); one keyed by
+  # a Secret is withheld and the site must be given it as
+  # OMNIA_DIAL_HOME_CONFIG.
+  providerRef: ""
+
+  # -- The most a work order may commit, in whole pounds, before it needs a
+  # human. The ToolPolicy's limit; the agent is not told it.
+  workOrderLimitGBP: 25000
+
+# ---------------------------------------------------------------------------
 # wrenmoorSite — Wrenmoor Energy's websites
 #
 # The public site, the customer portal with the Wren panel, and the Wrenmoor

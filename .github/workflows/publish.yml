@@ -10,6 +10,10 @@ on:
       - demos/mortgage-underwriting/**
       - demos/sharepoint-adapter/**
       - demos/demo-sites/**
+      - demos/grid-site-agent/**
+      - charts/omnia-demo/files/arena/grid-site-agent-pack.json
+      - go.mod
+      - go.sum
       - .github/workflows/publish.yml
   workflow_dispatch:
 
@@ -45,6 +49,11 @@ jobs:
             context: .
             file: demos/demo-sites/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-sites
+          # Wrenmoor Energy's on-site agent: runs at the site, dials home.
+          - name: grid-site-agent
+            context: .
+            file: demos/grid-site-agent/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-grid-site-agent
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

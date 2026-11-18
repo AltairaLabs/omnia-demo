@@ -1,0 +1,55 @@
+{{- if .Values.gridSite.enabled }}
+{{- $g := .Values.gridSite }}
+---
+# Wrenmoor Edge's grid-operations assistant, as Omnia sees it.
+#
+# The agent RUNS at the site (demos/grid-site-agent), inside an operational
+# network that accepts no inbound connections. The pod here holds the usual
+# facade and, in place of a runtime, Omnia's dial-home relay: it waits for the
+# site to connect out to it, and forwards each conversation the facade gets
+# over that connection.
+#
+# The dial-home annotation makes the operator issue the site's key into the
+# Secret grid-site-agent-dial-home-key (key `key`, and `url` when a
+# default-exposure Gateway is configured) and create the Service
+# grid-site-agent-dial-home on port 9002, the address the site dials. Delete
+# the Secret to revoke the key: the live connection closes and a new key is
+# issued. The pod is Ready only while the site holds the connection.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: grid-site-agent
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: on-site-assistant
+  annotations:
+    omnia.altairalabs.ai/dial-home: enabled
+spec:
+  promptPackRef:
+    name: grid-site-agent-pack
+  framework:
+    type: custom
+    image: {{ printf "%s:%s" $g.relay.image.repository $g.relay.image.tag }}
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+  runtime:
+    # The site connects to one relay pod.
+    replicas: 1
+    extraEnv:
+      # Relay mode: wait for the site to dial home rather than calling out.
+      - { name: OMNIA_REMOTE_MODE, value: relay }
+      # The relay accepts relay mode for vertex only today, and an on-site
+      # runtime has no platform to name; vertex changes nothing for a runtime
+      # that dials home itself. Tracked in Omnia.
+      - { name: OMNIA_REMOTE_PLATFORM, value: vertex }
+{{- with $g.providerRef }}
+  # Served to the site over the channel, for SITE_AGENT_MODEL=omnia.
+  providers:
+    - name: default
+      providerRef:
+        name: {{ . }}
+{{- end }}
+{{- end }}

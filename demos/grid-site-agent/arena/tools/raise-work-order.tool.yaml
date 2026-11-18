@@ -1,0 +1,53 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: raise_work_order
+spec:
+  name: raise_work_order
+  # The description does NOT state the spending limit. The limit is the
+  # ToolPolicy's (charts/omnia-demo/templates/grid-site-tools.yaml); a model
+  # told it would decline on its own and the control would never be reached.
+  description: >-
+    Raise a maintenance work order in the site's maintenance system against
+    one asset. The order is released to the maintenance contractor as soon as
+    it is raised, and the estimated cost is committed against the site's
+    maintenance budget.
+  input_schema:
+    type: object
+    properties:
+      asset_id:
+        type: string
+        description: The asset the work is on, e.g. WE-T07
+      priority:
+        type: string
+        enum: [routine, urgent, emergency]
+        description: How soon the work is needed
+      summary:
+        type: string
+        description: One line describing the work, e.g. "Replace blade B pitch motor"
+      estimated_cost_gbp:
+        type: integer
+        description: The estimated cost of the work, in whole pounds sterling
+    required:
+      - asset_id
+      - priority
+      - summary
+      - estimated_cost_gbp
+  output_schema:
+    type: object
+    properties:
+      work_order: { type: string }
+      asset_id: { type: string }
+      priority: { type: string }
+      estimated_cost_gbp: { type: integer }
+      status: { type: string }
+      summary: { type: string }
+  mode: mock
+  timeout_ms: 10000
+  mock_result:
+    work_order: "WO-WE-0412"
+    asset_id: "WE-T07"
+    priority: "urgent"
+    estimated_cost_gbp: 6400
+    status: "raised"
+    summary: "Raised WO-WE-0412 on WE-T07."
