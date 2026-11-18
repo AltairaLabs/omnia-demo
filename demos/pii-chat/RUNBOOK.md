@@ -234,9 +234,11 @@ exactly what the false-refusal partner is there to catch.
 
 ## Dreaming: the night shift
 
-**Blocked on Omnia #4200** (Dreaming's `dream_propose` schema can't be sent
-in OpenAI strict mode, and every Foundry Provider is `openai`-type). Built,
-deployed and verified up to the night's first model call.
+**Blocked on Omnia #4241** (the scenario compiler's output schema can't be
+sent in OpenAI strict mode, and every Foundry Provider is `openai`-type).
+#4200 is fixed. Since 2026-11-18 a night finds its candidates and begins, and
+then every `dream_compile_session` fails. The `dreaming-default-policy`
+ToolPolicy in this chart lets the night call its tools at all (Omnia #4240).
 
 Dreaming studies the member assistant's failed conversations each evening and
 turns them into Arena scenarios, evaluated on a replay twin of the agent, and
@@ -259,7 +261,7 @@ What's in place:
   powered off from 21:00 UK time), and the envelope `larkmere-dreaming`
   (PromptPack changes allowed, $2 per run, $10 per week).
 
-On stage, once #4200 is in:
+On stage, once #4241 is in:
 
 1. In the portal, Ellen asks the travel questions. In the console, the
    session's eval is failed.
