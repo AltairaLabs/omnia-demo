@@ -98,6 +98,25 @@ Add a row when you add a stand-in.
 - **Downstream:** the same as the front doors. The callers only run while
   `make canary` has scaled them up, so their JWKS is reachable only then.
 
+### The claims handler (`demos/claims-triage/hack/handler.sh`)
+
+- **Fakes:** the person who approves a held settlement. The script decides as
+  the `claims-handler` ServiceAccount the chart creates, with a ten-minute
+  token for the audience `omnia-referral-api`, over a port-forward to the
+  workspace's referral-api.
+- **Real system:** a claims handler signed in with the insurer's identity
+  provider, working a queue page. Omnia has no such page, and referral-api
+  takes no user approvers on this install (Omnia #4248). An Entra user would
+  need `workspaceServices.referralApi.oidc` set in omnia-azure.
+- **Downstream:**
+  - **The record shows a ServiceAccount, not a person.** `decidedBy` is
+    `larkmere-mutual/claims-handler`. Say so on stage.
+  - **Only listed approvers can decide.** The ToolPolicy's `approverRoutes`
+    names this ServiceAccount; any other caller gets 403. Don't widen the
+    route to make the script work from elsewhere.
+  - **referral-api stays ClusterIP.** The script needs kubectl access to the
+    cluster, which a real handler would never have.
+
 ## Line-of-business systems
 
 ### Case, claims and account stubs (`demos/mortgage-underwriting`, one binary)
