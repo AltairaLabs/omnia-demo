@@ -8,9 +8,13 @@ site SCADA and raises maintenance work orders.
 
 The agent opens one outbound connection to Omnia, the
 [dial-home channel](https://github.com/AltairaLabs/omnia-dialhome), and Omnia
-treats it as one of its own agents: the console can talk to it, and its
-conversations are recorded as sessions. (The pack declares no evals; any
-workspace eval that reads sessions sees these like any other agent's.)
+treats it as one of its own agents: the console can talk to it, its
+conversations are recorded as sessions, and **every tool it runs on site is
+put to Omnia's tool policy first**. The site asks over the channel before each
+tool runs, and runs it only if Omnia allows it. Each call it made is on the
+session, and a call Omnia refused is recorded there as denied. (The pack
+declares no evals; any workspace eval that reads sessions sees these like any
+other agent's.)
 
 ```
  Wrenmoor Edge operational network          |  Omnia (wrenmoor-energy namespace)
@@ -18,9 +22,10 @@ workspace eval that reads sessions sees these like any other agent's.)
                                             |
   grid-site-agent  -- one outbound ws(s) -->|-->  relay  ---  facade  <---  console
    PromptKit pack                           |     (agent pod: grid-site-agent)
-   list_assets, read_scada,                 |                    |
-   raise_work_order run HERE                |                    v
-                                            |                session-api
+   list_assets, read_scada,                 |       |         |
+   raise_work_order run HERE,               |       v         v
+   each one only after Omnia allows it      |  policy broker  session-api
+                                            |  (grid-site-policy)
 ```
 
 ## What is in it
@@ -28,7 +33,7 @@ workspace eval that reads sessions sees these like any other agent's.)
 | Path | What it is |
 |---|---|
 | `arena/` | The pack's source: the prompt and the three tools. Compiled by `hack/build-packs.sh grid-site-agent` into `charts/omnia-demo/files/arena/grid-site-agent-pack.json` |
-| `main.go` | The on-site entrypoint: dials home with the key Omnia issued and serves the pack over the channel, using the [omnia-dialhome](https://github.com/AltairaLabs/omnia-dialhome) library |
+| `main.go` | The on-site entrypoint: dials home with the key Omnia issued and serves the pack over the channel, using the [omnia-dialhome](https://github.com/AltairaLabs/omnia-dialhome) library, with every site tool put to Omnia's tool policy and recorded on the session |
 | `site.go` | The site's SCADA and maintenance system: fictional, deterministic, in memory. The tools run here, in this process |
 | `script.go` | The scripted model: PromptKit's mock provider choosing the next move from the engineer's message, so no model and no key are needed |
 | `site/kubernetes.yaml` | The site as a namespace: NetworkPolicy allowing no ingress and egress only to the relay |
@@ -37,40 +42,53 @@ workspace eval that reads sessions sees these like any other agent's.)
 
 The Omnia side is the chart's `gridSite` values: the `grid-site-agent`
 AgentRuntime with the `omnia.altairalabs.ai/dial-home` annotation (its pod
-runs Omnia's relay, `omnia-remote-runtime`, in place of a runtime), its
-PromptPack, and the `grid-site-policy` ToolPolicy.
+runs Omnia's relay, `omnia-remote-runtime`, in place of a runtime, with
+`OMNIA_REMOTE_PLATFORM=self-hosted`), its PromptPack, and the
+`grid-site-policy` ToolPolicy, which refuses a work order above £25,000
+(`gridSite.workOrderLimitGBP`).
 
 ### How the site's tools run
 
 The tools are **local tool handlers**, not client tools. `omnia-dialhome`'s
 `promptkit` handler runs each pack tool that has an `OnTool` handler in the
-site process, and nothing about the call crosses the channel; a client tool
-would instead be sent to whoever is talking to the agent (the console), which
-is the wrong place for a SCADA read. The released `omnia-dialhome` command can
-only run client tools, so the site has its own small `main.go` on the
-library ([omnia-dialhome#5](https://github.com/AltairaLabs/omnia-dialhome/issues/5)).
+site process; a client tool would instead be sent to whoever is talking to
+the agent (the console), which is the wrong place for a SCADA read. The
+released `omnia-dialhome` command can only run client tools, so the site has
+its own small `main.go` on the library
+([omnia-dialhome#5](https://github.com/AltairaLabs/omnia-dialhome/issues/5)).
 
-## What this demo does not show yet
+### How Omnia governs them
 
-Say these plainly if asked; they are open work, not features.
+The tool runs on site, but the decision is Omnia's:
 
-- **Omnia does not yet decide the site's tool calls.** The `grid-site-policy`
-  ToolPolicy refuses a work order above £25,000, but nothing on the dial-home
-  path asks Omnia before a site tool runs, so today the £48,000 transformer
-  order below **is raised**.
-  [omnia-dialhome#2](https://github.com/AltairaLabs/omnia-dialhome/issues/2)
-  tracks carrying the decision over the channel. The test
-  `TestAnOrderAboveTheLimitIsRaisedUntilPolicyIsConsulted` pins today's
-  behaviour, so the change shows up when it lands.
-- **The site's tool calls are not on the session.** The engineer's message
-  and the reply are recorded; the tool call between them is not
-  ([omnia-dialhome#3](https://github.com/AltairaLabs/omnia-dialhome/issues/3)).
-- **No memory.** The channel carries the memory stream, but nothing gives the
-  pack Omnia memory over it yet
-  ([omnia-dialhome#4](https://github.com/AltairaLabs/omnia-dialhome/issues/4)).
-- **The relay is told the site is on Vertex.** Omnia's relay accepts relay mode
-  only with `OMNIA_REMOTE_PLATFORM=vertex`, and an on-site runtime has no
-  platform of its own to name. Nothing in this demo depends on the value.
+1. Before a tool runs, the site sends Omnia the call (tool, arguments, and the
+   registry name `grid-site-tools`) over the channel, naming only the
+   conversation.
+2. Omnia's relay asks the policy broker in the agent's pod, as Omnia's own
+   runtime does, for the engineer the console sent with that conversation.
+   `grid-site-policy` permits the site's tools and forbids a work order whose
+   `estimated_cost_gbp` is above the limit.
+3. On an allow the tool runs, and the site records the call on the session.
+   On a refusal it does not run. The model is told why in the policy's
+   `@message`, and Omnia records the call on the session as **denied**.
+4. If no decision comes (the channel is down, say), the tool does not run
+   either. Nothing on site runs without Omnia's say-so.
+
+## What this demo does not show
+
+Say these plainly if asked.
+
+- **Memory.** The site can use the memory Omnia keeps for the engineer
+  (`SITE_AGENT_MEMORY=true`, with `spec.memory` enabled on the AgentRuntime),
+  but this demo's chart does not enable it and the scripted model never
+  calls a memory tool.
+- **Approval.** A policy that refers a call for a person's approval is
+  refused by Omnia's relay rather than held: a site cannot hold a call while a
+  person decides.
+- **A dishonest site.** The site asks before every tool. A site built to skip
+  the question would run its tools ungoverned, as any code holding the agent's
+  key could. What the demo shows is that an honest site is governed exactly
+  as an in-cluster agent is, and fails closed when it cannot be.
 
 ## Run it
 
@@ -78,7 +96,10 @@ Say these plainly if asked; they are open work, not features.
 
 - An Omnia install with Enterprise enabled (dev mode is fine): the relay and
   ToolPolicy are Enterprise. Its operator must support the dial-home
-  annotation.
+  annotation (it injects the policy broker beside the relay, as for any
+  Enterprise agent), and its relay image must accept
+  `OMNIA_REMOTE_PLATFORM=self-hosted` and serve the dial-home policy stream:
+  an older relay refuses the platform at start-up.
 - A Workspace for Wrenmoor Energy, e.g. the `wrenmoor-energy` tenant from
   `profiles/`. The commands below assume namespace `wrenmoor-energy` and kube
   context `<ctx>`.
@@ -166,13 +187,17 @@ site" is the honest answer if asked.
 | `Read turbine 7` | `read_scada` WE-T07 | Stopped, pitch system fault on blade B, 0 kW at 11.2 m/s |
 | `SCADA for WE-GT1` | `read_scada` WE-GT1 | Top oil 71 °C, hot spot 84 °C, 2 of 4 cooling fans |
 | `Raise an urgent work order to replace the blade B pitch motor on turbine 7, estimated £6,400` | `raise_work_order` | `Raised WO-WE-0412 …` |
-| `Raise an urgent work order to regenerate the oil and replace two cooling fans on the transformer, estimated £48,000` | `raise_work_order` | `Raised WO-WE-0413 …`: **today**. Once the policy decision crosses the channel, refused by `grid-site-policy` |
+| `Raise an urgent work order to regenerate the oil and replace two cooling fans on the transformer, estimated £48,000` | nothing: Omnia refuses `raise_work_order` before it runs | `Omnia refused that. This work order is above the £25000 the site assistant may commit without a human …` |
 | `Open breaker WE-CB3` | nothing | It does not operate plant |
 
 Work-order numbers restart at WO-WE-0412 when the site process restarts.
 
 Then show the record: the session is in Omnia with each message and reply,
-although the conversation ran on the site.
+although the conversation ran on the site. Its tool calls show each site tool
+that ran, with its arguments and what the site returned, and the £48,000 order
+as **denied** by `deny-work-order-above-site-limit`, with the policy's message.
+The policy broker's decisions (its logs and
+`omnia_toolpolicy_decisions_total`) show the same refusal.
 
 ### 5. Revoke it
 
@@ -210,7 +235,7 @@ reports no cost).
 ## Develop
 
 ```bash
-go test ./demos/grid-site-agent/                 # tools, script, and a turn over a stand-in relay
+go test ./demos/grid-site-agent/                 # tools, script, the policy refusal, and turns over a stand-in relay
 hack/build-packs.sh grid-site-agent              # after editing arena/
 docker build -f demos/grid-site-agent/Dockerfile -t omnia-demo-grid-site-agent:dev .
 ```

@@ -39,12 +39,11 @@ spec:
     # The site connects to one relay pod.
     replicas: 1
     extraEnv:
-      # Relay mode: wait for the site to dial home rather than calling out.
+      # The site runs on no cloud platform: self-hosted, which is relay mode
+      # only. The relay waits for the site to dial home rather than calling
+      # out, and decides each tool the site runs with grid-site-policy.
+      - { name: OMNIA_REMOTE_PLATFORM, value: self-hosted }
       - { name: OMNIA_REMOTE_MODE, value: relay }
-      # The relay accepts relay mode for vertex only today, and an on-site
-      # runtime has no platform to name; vertex changes nothing for a runtime
-      # that dials home itself. Tracked in Omnia.
-      - { name: OMNIA_REMOTE_PLATFORM, value: vertex }
 {{- with $g.providerRef }}
   # Served to the site over the channel, for SITE_AGENT_MODEL=omnia.
   providers:

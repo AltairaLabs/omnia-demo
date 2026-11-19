@@ -2,13 +2,65 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
 
+	dialhome "github.com/AltairaLabs/omnia-dialhome"
 	"github.com/AltairaLabs/omnia-dialhome/server"
 	"github.com/go-logr/logr"
 )
+
+// siteLimitGBP is the chart's gridSite.workOrderLimitGBP default
+// (charts/omnia-demo/values.yaml).
+const siteLimitGBP = 25000
+
+// limitMessage is grid-site-policy's @message, as the chart renders it.
+var limitMessage = fmt.Sprintf("This work order is above the £%d the site assistant may commit without a human, "+
+	"so it was not raised. Ask the control engineer to raise it, and do not split it into smaller orders to "+
+	"bring each under the limit. (Wrenmoor Energy delegated authority WE-MNT-03.)", siteLimitGBP)
+
+// sitePolicy stands in for Omnia deciding with the grid-site-policy
+// ToolPolicy: it permits the site's tools and refuses a work order above the
+// limit. It keeps every question it was asked.
+type sitePolicy struct {
+	mu    sync.Mutex
+	asked []dialhome.PolicyRequest
+}
+
+func (p *sitePolicy) Decide(_ context.Context, r dialhome.PolicyRequest) (dialhome.PolicyDecision, error) {
+	p.mu.Lock()
+	p.asked = append(p.asked, r)
+	p.mu.Unlock()
+	return decide(r), nil
+}
+
+func (p *sitePolicy) questions() []dialhome.PolicyRequest {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return append([]dialhome.PolicyRequest(nil), p.asked...)
+}
+
+// decide is grid-site-policy's verdict on one call.
+func decide(r dialhome.PolicyRequest) dialhome.PolicyDecision {
+	if r.Registry != defaultRegistry {
+		return dialhome.PolicyDecision{DeniedBy: "no-matching-permit", Reason: "no policy permits this tool"}
+	}
+	var args struct {
+		Cost *float64 `json:"estimated_cost_gbp"`
+	}
+	if err := json.Unmarshal(r.Arguments, &args); err != nil {
+		// onFailure: deny: a condition that cannot be evaluated refuses.
+		return dialhome.PolicyDecision{DeniedBy: "evaluation-failed", Reason: "the call could not be evaluated"}
+	}
+	if args.Cost != nil && *args.Cost > siteLimitGBP {
+		return dialhome.PolicyDecision{DeniedBy: "deny-work-order-above-site-limit", Policy: "grid-site-policy",
+			Reason: limitMessage}
+	}
+	return dialhome.PolicyDecision{Allow: true, Policy: "grid-site-policy"}
+}
 
 // The compiled pack the chart ships and the image carries.
 const testPack = "../../charts/omnia-demo/files/arena/grid-site-agent-pack.json"
@@ -42,7 +94,14 @@ func (e *emitter) Done(d server.Done) error {
 // returns the final reply.
 func converse(t *testing.T, s *site, session, msg string) string {
 	t.Helper()
-	h, err := newHandler(options{pack: testPack, prompt: defaultPrompt}, s, scriptProvider, logr.Discard())
+	return converseUnder(t, s, &sitePolicy{}, session, msg)
+}
+
+// converseUnder is converse with the site's tools put to policy.
+func converseUnder(t *testing.T, s *site, policy *sitePolicy, session, msg string) string {
+	t.Helper()
+	h, err := newHandler(options{pack: testPack, prompt: defaultPrompt, registry: defaultRegistry}, s, scriptProvider,
+		governors{policy: policy}, logr.Discard())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -85,17 +144,51 @@ func TestTurnsRunTheSiteToolsLocally(t *testing.T) {
 	}
 }
 
-// The transformer order is the one the ToolPolicy in Omnia is written to
-// refuse. Today nothing on the dial-home path asks Omnia, so the site raises
-// it. This test pins that, so the day the policy is consulted the change is
-// seen here rather than discovered in a demo.
-func TestAnOrderAboveTheLimitIsRaisedUntilPolicyIsConsulted(t *testing.T) {
+// The transformer order is above the site's delegated limit. The site asks
+// Omnia before the tool runs, Omnia's grid-site-policy refuses it, and the
+// work order is never raised: the engineer is told why, in the policy's own
+// words.
+func TestOmniaRefusesAnOrderAboveTheSiteLimit(t *testing.T) {
 	s := newSite()
-	got := converse(t, s, "big-order",
+	policy := &sitePolicy{}
+	got := converseUnder(t, s, policy, "big-order",
 		"Raise an urgent work order to regenerate the oil and replace two cooling fans on the transformer, estimated £48,000")
-	if !strings.Contains(got, "Raised WO-WE-0412 on WE-GT1") || !strings.Contains(got, "£48000") {
+	if !strings.HasPrefix(got, "Omnia refused that. This work order is above the £25000") {
 		t.Fatalf("reply = %q", got)
 	}
+	if len(s.raised()) != 0 {
+		t.Fatalf("the order was raised: %+v", s.raised())
+	}
+	q := policy.questions()
+	if len(q) != 1 || q[0].Tool != "raise_work_order" || q[0].Registry != defaultRegistry ||
+		!strings.Contains(string(q[0].Arguments), `"estimated_cost_gbp":48000`) {
+		t.Fatalf("Omnia was asked %+v", q)
+	}
+}
+
+// With no decision from Omnia, a site tool does not run: not even a read.
+func TestNoDecisionNoTool(t *testing.T) {
+	s := newSite()
+	h, err := newHandler(options{pack: testPack, prompt: defaultPrompt, registry: defaultRegistry}, s, scriptProvider,
+		governors{policy: unreachable{}}, logr.Discard())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = h.Close() })
+	e := &emitter{}
+	if err := h.Converse(context.Background(), server.Turn{SessionID: "down",
+		Content: "Raise a work order to replace the pitch motor on WE-T07, £6,400"}, e); err != nil {
+		t.Fatal(err)
+	}
+	if len(s.raised()) != 0 || e.done == nil || !strings.HasPrefix(e.done.Final, "I couldn't do that: the tool did not run") {
+		t.Fatalf("raised %+v, reply %+v", s.raised(), e.done)
+	}
+}
+
+type unreachable struct{}
+
+func (unreachable) Decide(context.Context, dialhome.PolicyRequest) (dialhome.PolicyDecision, error) {
+	return dialhome.PolicyDecision{}, fmt.Errorf("%w: %w", dialhome.ErrNoDecision, dialhome.ErrNotConnected)
 }
 
 // An order with no usable cost is asked about, not raised with a guess.

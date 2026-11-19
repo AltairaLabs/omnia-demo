@@ -627,14 +627,17 @@ wren:
 # tools. The site itself is demos/grid-site-agent, run outside the cluster or
 # in a namespace of its own; see demos/grid-site-agent/README.md.
 #
-# Not yet true, and narrated as such: Omnia does not yet decide the site's
-# tool calls. The ToolPolicy below is the control as it will be enforced, but
-# nothing on the dial-home path asks Omnia before a site tool runs
-# (omnia-dialhome#2), and the calls are not on the session's tool calls
-# (omnia-dialhome#3). Memory does not reach the site either (omnia-dialhome#4).
+# Omnia decides every tool the site runs: the site asks over the channel
+# before each one, the relay asks the policy broker beside it, and the
+# ToolPolicy below refuses a work order above the limit before it is raised.
+# Each call is recorded on the session; a refused one as denied. Memory can
+# reach the site too (the site's SITE_AGENT_MEMORY, with spec.memory on the
+# AgentRuntime), but this chart does not enable it.
 #
 # Requires Omnia Enterprise: the dial-home relay (omnia-remote-runtime) and
-# ToolPolicy are EE.
+# ToolPolicy are EE. The relay must accept OMNIA_REMOTE_PLATFORM=self-hosted
+# and serve the dial-home policy stream (omnia-dialhome v0.2.0); an older
+# relay refuses the platform at start-up.
 # ---------------------------------------------------------------------------
 gridSite:
   enabled: false
@@ -662,7 +665,8 @@ gridSite:
   providerRef: ""
 
   # -- The most a work order may commit, in whole pounds, before it needs a
-  # human. The ToolPolicy's limit; the agent is not told it.
+  # human. The ToolPolicy's limit; the agent is not told it. The site's tests
+  # stand in for the policy at this default (siteLimitGBP in agent_test.go).
   workOrderLimitGBP: 25000
 
 # ---------------------------------------------------------------------------

@@ -18,6 +18,15 @@
 //	SITE_AGENT_MODEL        "script" (default): the scripted mock, no model and
 //	                        no key; "omnia": the Provider Omnia serves over the
 //	                        channel (or -model)
+//	SITE_AGENT_POLICY_REGISTRY  the name Omnia's ToolPolicy selects the site's
+//	                        tools by (default grid-site-tools)
+//	SITE_AGENT_MEMORY       "true" gives conversations the memory Omnia keeps
+//	                        for the engineer (the AgentRuntime needs spec.memory)
+//
+// Every tool the site runs is put to Omnia's tool policy first, over the
+// channel, and runs only if Omnia allows it; each one is recorded on the
+// session in Omnia.
+//
 //	PORT                    when set, serve /healthz and /readyz on it
 package main
 
@@ -43,10 +52,11 @@ import (
 )
 
 const (
-	defaultPack   = "/pack/grid-site-agent.pack.json"
-	defaultPrompt = "grid_operations"
-	modelScript   = "script"
-	modelOmnia    = "omnia"
+	defaultPack     = "/pack/grid-site-agent.pack.json"
+	defaultPrompt   = "grid_operations"
+	defaultRegistry = "grid-site-tools"
+	modelScript     = "script"
+	modelOmnia      = "omnia"
 )
 
 // Exit codes.
@@ -63,6 +73,10 @@ func main() {
 
 type options struct {
 	pack, prompt, model, port string
+	// registry is the name Omnia's ToolPolicy selects the site's tools by.
+	registry string
+	// memory gives conversations the memory Omnia keeps for the engineer.
+	memory bool
 }
 
 func parse(args []string, getenv func(string) string) (options, error) {
@@ -76,7 +90,9 @@ func parse(args []string, getenv func(string) string) (options, error) {
 	if *model != modelScript && *model != modelOmnia {
 		return options{}, fmt.Errorf("-model must be %q or %q, not %q", modelScript, modelOmnia, *model)
 	}
-	return options{pack: *pack, prompt: *prompt, model: *model, port: getenv("PORT")}, nil
+	return options{pack: *pack, prompt: *prompt, model: *model, port: getenv("PORT"),
+		registry: orDefault(getenv("SITE_AGENT_POLICY_REGISTRY"), defaultRegistry),
+		memory:   getenv("SITE_AGENT_MEMORY") == "true"}, nil
 }
 
 func orDefault(v, def string) string {
@@ -122,7 +138,12 @@ func serve(ctx context.Context, args []string, getenv func(string) string) int {
 		}
 		provider = servedProvider(dialhome.NewConfigSource(ch, baked), getenv, log)
 	}
-	h, err := newHandler(opts, newSite(), provider, log)
+	gov := dialhome.NewGovernance(ch)
+	g := governors{policy: gov, calls: gov}
+	if opts.memory {
+		g.memory = gov
+	}
+	h, err := newHandler(opts, newSite(), provider, g, log)
 	if err != nil {
 		log.Error(err, "runtime not built")
 		return exitConfig
@@ -144,15 +165,30 @@ func serve(ctx context.Context, args []string, getenv func(string) string) int {
 	return exitOK
 }
 
+// governors are what Omnia governs the site's tools and memory with: over
+// the dial-home channel, its *dialhome.Governance.
+type governors struct {
+	policy promptkit.Decider
+	calls  promptkit.Recorder
+	memory promptkit.MemoryService
+}
+
 // newHandler is the pack served with the site's tools registered on every
-// conversation.
-func newHandler(opts options, s *site, provider promptkit.ProviderFunc, log logr.Logger) (*promptkit.Handler, error) {
+// conversation, each put to Omnia's tool policy before it runs and recorded
+// on the session.
+func newHandler(
+	opts options, s *site, provider promptkit.ProviderFunc, g governors, log logr.Logger,
+) (*promptkit.Handler, error) {
 	return promptkit.New(promptkit.Config{
-		PackPath:   opts.pack,
-		PromptName: opts.prompt,
-		Provider:   provider,
-		Configure:  s.register,
-		Log:        log,
+		PackPath:       opts.pack,
+		PromptName:     opts.prompt,
+		Provider:       provider,
+		Configure:      s.register,
+		Policy:         g.policy,
+		PolicyRegistry: opts.registry,
+		ToolCalls:      g.calls,
+		Memory:         g.memory,
+		Log:            log,
 	})
 }
 

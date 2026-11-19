@@ -5,7 +5,7 @@ go 1.26.0
 require (
 	github.com/AltairaLabs/PromptKit/runtime/v2 v2.21.0
 	github.com/AltairaLabs/PromptKit/sdk/v2 v2.21.0
-	github.com/AltairaLabs/omnia-dialhome v0.1.0
+	github.com/AltairaLabs/omnia-dialhome v0.2.0
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.15.0
 	github.com/go-logr/logr v1.4.4

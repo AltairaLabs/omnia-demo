@@ -147,16 +147,43 @@ func (s *script) GetTurn(context.Context, mock.ResponseParams) (*mock.Turn, erro
 	return plan(user), nil
 }
 
+// sentence is s with its first letter capitalised.
+func sentence(s string) string {
+	r, n := utf8.DecodeRuneInString(s)
+	if r == utf8.RuneError {
+		return s
+	}
+	return string(unicode.ToUpper(r)) + s[n:]
+}
+
 func text(s string) *mock.Turn { return &mock.Turn{Type: "text", Content: s} }
 
 func call(name string, args map[string]any) *mock.Turn {
 	return &mock.Turn{Type: "tool_calls", ToolCalls: []mock.ToolCall{{Name: name, Arguments: args}}}
 }
 
+// refusedCue is how PromptKit words a tool call its tool hook refused: here,
+// Omnia's tool policy, asked over the dial-home channel before the tool ran.
+const refusedCue = " blocked by hook: "
+
+// noDecision starts the reason omnia-dialhome gives when Omnia gave no
+// decision at all: the channel down, say.
+const noDecision = "the tool did not run"
+
 // answer turns a tool's result into the reply: the summary the site's tools
-// write, or why the call did not happen.
+// write, why the call did not happen, or, when Omnia's policy refused it, the
+// policy's own message.
 func answer(m *types.Message) string {
 	if m.ToolResult != nil && m.ToolResult.Error != "" {
+		if _, reason, ok := strings.Cut(m.ToolResult.Error, refusedCue); ok {
+			if strings.HasPrefix(reason, noDecision) {
+				// No answer from Omnia: nothing refused it, it just cannot run.
+				return "I couldn't do that: " + reason
+			}
+			// The policy's message, or the relay's own reason (a policy
+			// service it could not reach): either way, Omnia refused it.
+			return "Omnia refused that. " + sentence(reason)
+		}
 		return "That did not go through: " + m.ToolResult.Error
 	}
 	content := m.GetContent()
