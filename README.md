@@ -11,7 +11,8 @@ documents its prerequisites and can be enabled or disabled through values.
 - [`demos/`](demos/) — PromptArena sources and synthetic back-end services for
   the demo cast's agents: Larkmere Mutual (mortgage underwriting, claims
   triage, card support) and Wrenmoor Energy (on-call incident agent, grid data
-  analyst, field-service copilot).
+  analyst, field-service copilot, and an on-site grid-operations agent that
+  dials home to Omnia from a network that accepts no inbound connections).
 - [`memory-ingestion/`](memory-ingestion/) — a public S3-compatible source
   connector that sends documents to Omnia institutional memory.
 - [`charts/omnia-demo/`](charts/omnia-demo/) — the Helm add-on that deploys the

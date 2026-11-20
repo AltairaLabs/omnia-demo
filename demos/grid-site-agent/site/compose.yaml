@@ -1,0 +1,29 @@
+# Wrenmoor Edge's on-site agent as one container: no published ports, a
+# read-only filesystem, no capabilities. It makes one outbound connection, to
+# Omnia, and nothing can connect to it.
+#
+#   export OMNIA_DIAL_HOME_URL=wss://grid-site-agent-dial-home.<ns>.<base-domain>/v1/channel
+#   export OMNIA_DIAL_HOME_KEY=<the key from the grid-site-agent-dial-home-key Secret>
+#   docker compose -f demos/grid-site-agent/site/compose.yaml up
+#
+# The URL must be wss:// unless its host is loopback: the key rides every
+# handshake. To reach a cluster with no Gateway, port-forward the relay on the
+# docker host and run with host networking (Linux):
+#
+#   kubectl --context <ctx> -n <ns> port-forward svc/grid-site-agent-dial-home 9002
+#   OMNIA_DIAL_HOME_URL=ws://127.0.0.1:9002/v1/channel SITE_NETWORK_MODE=host \
+#     docker compose -f demos/grid-site-agent/site/compose.yaml up
+services:
+  grid-site-agent:
+    image: ghcr.io/altairalabs/omnia-demo-grid-site-agent:latest
+    environment:
+      OMNIA_DIAL_HOME_URL: ${OMNIA_DIAL_HOME_URL:?set OMNIA_DIAL_HOME_URL}
+      OMNIA_DIAL_HOME_KEY: ${OMNIA_DIAL_HOME_KEY:?set OMNIA_DIAL_HOME_KEY}
+      # script: the scripted mock, no model and no key. omnia: the Provider
+      # the agent's gridSite.providerRef names, served over the channel.
+      SITE_AGENT_MODEL: ${SITE_AGENT_MODEL:-script}
+    network_mode: ${SITE_NETWORK_MODE:-bridge}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped

@@ -1,0 +1,118 @@
+# Wrenmoor Edge's operational network, played by a namespace: the on-site
+# agent runs here, accepts no inbound connections, and may open exactly one
+# kind of outbound connection, to its AgentRuntime's dial-home relay.
+#
+# This is the SITE, not Omnia, so it is not in the omnia-demo chart. It
+# assumes the agent's release is in namespace wrenmoor-energy; for another,
+# change the namespaceSelector below and OMNIA_DIAL_HOME_URL in the Secret.
+#
+#   kubectl apply -f demos/grid-site-agent/site/kubernetes.yaml
+#   # then create the Secret, as demos/grid-site-agent/README.md shows
+#
+# A cluster whose CNI does not enforce NetworkPolicy runs this unchanged and
+# simply does not enforce the walls.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: wrenmoor-edge-site
+  labels:
+    app.kubernetes.io/part-of: omnia-demo
+---
+# Nothing gets in. No ingress rule at all: not from Omnia, not from anywhere.
+# (The kubelet's probes come from the node, which NetworkPolicy does not
+# govern.)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: no-inbound
+  namespace: wrenmoor-edge-site
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+# Out: DNS, and the relay's dial-home port in the agent's namespace. Nothing
+# else: everything the agent gets from Omnia comes over that one connection.
+# With SITE_AGENT_MODEL=omnia the model calls go from here straight to the
+# provider's endpoint, so add an egress rule for it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: dial-home-only
+  namespace: wrenmoor-edge-site
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: wrenmoor-energy
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/instance: grid-site-agent
+      ports:
+        - { protocol: TCP, port: 9002 }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grid-site-agent
+  namespace: wrenmoor-edge-site
+  labels:
+    app.kubernetes.io/name: grid-site-agent
+    app.kubernetes.io/part-of: omnia-demo
+spec:
+  # One: the relay takes one site connection at a time.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grid-site-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grid-site-agent
+        app.kubernetes.io/part-of: omnia-demo
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: agent
+          image: ghcr.io/altairalabs/omnia-demo-grid-site-agent:latest
+          imagePullPolicy: Always
+          env:
+            # script: the scripted mock, no model and no key. omnia: the
+            # Provider the agent's gridSite.providerRef names; its
+            # configuration comes over the channel, its model calls go out
+            # directly (see the egress note above).
+            - { name: SITE_AGENT_MODEL, value: script }
+            - { name: PORT, value: "8081" }
+            - name: OMNIA_DIAL_HOME_URL
+              valueFrom: { secretKeyRef: { name: grid-site-dial-home, key: url } }
+            - name: OMNIA_DIAL_HOME_KEY
+              valueFrom: { secretKeyRef: { name: grid-site-dial-home, key: key } }
+          ports:
+            - { name: probes, containerPort: 8081 }
+          # Ready while the connection to Omnia is up.
+          readinessProbe:
+            httpGet: { path: /readyz, port: probes }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /healthz, port: probes }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests: { cpu: 10m, memory: 64Mi }
+            limits: { cpu: 500m, memory: 256Mi }

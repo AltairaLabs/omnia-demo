@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for the Wrenmoor Edge on-site grid-operations assistant.
+#
+# The pack is compiled to charts/omnia-demo/files/arena/grid-site-agent-pack.json
+# and used twice: the on-site runtime (demos/grid-site-agent) runs it, and the
+# chart's PromptPack carries the same file so Omnia shows the prompt the site
+# actually runs.
+#
+# Regenerate with: hack/build-packs.sh grid-site-agent
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: grid-site-agent
+spec:
+  prompt_configs:
+    - id: grid-ops
+      file: prompts/grid-ops.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # One overview, one read, one write. All three run on site, inside the
+  # operational network: the on-site runtime registers a handler for each.
+  tools:
+    - file: tools/list-assets.tool.yaml
+    - file: tools/read-scada.tool.yaml
+    - file: tools/raise-work-order.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

@@ -1,0 +1,46 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: read_scada
+spec:
+  name: read_scada
+  description: >-
+    Read one asset's live values from the site SCADA: its state, any active
+    alarm, and each measured point with its unit. Read-only; it never
+    operates plant.
+  input_schema:
+    type: object
+    properties:
+      asset_id:
+        type: string
+        description: The asset id, e.g. WE-T07 (a turbine) or WE-GT1 (the grid transformer)
+    required:
+      - asset_id
+  output_schema:
+    type: object
+    properties:
+      asset_id: { type: string }
+      name: { type: string }
+      state: { type: string }
+      alarm: { type: string }
+      as_of: { type: string }
+      points:
+        type: array
+        items:
+          type: object
+          properties:
+            point: { type: string }
+            value: { type: number }
+            unit: { type: string }
+      summary: { type: string }
+  mode: mock
+  timeout_ms: 10000
+  mock_result:
+    asset_id: "WE-GT1"
+    name: "Grid transformer 33/132 kV"
+    state: "in service"
+    alarm: "Top-oil temperature high"
+    as_of: "2026-11-18T09:30:00Z"
+    points:
+      - { point: "top_oil_temperature", value: 71, unit: "°C" }
+    summary: "WE-GT1 is in service with a top-oil temperature alarm."

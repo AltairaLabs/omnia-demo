@@ -1,0 +1,36 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: list_assets
+spec:
+  name: list_assets
+  description: >-
+    List every asset at the Wrenmoor Edge wind farm and its 33 kV collector
+    substation, with its id, what it is, its state, and any active alarm.
+    Read from the site SCADA.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      site: { type: string }
+      as_of: { type: string }
+      assets:
+        type: array
+        items:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            state: { type: string }
+            alarm: { type: string }
+      summary: { type: string }
+  mode: mock
+  timeout_ms: 10000
+  mock_result:
+    site: "Wrenmoor Edge"
+    as_of: "2026-11-18T09:30:00Z"
+    assets:
+      - { id: "WE-T07", name: "Turbine 7", state: "stopped", alarm: "Pitch system fault, blade B (PS-214)" }
+    summary: "Two active alarms."

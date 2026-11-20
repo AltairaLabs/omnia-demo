@@ -104,6 +104,16 @@ Wrenmoor Energy, the wind and solar supplier, has four agents and a website:
   institutional memory: enable `memory` with
   `memory.fixtures: wrenmoor-field-procedures`.
 
+- `gridSite` — the on-site grid-operations assistant at the Wrenmoor Edge
+  wind farm. It runs inside the site's operational network
+  (`demos/grid-site-agent`), which accepts no inbound connections; its SCADA
+  and work-order tools run there, and it dials home to the
+  `grid-site-agent` AgentRuntime, whose pod runs Omnia's dial-home relay in
+  place of a runtime. The release deploys Omnia's side only; the site runs
+  as a namespace or a container, per `demos/grid-site-agent/README.md`. The
+  `grid-site-policy` ToolPolicy is not yet consulted for the site's calls,
+  and the README says what else is still open.
+
 Wren, the incident agent and the data analyst use the stub image the Larkmere
 demos use; it serves Wrenmoor Energy's `/wren`, `/ops` and `/grid` endpoints
 too.

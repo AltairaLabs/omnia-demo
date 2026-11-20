@@ -1,0 +1,35 @@
+{{- if .Values.gridSite.enabled }}
+---
+# The on-site agent's pack. The site runs its own copy (it is baked into the
+# grid-site-agent image); this one satisfies the AgentRuntime's
+# promptPackRef and shows in Omnia the prompt the site actually runs, since
+# both are the same compiled file.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: grid-site-agent-pack
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: grid-site-agent-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: grid-site-agent-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/grid-site-agent/arena. Regenerate with:
+#   hack/build-packs.sh grid-site-agent
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grid-site-agent-pack-v1
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/grid-site-agent-pack.json" | indent 4 }}
+{{- end }}
