@@ -623,8 +623,8 @@ wren:
 # as sessions, like any other agent's.
 #
 # This release deploys only Omnia's side: the AgentRuntime (a dial-home relay
-# in place of a runtime), its PromptPack and the ToolPolicy for the site's
-# tools. The site itself is demos/grid-site-agent, run outside the cluster or
+# in place of a runtime), its PromptPack, the ToolRegistry that declares the
+# site's tools (remote handlers) and the ToolPolicy for them. The site itself is demos/grid-site-agent, run outside the cluster or
 # in a namespace of its own; see demos/grid-site-agent/README.md.
 #
 # Omnia decides every tool the site runs: the site asks over the channel
@@ -637,7 +637,8 @@ wren:
 # Requires Omnia Enterprise: the dial-home relay (omnia-remote-runtime) and
 # ToolPolicy are EE. The relay must accept OMNIA_REMOTE_PLATFORM=self-hosted
 # and serve the dial-home policy stream (omnia-dialhome v0.2.0); an older
-# relay refuses the platform at start-up.
+# relay refuses the platform at start-up. It must also know ToolRegistry
+# `remote` handlers: an Omnia without them rejects the ToolRegistry.
 # ---------------------------------------------------------------------------
 gridSite:
   enabled: false

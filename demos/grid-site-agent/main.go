@@ -18,8 +18,10 @@
 //	SITE_AGENT_MODEL        "script" (default): the scripted mock, no model and
 //	                        no key; "omnia": the Provider Omnia serves over the
 //	                        channel (or -model)
-//	SITE_AGENT_POLICY_REGISTRY  the name Omnia's ToolPolicy selects the site's
-//	                        tools by (default grid-site-tools)
+//	SITE_AGENT_POLICY_REGISTRY  deprecated: the name the site's tools were
+//	                        governed under (default grid-site-tools); a current
+//	                        Omnia decides each under the ToolRegistry that
+//	                        declares it, and ignores this
 //	SITE_AGENT_MEMORY       "true" gives conversations the memory Omnia keeps
 //	                        for the engineer (the AgentRuntime needs spec.memory)
 //
@@ -73,7 +75,10 @@ func main() {
 
 type options struct {
 	pack, prompt, model, port string
-	// registry is the name Omnia's ToolPolicy selects the site's tools by.
+	// registry is the name the site's tools were governed under. A current
+	// Omnia ignores it, deciding each tool under the ToolRegistry that declares
+	// it (charts/omnia-demo/templates/grid-site-tools.yaml); it is still sent,
+	// for an older Omnia.
 	registry string
 	// memory gives conversations the memory Omnia keeps for the engineer.
 	memory bool

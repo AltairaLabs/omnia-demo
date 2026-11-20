@@ -28,6 +28,10 @@ metadata:
 spec:
   promptPackRef:
     name: grid-site-agent-pack
+  # The site's own tools, declared as remote handlers (grid-site-tools.yaml).
+  # Without this, Omnia refuses every tool the site runs.
+  toolRegistryRefs:
+    - name: grid-site-tools
   framework:
     type: custom
     image: {{ printf "%s:%s" (dig "relay" "image" "repository" "ghcr.io/altairalabs/omnia-remote-runtime" $g) (dig "relay" "image" "tag" "main" $g) }}

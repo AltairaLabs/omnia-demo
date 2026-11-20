@@ -2,6 +2,48 @@
 {{- $g := .Values.gridSite }}
 {{- $limit := int (default 25000 $g.workOrderLimitGBP) }}
 ---
+# THE TOOLS: what the site runs, declared in Omnia.
+#
+# The site's tools run on site, never in the cluster, so each one is a
+# `remote` handler: metadata only, with no endpoint. Omnia runs a tool the site
+# runs itself only if a registry the agent references declares it, and
+# decides it under that registry, whatever name the site sends. The schemas
+# are the pack's (files/arena/grid-site-agent-pack.json); the relay logs any
+# difference. remote.agents offers them to the site's agent only.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: grid-site-tools
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: site-assets
+      type: remote
+      tool:
+        name: list_assets
+        description: "List every asset at the Wrenmoor Edge wind farm and its 33 kV collector substation, with its id, what it is, its state, and any active alarm. Read from the site SCADA."
+        inputSchema: {"properties": {}, "type": "object"}
+      remote:
+        agents: [grid-site-agent]
+    - name: site-scada
+      type: remote
+      tool:
+        name: read_scada
+        description: "Read one asset's live values from the site SCADA: its state, any active alarm, and each measured point with its unit. Read-only; it never operates plant."
+        inputSchema: {"properties": {"asset_id": {"description": "The asset id, e.g. WE-T07 (a turbine) or WE-GT1 (the grid transformer)", "type": "string"}}, "required": ["asset_id"], "type": "object"}
+      remote:
+        agents: [grid-site-agent]
+    - name: site-work-orders
+      type: remote
+      tool:
+        name: raise_work_order
+        description: "Raise a maintenance work order in the site's maintenance system against one asset. The order is released to the maintenance contractor as soon as it is raised, and the estimated cost is committed against the site's maintenance budget."
+        inputSchema: {"properties": {"asset_id": {"description": "The asset the work is on, e.g. WE-T07", "type": "string"}, "estimated_cost_gbp": {"description": "The estimated cost of the work, in whole pounds sterling", "type": "integer"}, "priority": {"description": "How soon the work is needed", "enum": ["routine", "urgent", "emergency"], "type": "string"}, "summary": {"description": "One line describing the work, e.g. \"Replace blade B pitch motor\"", "type": "string"}}, "required": ["asset_id", "priority", "summary", "estimated_cost_gbp"], "type": "object"}
+      remote:
+        agents: [grid-site-agent]
+---
 # THE CONTROL: a work order above the site's delegated limit needs a human.
 #
 # The site's tools run at the site, and before each one runs the site asks
@@ -11,10 +53,8 @@
 # an allow. A £48,000 order is refused here, before it is raised, and the
 # refusal is recorded on the session as denied.
 #
-# The site's tools are in no ToolRegistry (they run where no registry
-# reaches), so the site names them `grid-site-tools`
-# (SITE_AGENT_POLICY_REGISTRY), and this policy selects and permits them by
-# that name.
+# The site's tools are declared in the grid-site-tools ToolRegistry (this file),
+# and this policy selects and permits them by it.
 #
 # The condition is the money, not the tool's name, for the reason the claims
 # demo gives: a name match governs one tool and misses the next one that

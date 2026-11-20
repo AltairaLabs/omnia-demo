@@ -61,17 +61,21 @@ its own small `main.go` on the library
 
 The tool runs on site, but the decision is Omnia's:
 
-1. Before a tool runs, the site sends Omnia the call (tool, arguments, and the
-   registry name `grid-site-tools`) over the channel, naming only the
-   conversation.
-2. Omnia's relay asks the policy broker in the agent's pod, as Omnia's own
-   runtime does, for the engineer the console sent with that conversation.
+1. Each site tool is declared in Omnia, in the `grid-site-tools` ToolRegistry,
+   as a `remote` handler: its name, description and schema, and no endpoint,
+   since only the site runs it. Omnia refuses a tool the site runs that no such
+   handler declares.
+2. Before a tool runs, the site sends Omnia the call (tool and arguments) over
+   the channel, naming only the conversation.
+3. Omnia's relay asks the policy broker in the agent's pod, as Omnia's own
+   runtime does, under the registry that declares the tool, for the engineer
+   the console sent with that conversation.
    `grid-site-policy` permits the site's tools and forbids a work order whose
    `estimated_cost_gbp` is above the limit.
-3. On an allow the tool runs, and the site records the call on the session.
+4. On an allow the tool runs, and the site records the call on the session.
    On a refusal it does not run. The model is told why in the policy's
    `@message`, and Omnia records the call on the session as **denied**.
-4. If no decision comes (the channel is down, say), the tool does not run
+5. If no decision comes (the channel is down, say), the tool does not run
    either. Nothing on site runs without Omnia's say-so.
 
 ## What this demo does not show
