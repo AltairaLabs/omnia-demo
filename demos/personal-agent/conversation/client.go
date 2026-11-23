@@ -168,7 +168,7 @@ func (c *Client) Start(ctx context.Context, co *discovery.Company, agent discove
 	if err != nil {
 		return Conversation{}, err
 	}
-	conv := Conversation{ID: id, Company: co.Domain, Endpoint: agent.Endpoint}
+	conv := Conversation{ID: id, Company: co.Domain, Name: co.Name, Endpoint: agent.Endpoint}
 	return conv, c.Store.SaveConversation(conv)
 }
 
@@ -188,7 +188,11 @@ func (c *Client) OpenDirect(ctx context.Context, parent Conversation, text strin
 	if err != nil {
 		return Conversation{}, err
 	}
-	conv := Conversation{ID: id, Company: parent.Company, Endpoint: parent.Endpoint, ParentID: parent.ID}
+	name := parent.Name
+	if name == "" {
+		name = co.Name
+	}
+	conv := Conversation{ID: id, Company: parent.Company, Name: name, Endpoint: parent.Endpoint, ParentID: parent.ID}
 	return conv, c.Store.SaveConversation(conv)
 }
 

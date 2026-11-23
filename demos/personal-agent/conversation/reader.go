@@ -96,8 +96,12 @@ func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conver
 			r.markClosed(conv)
 			return
 		case IsCode(err, "cursor_expired"):
-			if r.Client.Store.SetCursor(conv.ID, "") == nil {
-				continue // read from the beginning at once
+			// Read from the beginning at once, unless this read already
+			// was: then dropping the cursor can't help, and asking again at
+			// once would loop, so back off like any other failure.
+			if cur, gerr := r.Client.Store.Cursor(conv.ID); gerr == nil && cur != "" &&
+				r.Client.Store.SetCursor(conv.ID, "") == nil {
+				continue
 			}
 		case errors.As(err, &cerr) && cerr.Status >= 400 && cerr.Status < 500 && cerr.Status != http.StatusTooManyRequests:
 			// conversation_not_found, a 401 asking for sign-in,

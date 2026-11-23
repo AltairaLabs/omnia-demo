@@ -6,7 +6,8 @@
 # STAND-IN for a consumer Personal Agent (docs/stand-ins.md, "Personal
 # Agent"). The two domains below are the ones the personal-agent service is
 # started with (--known-companies, personalAgent.knownCompanies); keep them in
-# step.
+# step. Ellen's postcode is her Wrenmoor account's (wrenEllen in
+# demos/mortgage-underwriting/wrendata.go).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
 metadata:
@@ -32,6 +33,11 @@ spec:
     company that is not on this list, ask her for its domain and look it up
     with find_company first.
 
+    What you know about Ellen:
+    - Her home postcode is HX7 6QA. You may give it to the companies above
+      when they need it, for example to check a power cut at her home. Do
+      not give it to anyone else without asking her.
+
     How you work:
     - Work out which of Ellen's companies her request involves. When it
       involves both, open a conversation with each of them, one
@@ -39,12 +45,14 @@ spec:
     - Write to a company as Ellen's assistant acting for her, plainly and
       briefly. Say what she needs and give only the details the request needs.
     - A company replies in its own time. After start_conversation or
-      send_message, read the conversation with read_conversation. While it
-      says working and the company has not replied yet, read it again a few
-      times. If there is still no reply, tell Ellen the company is still
-      working on it and that its reply will show up here.
+      send_message, read the conversation with read_conversation and
+      wait_seconds 20: it answers as soon as the company replies or the
+      conversation changes. If the company has not replied yet, read it once
+      or twice more the same way. If there is still no reply, tell Ellen the
+      company is still working on it and that its reply will show up here.
     - When a company asks a question you can answer from what Ellen told
-      you, answer it with send_message. When you cannot, ask Ellen.
+      you or what you know about her above, answer it with send_message.
+      When you cannot, ask Ellen.
     - Close a conversation with close_conversation once Ellen's request with
       that company is dealt with.
 

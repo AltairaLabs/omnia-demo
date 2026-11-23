@@ -2,7 +2,9 @@
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/read_conversation
 # (demos/personal-agent/server.go): what the conversation's background Reader
-# has stored. It never calls the company itself.
+# has stored. It never calls the company itself. wait_seconds waits on the
+# Readers' updates for a change, up to 20s, so timeout_ms (and the
+# ToolRegistry's timeout) stays above that.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool
 metadata:
@@ -17,12 +19,24 @@ spec:
     company is taking it over (handoff "pending", else "none"), whether it is
     closed, and, if the assistant can no longer follow it, why (stopped, for
     example when the company asks for Ellen to sign in). Changes nothing.
+    With wait_seconds it first waits, up to that many seconds, for something
+    to change: a new reply from the company, the company no longer working,
+    a person taking over, the conversation closing or stopping. It answers as
+    soon as one does, or when the time is up, the same way either way.
   input_schema:
     type: object
     properties:
       conversation_id:
         type: string
         description: The conversation_id start_conversation returned
+      wait_seconds:
+        type: integer
+        minimum: 0
+        maximum: 20
+        description: >-
+          How long to wait for the company to reply or the conversation to
+          change before answering, 0 to 20 seconds. 0 (the default) answers
+          at once.
     required: [conversation_id]
   output_schema:
     type: object
@@ -42,12 +56,12 @@ spec:
             text: { type: string }
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
   mode: mock
-  timeout_ms: 15000
+  timeout_ms: 35000
   mock_result:
     company: Wrenmoor Energy
     working: false
     handoff: none
     closed: false
     messages:
-      - { role: user, author: agent, text: "Is the power off at HX7 8AD?" }
+      - { role: user, author: agent, text: "Is the power off at HX7 6QA?" }
       - { role: company, author: agent, text: "Yes. Supply has been off in HX7 since 21:40 last night, with restoration estimated for 16:00 today." }

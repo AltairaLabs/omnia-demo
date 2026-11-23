@@ -782,6 +782,35 @@ func TestReaderReconnectsAtBaseBackoffAfterCleanEnd(t *testing.T) {
 	}
 }
 
+// cursor_expired on a read that sent no cursor can't be cured by dropping
+// the cursor, so the Reader backs off instead of asking again at once.
+func TestReaderCursorExpiredWithoutCursorBacksOff(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		writeJSON(w, http.StatusGone, map[string]string{"error": "cursor_expired"})
+	})
+	c, _ := newTestClient(t, f)
+	c.Remember(f.co)
+	conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var waits []time.Duration
+	r := &Reader{Client: c, Backoff: 10 * time.Millisecond}
+	r.sleep = func(ctx context.Context, d time.Duration) error {
+		waits = append(waits, d)
+		if len(waits) == 3 {
+			cancel()
+		}
+		return ctx.Err()
+	}
+	r.Run(ctx, conv, func(Conversation, Event) {})
+	if len(waits) != 3 {
+		t.Fatalf("waited %v, want the Reader to back off between reads", waits)
+	}
+	if n := len(f.requests()); n != 3 {
+		t.Errorf("%d requests, want 3: one per wait", n)
+	}
+}
+
 // A Reader that stops because the Company refused it for good records why,
 // so read_conversation can tell the model.
 func TestReaderRecordsTerminalStop(t *testing.T) {

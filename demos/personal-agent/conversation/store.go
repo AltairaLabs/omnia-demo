@@ -17,11 +17,14 @@ import (
 )
 
 // Conversation is one PAP conversation (§8) the Personal Agent holds with a
-// Company. Company is the Company's domain, Endpoint the poppy endpoint it
-// was started on, and ParentID is set on a Direct Conversation (§8.10).
+// Company. Company is the Company's domain, Name its name as discovery
+// found it when the conversation started (so a closed conversation is still
+// named after a restart, with nothing rediscovered), Endpoint the poppy
+// endpoint it was started on, and ParentID is set on a Direct Conversation
+// (§8.10).
 type Conversation struct {
-	ID, Company, Endpoint, ParentID string
-	Closed                          bool
+	ID, Company, Name, Endpoint, ParentID string
+	Closed                                bool
 }
 
 // Event is one conversation event (§8.5). Role, AuthorType and Text come

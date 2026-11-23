@@ -89,16 +89,23 @@ func main() {
 	s.resume()
 
 	srv := &http.Server{Addr: *addr, Handler: s.handler(), ReadHeaderTimeout: 10 * time.Second}
+	// ListenAndServe returns as soon as Shutdown starts, while requests are
+	// still finishing; shutdownDone closes once they have (or 10s passed).
+	shutdownDone := make(chan struct{})
 	go func() {
+		defer close(shutdownDone)
 		<-ctx.Done()
 		shutdown, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
-		_ = srv.Shutdown(shutdown)
+		if err := srv.Shutdown(shutdown); err != nil {
+			log.Printf("shutdown: %v", err)
+		}
 	}()
 	log.Printf("personal-agent listening on %s as %s; known companies %v", *addr, id.ClientID, companies)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}
+	<-shutdownDone
 	s.wait()
 }
 

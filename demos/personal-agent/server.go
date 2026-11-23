@@ -27,6 +27,9 @@ const (
 	maxRequestBody   = 1 << 20
 	companyTimeout   = 30 * time.Second
 	updatesPing      = 25 * time.Second
+	// maxReadWait is the longest read_conversation waits for a change. The
+	// ToolRegistry's timeout for it must stay above this.
+	maxReadWait = 20 * time.Second
 )
 
 // config is what the server is built from; main fills it from flags.
@@ -123,8 +126,14 @@ func (s *server) handler() http.Handler {
 }
 
 // wait returns once every Reader has stopped, after the server's context
-// has ended.
-func (s *server) wait() { s.wg.Wait() }
+// has ended. follow checks the context and adds to wg under s.mu, so once
+// wait has taken s.mu no new Reader can start, and wg.Add never races
+// wg.Wait.
+func (s *server) wait() {
+	s.mu.Lock() // an empty critical section: a barrier for follow
+	s.mu.Unlock()
+	s.wg.Wait()
+}
 
 // resume restarts a Reader for each stored conversation that is neither
 // closed nor stopped, as after a restart. Each Reader rediscovers its
@@ -155,13 +164,15 @@ func (s *server) resume() {
 // request's that started it.
 func (s *server) follow(conv conversation.Conversation) {
 	s.mu.Lock()
-	if s.readers[conv.ID] {
+	if s.readers[conv.ID] || s.ctx.Err() != nil {
+		// Already followed, or the server is shutting down: a Reader
+		// started now would outlive wait.
 		s.mu.Unlock()
 		return
 	}
 	s.readers[conv.ID] = true
-	s.mu.Unlock()
 	s.wg.Add(1)
+	s.mu.Unlock()
 	go func() {
 		defer s.wg.Done()
 		defer func() {
@@ -174,6 +185,15 @@ func (s *server) follow(conv conversation.Conversation) {
 		if reason, _ := s.store.Stopped(conv.ID); reason != "" {
 			log.Printf("reader stopped: conversation=%s reason=%s", conv.ID, reason)
 			b, _ := json.Marshal(map[string]string{"type": "stopped", "reason": reason})
+			s.publishRaw(conv, b)
+			return
+		}
+		// A Reader that left because the conversation closed with no state
+		// event (conversation_closed, or an expired conversation) has
+		// published nothing saying so. Say it, so the page and a waiting
+		// read_conversation see it.
+		if s.ctx.Err() == nil && s.isClosed(conv) {
+			b, _ := json.Marshal(map[string]any{"type": "state", "working": false, "handoff": "none", "closed": true})
 			s.publishRaw(conv, b)
 		}
 	}()
@@ -206,7 +226,7 @@ func (s *server) publishRaw(conv conversation.Conversation, raw json.RawMessage)
 	// json.Marshal compacts the RawMessage, so the update is one line.
 	b, err := json.Marshal(update{
 		ConversationID: conv.ID, ParentConversationID: conv.ParentID,
-		Company: s.name(conv.Company), Event: raw,
+		Company: s.name(conv), Event: raw,
 	})
 	if err != nil {
 		return
@@ -214,13 +234,19 @@ func (s *server) publishRaw(conv conversation.Conversation, raw json.RawMessage)
 	s.hub.publish(b)
 }
 
-func (s *server) name(domain string) string {
+// name is a conversation's Company name: as last discovered, else as stored
+// when the conversation started, else its domain.
+func (s *server) name(c conversation.Conversation) string {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if n := s.names[domain]; n != "" {
+	n := s.names[c.Company]
+	s.mu.Unlock()
+	switch {
+	case n != "":
 		return n
+	case c.Name != "":
+		return c.Name
 	}
-	return domain
+	return c.Company
 }
 
 func (s *server) agentJSON(w http.ResponseWriter, _ *http.Request) {
@@ -267,6 +293,9 @@ type toolRequest struct {
 	Message        string `json:"message"`
 	ConversationID string `json:"conversation_id"`
 	Text           string `json:"text"`
+	// WaitSeconds is how long read_conversation may wait for a change,
+	// 0 to 20.
+	WaitSeconds int `json:"wait_seconds"`
 }
 
 // toolError is a refusal or failure the model can read and act on.
@@ -350,7 +379,8 @@ type companyOut struct {
 }
 
 // findCompany discovers a domain's Poppy agents (§3). Not finding one is an
-// answer, with HTTP 200, not an error the model would retry.
+// answer, with HTTP 200, not an error the model would retry. A failure that
+// may pass (a network error or a 5xx) says so, and may be retried once.
 func (s *server) findCompany(ctx context.Context, req toolRequest) (any, *toolError) {
 	domain, ok := normalizeDomain(req.Domain)
 	if !ok {
@@ -362,6 +392,9 @@ func (s *server) findCompany(ctx context.Context, req toolRequest) (any, *toolEr
 	co, err := s.client.Discover(ctx, domain)
 	if err != nil {
 		log.Printf("find_company: domain=%s: %v", domain, err)
+		if errors.Is(err, discovery.ErrUnreachable) {
+			return map[string]any{"found": false, "reason": unreachableReason(domain)}, nil
+		}
 		return notFound, nil
 	}
 	if len(co.Agents) == 0 {
@@ -399,6 +432,9 @@ func (s *server) startConversation(ctx context.Context, req toolRequest) (any, *
 	co, err := s.client.Discover(ctx, domain)
 	if err != nil {
 		log.Printf("start_conversation: domain=%s: %v", domain, err)
+		if errors.Is(err, discovery.ErrUnreachable) {
+			return nil, fail(http.StatusBadGateway, "%s", unreachableReason(domain))
+		}
 		return nil, fail(http.StatusBadGateway, "no Poppy agent at %s", domain)
 	}
 	if len(co.Agents) == 0 {
@@ -411,6 +447,10 @@ func (s *server) startConversation(ctx context.Context, req toolRequest) (any, *
 	}
 	s.follow(conv)
 	return map[string]string{"conversation_id": conv.ID, "company": co.Name}, nil
+}
+
+func unreachableReason(domain string) string {
+	return "couldn't reach " + domain + " right now; try again shortly"
 }
 
 // lookup finds a stored conversation by ID.
@@ -489,12 +529,72 @@ type readOut struct {
 // readConversation answers from the Store alone: what the conversation's
 // Reader has stored. It never reads from the Company itself, which would
 // race the Reader for the same events.
-func (s *server) readConversation(_ context.Context, req toolRequest) (any, *toolError) {
+//
+// With wait_seconds (0 to 20; more is taken as 20) it first waits for a
+// change: a new message from the company, working going false, a handoff,
+// the conversation closing or its Reader stopping. It wakes on the Readers'
+// updates (the hub), never by polling, and answers as soon as one of them
+// changes the conversation, or at the timeout, with the same shape either
+// way.
+func (s *server) readConversation(ctx context.Context, req toolRequest) (any, *toolError) {
 	c, terr := s.lookup(req.ConversationID)
 	if terr != nil {
 		return nil, terr
 	}
-	return s.read(c)
+	wait := min(time.Duration(max(req.WaitSeconds, 0))*time.Second, maxReadWait)
+	if wait == 0 {
+		return s.read(c)
+	}
+	// Subscribe before reading, so no update between the two is missed.
+	ch, stop := s.hub.subscribe()
+	defer stop()
+	before, terr := s.read(c)
+	if terr != nil || before.Closed || before.Stopped != "" {
+		return before, terr
+	}
+	timer := time.NewTimer(wait)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return s.read(c)
+		case <-s.ctx.Done():
+			return s.read(c)
+		case <-timer.C:
+			return s.read(c)
+		case b := <-ch:
+			var u struct {
+				ConversationID string `json:"conversation_id"`
+			}
+			if json.Unmarshal(b, &u) != nil || u.ConversationID != c.ID {
+				continue
+			}
+			now, terr := s.read(c)
+			if terr != nil || changed(before, now) {
+				return now, terr
+			}
+		}
+	}
+}
+
+// changed reports whether now is worth waking a waiting read for: the
+// company said something new, stopped working, handed off, or the
+// conversation ended.
+func changed(before, now readOut) bool {
+	return companyMessages(now) > companyMessages(before) ||
+		(before.Working && !now.Working) ||
+		now.Handoff != before.Handoff ||
+		now.Closed || now.Stopped != ""
+}
+
+func companyMessages(r readOut) int {
+	n := 0
+	for _, m := range r.Messages {
+		if m.Role == "company" {
+			n++
+		}
+	}
+	return n
 }
 
 // read is a conversation as the Store holds it: its state and its messages.
@@ -512,7 +612,7 @@ func (s *server) read(c conversation.Conversation) (readOut, *toolError) {
 		return readOut{}, fail(http.StatusInternalServerError, "reading events: %v", err)
 	}
 	out := readOut{
-		Company: s.name(c.Company), Working: working, Handoff: handoffOf(handoff),
+		Company: s.name(c), Working: working, Handoff: handoffOf(handoff),
 		Messages: []messageOut{}, Closed: closed || c.Closed, Stopped: stopped,
 	}
 	if out.Closed {
@@ -575,7 +675,19 @@ func (s *server) closeConversation(ctx context.Context, req toolRequest) (any, *
 	if !c.Closed {
 		ctx, cancel := context.WithTimeout(ctx, companyTimeout)
 		defer cancel()
-		if err := s.client.Close(ctx, c); err != nil && !conversation.IsCode(err, "conversation_closed") {
+		err := s.client.Close(ctx, c)
+		switch {
+		case conversation.IsCode(err, "conversation_closed"):
+			// The Company closed it first: record it closed here too, so it
+			// is never sent on again (Client.Close records only its own).
+			c.Closed = true
+			if err := s.store.SaveConversation(c); err != nil {
+				return nil, fail(http.StatusInternalServerError, "recording the close: %v", err)
+			}
+			if err := s.store.SetState(c.ID, false, "none", true); err != nil {
+				return nil, fail(http.StatusInternalServerError, "recording the close: %v", err)
+			}
+		case err != nil:
 			return nil, companyError(c.Company, err)
 		}
 	}
@@ -629,7 +741,7 @@ func (s *server) direct(ctx context.Context, req toolRequest) (any, *toolError) 
 	}
 	return map[string]string{
 		"conversation_id": target.ID, "parent_conversation_id": target.ParentID,
-		"company": s.name(target.Company),
+		"company": s.name(target),
 	}, nil
 }
 

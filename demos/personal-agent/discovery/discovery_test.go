@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -93,6 +94,9 @@ func TestDiscoverDomainMismatch(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "does not match") {
 		t.Fatalf("want domain mismatch error, got %v", err)
 	}
+	if errors.Is(err, ErrUnreachable) {
+		t.Errorf("a domain mismatch is the domain's answer, not ErrUnreachable: %v", err)
+	}
 }
 
 func TestDiscoverRedirectToOtherPath(t *testing.T) {
@@ -106,6 +110,9 @@ func TestDiscoverRedirectToOtherPath(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "redirect") {
 		t.Fatalf("want redirect error, got %v", err)
 	}
+	if errors.Is(err, ErrUnreachable) {
+		t.Errorf("a refused redirect is the domain's answer, not ErrUnreachable: %v", err)
+	}
 }
 
 func TestDiscoverProtectedResource500(t *testing.T) {
@@ -116,6 +123,9 @@ func TestDiscoverProtectedResource500(t *testing.T) {
 	_, err := Discover(context.Background(), srv.Client(), host)
 	if err == nil || !strings.Contains(err.Error(), "500") {
 		t.Fatalf("want 500 error, got %v", err)
+	}
+	if !errors.Is(err, ErrUnreachable) {
+		t.Errorf("a 5xx may pass, so want ErrUnreachable: %v", err)
 	}
 }
 

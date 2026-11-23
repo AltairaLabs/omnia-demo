@@ -5,6 +5,7 @@ package discovery
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,6 +17,33 @@ const (
 	prmPath     = "/.well-known/oauth-protected-resource"
 	maxBodySize = 1 << 20 // 1 MiB
 )
+
+// ErrUnreachable marks a discovery that failed in a way that may pass: a
+// network error (no answer, a timeout, a TLS failure) or a 5xx. Every other
+// failure (a 404 or other 4xx, a document that isn't one, a domain that
+// doesn't match, a refused redirect) says the domain has no Poppy agent.
+var ErrUnreachable = errors.New("unreachable")
+
+// errRedirect is a redirect fetchPoppy refused. It reaches the caller as a
+// network error from the client, but is the domain's answer, not a failure.
+var errRedirect = errors.New("redirect refused")
+
+// unreachable wraps err from fetching path as ErrUnreachable, unless it is a
+// refused redirect.
+func unreachable(path string, err error) error {
+	if errors.Is(err, errRedirect) {
+		return fmt.Errorf("fetching %s: %w", path, err)
+	}
+	return fmt.Errorf("fetching %s: %w: %w", path, ErrUnreachable, err)
+}
+
+// statusError is a non-200 answer for path; a 5xx is ErrUnreachable.
+func statusError(path string, status int) error {
+	if status >= 500 {
+		return fmt.Errorf("fetching %s: %w: status %d", path, ErrUnreachable, status)
+	}
+	return fmt.Errorf("fetching %s: status %d", path, status)
+}
 
 // Company is what discovery learned about a domain.
 type Company struct {
@@ -90,13 +118,13 @@ func fetchPoppy(ctx context.Context, hc *http.Client, domain string, out *poppyD
 	client := *hc
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 5 {
-			return fmt.Errorf("too many redirects fetching %s", poppyPath)
+			return fmt.Errorf("%w: too many redirects fetching %s", errRedirect, poppyPath)
 		}
 		if req.URL.Scheme != "https" {
-			return fmt.Errorf("redirect to non-https URL %q refused", req.URL)
+			return fmt.Errorf("%w: to non-https URL %q", errRedirect, req.URL)
 		}
 		if req.URL.Path != poppyPath || req.URL.RawQuery != "" {
-			return fmt.Errorf("redirect to %q refused: final URL must be exactly %s with no query", req.URL, poppyPath)
+			return fmt.Errorf("%w: to %q: final URL must be exactly %s with no query", errRedirect, req.URL, poppyPath)
 		}
 		return nil
 	}
@@ -106,11 +134,11 @@ func fetchPoppy(ctx context.Context, hc *http.Client, domain string, out *poppyD
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("fetching %s: %w", poppyPath, err)
+		return unreachable(poppyPath, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("fetching %s: status %d", poppyPath, resp.StatusCode)
+		return statusError(poppyPath, resp.StatusCode)
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBodySize)).Decode(out); err != nil {
 		return fmt.Errorf("decoding %s: %w", poppyPath, err)
@@ -129,7 +157,7 @@ func fetchIssuer(ctx context.Context, hc *http.Client, domain string) (string, e
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("fetching %s: %w", prmPath, err)
+		return "", unreachable(prmPath, err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
@@ -137,7 +165,7 @@ func fetchIssuer(ctx context.Context, hc *http.Client, domain string) (string, e
 		return "", nil
 	case http.StatusOK:
 	default:
-		return "", fmt.Errorf("fetching %s: status %d", prmPath, resp.StatusCode)
+		return "", statusError(prmPath, resp.StatusCode)
 	}
 	var prm struct {
 		AuthorizationServers []string `json:"authorization_servers"`

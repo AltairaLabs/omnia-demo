@@ -13,8 +13,11 @@ spec:
     Look up a company's Poppy agents by its domain (for example
     larkmere.azure.altairalabs.ai). Returns the company's name, its domain and
     what each of its agents can talk about, with its access: "session" (no
-    sign-in needed) or "signed_in" (the company needs Ellen signed in). When the domain has no Poppy agent it returns found false and a
-    reason; that is an answer, not a failure to retry.
+    sign-in needed) or "signed_in" (the company needs Ellen signed in). When
+    the domain has no Poppy agent it returns found false and a reason; that
+    is an answer, not a failure to retry. When the company couldn't be
+    reached right now, the reason says so ("couldn't reach ... right now");
+    that may pass, so try once more, and if it fails again tell Ellen.
   input_schema:
     type: object
     properties:
