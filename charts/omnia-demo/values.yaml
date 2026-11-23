@@ -678,7 +678,10 @@ analystWorkbench:
     tag: ""
   # -- The RuntimeClass the sandbox runs under, and how it reaches those
   # nodes. Empty runtimeClassName: the cluster default (runc), with no VM
-  # boundary; say so if you demo it that way.
+  # boundary; say so if you demo it that way. Either works in an ambient-mesh
+  # namespace: Omnia keeps sandbox pods out of the mesh (#4112). A Service in
+  # the sandbox's allowedServices must accept plaintext, so one under a STRICT
+  # PeerAuthentication needs a workload-scoped PERMISSIVE one.
   runtimeClassName: ""
   nodeSelector: {}
   tolerations: []

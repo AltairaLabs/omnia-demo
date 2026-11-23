@@ -21,16 +21,28 @@ wren: { enabled: true }
 wrenmoorSite: { enabled: true }
 incidentAgent: { enabled: true }
 dataAnalyst: { enabled: true }
-# The analyst workbench. Its sandboxes are meant for omnia-azure's Kata pool
-# (bicep/modules/sandbox-pool.bicep), each pod its own VM:
-#   runtimeClassName: kata-vm-isolation
-#   tolerations: [{ key: workload, operator: Equal, value: sandbox, effect: NoSchedule }]
-# but a Kata pod in an ambient-mesh namespace is unreachable, and a sandbox
-# can't opt out of the mesh yet (Omnia #4112). On runc it starts, but its one
-# allowed egress (the grid data) goes via the waypoint on :15008, which the
-# sandbox's NetworkPolicy drops (#4112, second comment). Off until #4112.
+# The analyst workbench. Each sandbox runs on omnia-azure's Kata pool
+# (bicep/modules/sandbox-pool.bicep), its own VM: the RuntimeClass's own
+# scheduling picks the Kata nodes, and the toleration admits the pool's taint.
+# The pool scales from zero, so a first sandbox waits a few minutes for a node.
+#
+# This namespace is in Istio's ambient mesh with a waypoint. Omnia labels
+# every sandbox pod `istio.io/dataplane-mode: none` (#4112, fixed in #4147),
+# so the mesh never captures it: the runtime reaches the VM, and the sandbox
+# reaches wrenmoor-grid-data in plaintext on the port its NetworkPolicy
+# allows. That holds only while grid-data accepts plaintext; under a STRICT
+# PeerAuthentication it would need a workload-scoped PERMISSIVE one (Omnia's
+# "Sandboxes and a service mesh").
+#
+# Its image (omnia-demo-analyst-sandbox) has no ghcr tag yet: `make images`
+# builds it into the dev registry, or run the publish workflow and pin its
+# sha-<short> here as image.tag, like the pins in common.yaml. Without one the
+# sandbox pod can't pull, and the first tool call times out.
 analystWorkbench:
-  enabled: false
+  enabled: true
+  runtimeClassName: kata-vm-isolation
+  tolerations:
+    - { key: workload, operator: Equal, value: sandbox, effect: NoSchedule }
 fieldService: { enabled: true }
 # The field manuals, ingested as institutional memory for the copilot.
 memory:

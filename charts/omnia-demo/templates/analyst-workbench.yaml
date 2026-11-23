@@ -47,6 +47,9 @@ data:
 # from it. The containment is all here, none of it in the prompt:
 #   - its own VM (runtimeClassName: Kata on the sandbox pool);
 #   - no network except the generation data service, and no DNS;
+#   - outside any Istio ambient mesh: the operator labels every sandbox pod
+#     `istio.io/dataplane-mode: none` (Omnia #4112), so the NetworkPolicy is
+#     the boundary in both directions, and a Kata VM stays reachable;
 #   - restricted pod security and no service-account token (the operator's
 #     defaults for every sandbox);
 #   - CPU and memory limits, mandatory for a class that runs agent code.

@@ -345,6 +345,12 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
         <td class="status live">Live</td>
       </tr>
       <tr>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=analyst-workbench">Analyst workbench</a></td>
+        <td>An analyst's question answered by Python the agent writes and runs in a sandbox: its own Kata VM, with no network but the generation data service. The sandbox is the control, not the prompt. Enabled now that Omnia keeps sandboxes out of the mesh (#4112); not yet run live on that build. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/analyst-workbench/RUNBOOK.md">Runbook</a></td>
+        <td><span class="cap">Sandboxes</span><span class="cap">Kata VM isolation</span><span class="cap">NetworkPolicy egress</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr>
         <td class="name">Multi-provider evaluation</td>
         <td>One Arena project across gpt-4o, gpt-5.4-mini and gpt-4o-mini as a scenario-by-provider grid, plus a load test with percentile gates.</td>
         <td><span class="cap">Arena</span><span class="cap">Load testing</span></td>
