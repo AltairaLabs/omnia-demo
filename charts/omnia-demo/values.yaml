@@ -202,7 +202,7 @@ mortgageUnderwriting:
 
 # ---------------------------------------------------------------------------
 # The card line (Larkmere): the member assistant's voice twin. A realtime voice
-# agent the member rings from the portal ("Call us"), on the same card system,
+# agent the member rings from the portal ("Call the card line"), on the same card system,
 # ToolRegistry, ToolPolicy and privacy policy as pii-chat, so the call is held
 # to exactly the same controls as the chat. Needs piiChat (its tools, policy
 # and portal) and a Provider whose model streams audio (duplex), such as

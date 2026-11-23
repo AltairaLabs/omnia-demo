@@ -37,9 +37,9 @@ data:
 {{ .Files.Get "files/arena/card-line-pack.json" | indent 4 }}
 ---
 # The disclosure, pre-recorded. Played instead of synthesising
-# duplex.disclosure.text, so the call needs no working tts for it: on keyless
-# Azure the synthesised disclosure fails (Omnia #4125) and the call would go
-# ahead with nothing said. Recorded once with the line's own tts model
+# duplex.disclosure.text, so the call needs no working tts for it. It was added
+# for keyless Azure, where the synthesised disclosure failed (Omnia #4125, now
+# fixed); the clip is still what plays, and the text is the fallback. Recorded once with the line's own tts model
 # (gpt-4o-mini-tts, voice sage) and checked in; it says the same words as the
 # text, which stays as the fallback if the clip can't be read. Normalised to
 # about the realtime voice's loudness (peak-limited, ~2 dB under it).

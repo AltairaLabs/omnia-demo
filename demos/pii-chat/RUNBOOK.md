@@ -298,6 +298,47 @@ Checked live 2026-11-17:
   out in Your data and fire a night: it studies nothing, and the refusal is
   the same answer as any other. Not yet checked (needs a night).
 
+## The card line
+
+The member assistant's voice twin: a realtime voice agent (`card-line`, from
+`charts/omnia-demo/templates/card-line.yaml`) behind the same portal edge,
+tools, ToolPolicy (`pii-chat-policy`) and privacy policy (`pii-chat-privacy`)
+as the chat. Live on Larkmere (`cardLine.enabled` in
+`profiles/azure/larkmere-mutual.yaml`); needs Omnia main `9f0b955` or later
+(PromptKit #2690, Omnia #4125).
+
+**Place the call.** In the portal (forwarded as under Prerequisites), open
+**Ask Larkmere** and choose **Call the card line**. The browser asks for the
+microphone; the button is absent if the portal has no phone line.
+
+**Ask:** "What's the status of my card?", then "Freeze my card", then
+"What's the status of my card?" again.
+
+**What should happen.** The disclosure is spoken first ("You are speaking with
+Larkmere Mutual's AI assistant. You can ask for a person at any time.") before
+the agent says anything. The card tools then act on the signed-in member,
+Ellen, with the same ToolPolicy and privacy policy as the chat: the card
+ending 4471 reads as active, then frozen. Next time Ellen opens the chat, the
+card is still frozen. Unfreeze it afterwards, as under Before each take.
+
+**Check afterwards** (dashboard, Sessions, the call's session):
+- an `ai.disclosure.sent` event from `websocket-voice`, written when the
+  audio played, not when the call opened;
+- the `get_card_status` and `freeze_card` calls, each carrying the member
+  (Ellen), and permitted by the policy;
+- the card's status changing in the next chat.
+
+**Find the session and the facade's log** (nothing here changes the cluster):
+```bash
+kubectl --context aks-omnia-demo -n larkmere-mutual get agentruntime card-line
+kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep -iE "session|disclosure"
+kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep "voice ai disclosure not delivered"
+```
+If the last line matches, the disclosure did not play: the call went ahead
+without it, so don't show the call. A tool refused with 401 means the call
+carried no member (PromptKit #2690); the policy-broker sidecar's log
+(`--all-containers` above) shows the decision.
+
 ## Who sees what
 
 Every member's memories stay theirs. With the callers running and Ellen's
