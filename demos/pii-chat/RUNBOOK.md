@@ -234,11 +234,12 @@ exactly what the false-refusal partner is there to catch.
 
 ## Dreaming: the night shift
 
-**Blocked on Omnia #4241** (the scenario compiler's output schema can't be
-sent in OpenAI strict mode, and every Foundry Provider is `openai`-type).
-#4200 is fixed. Since 2026-11-18 a night finds its candidates and begins, and
-then every `dream_compile_session` fails. The `dreaming-default-policy`
-ToolPolicy in this chart lets the night call its tools at all (Omnia #4240).
+Works on Omnia main `9f0b955`; **not yet run live end to end on it**, so do
+the night below once before a take. #4254 (`b12ae855`) made the scenario
+compiler's output schema strict-compatible, so a Foundry (`openai`-type)
+Provider accepts it (#4241), and Dreaming now provisions its own
+`dreaming-<group>-tools-permit` ToolPolicy for the orchestrator's tools
+(#4240). The chart's own permit, which stood in for it, is gone.
 
 Dreaming studies the member assistant's failed conversations each evening and
 turns them into Arena scenarios, evaluated on a replay twin of the agent, and
@@ -261,7 +262,13 @@ What's in place:
   powered off from 21:00 UK time), and the envelope `larkmere-dreaming`
   (PromptPack changes allowed, $2 per run, $10 per week).
 
-On stage, once #4241 is in:
+Before the first take on a new build, check the permit is there and fire a
+night (step 2): `kubectl --context aks-omnia-demo -n larkmere-mutual get
+toolpolicy dreaming-default-tools-permit`. The compiler
+(`deploy/dreaming-default-compiler`) should log no `Invalid schema for
+response_format`, and the night should compile scenarios (Dreams page).
+
+On stage:
 
 1. In the portal, Ellen asks the travel questions. In the console, the
    session's eval is failed.
