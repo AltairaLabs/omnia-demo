@@ -8,6 +8,7 @@ on:
       - memory-ingestion/**
       - demos/memory-seeder/**
       - demos/mortgage-underwriting/**
+      - demos/personal-agent/**
       - demos/sharepoint-adapter/**
       - demos/demo-sites/**
       - .github/workflows/publish.yml
@@ -35,6 +36,10 @@ jobs:
             context: .
             file: demos/mortgage-underwriting/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
+          - name: personal-agent
+            context: .
+            file: demos/personal-agent/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-personal-agent
           - name: sharepoint-adapter
             context: .
             file: demos/sharepoint-adapter/Dockerfile

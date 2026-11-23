@@ -45,6 +45,7 @@ IMAGES := \
   omnia-demo-memory-ingestion,memory-ingestion,memory-ingestion/Dockerfile \
   omnia-demo-memory-seeder,.,demos/memory-seeder/Dockerfile \
   omnia-demo-mortgage-underwriting,.,demos/mortgage-underwriting/Dockerfile \
+  omnia-demo-personal-agent,.,demos/personal-agent/Dockerfile \
   omnia-demo-sharepoint-adapter,.,demos/sharepoint-adapter/Dockerfile \
   omnia-demo-sites,.,demos/demo-sites/Dockerfile \
   omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
