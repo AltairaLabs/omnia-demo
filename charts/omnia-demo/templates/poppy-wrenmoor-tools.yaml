@@ -38,4 +38,48 @@ spec:
         endpoint: {{ $acct }}/wren/outage-status
         method: POST
         contentType: application/json
+---
+# THE CONTROL: the Company Agent may only read.
+#
+# The Wrenmoor Company Agent talks to anyone's Personal Agent, signed out, so
+# it holds no customer identity and must never change anything. Its only tool,
+# outage_status, is a public read. The policy keeps it that way: any tool that
+# declares a non-read effect is refused, keyed on the declared effect rather
+# than the tool's name, so a write added later is blocked until someone decides
+# otherwise. An undeclared tool is refused outright.
+#
+# Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: wrenmoor-outages-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: wrenmoor-outages-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+    - name: nonReadTool
+      type: cel
+      cel: 'tool.declared && tool.effect != "read"'
+  policy: |
+    @id("permit-wrenmoor-outages-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"wrenmoor-outages-tools");
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so the Wrenmoor Company Agent may not call it.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
+
+    @id("deny-non-read-tool")
+    @message("The Wrenmoor Company Agent talks to anyone, signed out, so it may only read. This tool changes something, so it is refused.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.nonReadTool };
 {{- end }}

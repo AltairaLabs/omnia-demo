@@ -112,4 +112,39 @@ spec:
         endpoint: {{ $pa }}/close_conversation
         method: POST
         contentType: application/json
+---
+# THE CONTROL: the assistant acts only for its one user, Ellen.
+#
+# Its tools speak only to companies she has accounts at: personal-agent
+# enforces that itself (--known-companies), so the policy needn't. It does not
+# gate on effect: send_message and start_conversation are writes by design,
+# and the prompt's "ask Ellen before agreeing to anything" is not a policy.
+# What the policy does is refuse a tool that does not declare what it does.
+#
+# Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: assistant-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: assistant-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+  policy: |
+    @id("permit-assistant-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"assistant-tools");
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so Ellen's assistant may not call it.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
 {{- end }}
