@@ -30,7 +30,8 @@ PROFILE          ?= azure
 # `CONTEXT=$(KUBE_CONTEXT) hack/personal-agent-keys.sh` (its keys) and
 # `make images` (no personal-agent image is pinned yet); without the keys or
 # the image, `make demos` waits out its 10m timeout.
-TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners halvern-research ellens-assistant
+# ellens-assistant before halvern-partners: the catalogue's nginx (in halvern-partners) resolves assistant-page.ellens-assistant at start and crashes if that Service doesn't exist yet.
+TENANTS          ?= larkmere-mutual wrenmoor-energy ellens-assistant halvern-partners halvern-research
 KUBE_CONTEXT     ?= aks-omnia-demo
 OMNIA_AZURE      ?= ../omnia-azure
 CHART            ?= charts/omnia-demo
