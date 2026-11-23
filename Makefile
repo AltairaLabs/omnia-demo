@@ -115,15 +115,17 @@ images:
 # step's weight is exact and each conversation, one WebSocket, stays on the
 # version it opened on. At every weight an analysis step reads the candidate's
 # average judge score (RolloutAnalysis card-support-gate), and a failed
-# gate rolls back on its own. mesh.waypoint is left unset on purpose: on Omnia
-# 0.9.0-beta.23 it puts istio.io/use-waypoint in the Service's selector, which
-# empties the Service (Omnia #3952). The namespace's own use-waypoint label
-# (omnia-azure `make workspace`) already sends the Service through the waypoint.
+# gate rolls back on its own. The rollout names the namespace's waypoint
+# (mesh.waypoint, CANARY_WAYPOINT), so the controller labels the Service to use
+# it, as Omnia's rollout docs intend; omnia-azure `make workspace` makes the
+# waypoint and labels the namespace the same way. (Omnia #3952, which emptied
+# the Service when this was set, is fixed in #3995.)
 # Not in the chart: a promotion rewrites
 # spec.promptPackRef, and a chart-owned rollout would restart on the next
 # upgrade.
 CANARY_NS    ?= larkmere-mutual
 CANARY_AGENT ?= pii-chat
+CANARY_WAYPOINT ?= waypoint
 VERSION      ?= 2.0
 
 .PHONY: canary canary-status canary-reset
@@ -137,11 +139,11 @@ canary:
 	evaldef=$$($(KUBECTL) -n $(CANARY_NS) get $$analysis -o jsonpath='{.spec.metrics[0].provider.arenaEval.evalDef}'); \
 	gate="{\"analysis\":{\"templateName\":\"card-support-gate\"}}"; \
 	: "The candidate is the same pack (packName pii-chat-pack) at the new version."; \
-	patch=$$(jq -n -c --arg ver "$(VERSION).0" --argjson gate "$$gate" '{spec: {rollout: { \
+	patch=$$(jq -n -c --arg ver "$(VERSION).0" --arg wp "$(CANARY_WAYPOINT)" --argjson gate "$$gate" '{spec: {rollout: { \
 	  candidate: {promptPackRef: {name: "pii-chat-pack", version: $$ver}}, \
 	  steps: [{setWeight: 20}, $$gate, {setWeight: 50}, $$gate, {setWeight: 100}, $$gate], \
 	  rollback: {mode: "automatic"}, \
-	  trafficRouting: {mode: "mesh"}}}}'); \
+	  trafficRouting: {mode: "mesh", mesh: {waypoint: $$wp}}}}}'); \
 	echo "==> Rolling out member assistant $(VERSION).0 to $(CANARY_AGENT): 20%, 50%, 100%, gated by the judge ($$evaldef)"; \
 	$(KUBECTL) -n $(CANARY_NS) patch agentruntime $(CANARY_AGENT) --type merge -p "$$patch" >/dev/null; \
 	$(KUBECTL) -n $(CANARY_NS) scale deploy card-callers --replicas=1 >/dev/null; \
