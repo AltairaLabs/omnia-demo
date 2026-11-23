@@ -207,7 +207,7 @@ spec:
     retrieval:
       enabled: true
       accessFilter:
-        denyCEL: '!(has(metadata.source_ref) && metadata.source_ref.contains("/member-guidance/"))'
+        denyCEL: {{ include "omnia-demo.memberGuidanceOnly" . | squote }}
 {{- end }}
   outputFormat: json_schema
   outputSchema:

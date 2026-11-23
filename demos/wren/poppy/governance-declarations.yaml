@@ -1,0 +1,35 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. The
+# per-tool half of RFC 0013, action_scope, is declared on each tool in
+# tools/*.tool.yaml.
+
+intended_purpose: >-
+  Tell Wrenmoor Energy's customers, or someone acting for them, whether the
+  power is off at a postcode, when it should be restored and why, and that
+  compensation is claimed through the customer's own account.
+
+foreseeable_misuse:
+  - Asking about a named customer's account, outage or compensation without that customer signed in
+  - Treating an estimated restoration time as a promise
+  - Relying on it in an emergency, which needs the emergency services
+
+# suggests: it reads public outage and weather data and changes nothing.
+autonomy_level: suggests
+
+# A role, not a person.
+accountable_owner: Wrenmoor Energy Customer Operations
+
+operator_role: eu-aiact:AIDeployer
+
+risk_classification: eu-aiact:RiskLevelLimited
+
+intended_deployment_contexts:
+  - Wrenmoor Energy's Company Agent, reached by Personal Agents under the Personal Agent Protocol
+
+approved_environments:
+  - demo
+
+# True: it talks to the public, directly or through someone acting for them.
+requires_ai_disclosure: true

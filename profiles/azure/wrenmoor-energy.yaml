@@ -43,3 +43,8 @@ poppy:
   enabled: true
   domain: wrenmoor.azure.altairalabs.ai
   allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
+  # The Company Agent, wrenmoor-outages, at https://<domain>/poppy.
+  agent:
+    enabled: true
+    company: wrenmoor
+    description: Power cuts, restoration times and compensation for Wrenmoor Energy customers

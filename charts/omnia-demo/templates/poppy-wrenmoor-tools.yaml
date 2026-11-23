@@ -1,0 +1,55 @@
+{{- if and .Values.poppy.enabled .Values.poppy.agent.enabled (eq .Values.poppy.agent.company "wrenmoor") }}
+{{- $ns := .Values.namespace }}
+{{- $acct := printf "http://wren-account.%s:8080" $ns }}
+---
+# wrenmoor-outages' tools: two public reads on the Wrenmoor stub.
+#
+#   outage_status   the power cut at a postcode (outages.go, no customer needed)
+#   get_weather     the same endpoint Wren uses
+#
+# The descriptions and schemas here are the BINDING, not what the model reads.
+# PromptKit builds the model's tool descriptors from the pack
+# (demos/wren/poppy/tools/), including the action_scope. Kept in step anyway,
+# because a drifted schema here breaks dispatch.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: wrenmoor-outages-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: outage-status-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: outage_status
+        description: "The power cut affecting a postcode in Wrenmoor Energy's area: whether the supply is off or restored, when it went off, the estimated restoration time, when it was restored (if it has been), how many customers are affected and the cause. Times are UTC. When there is no outage on record for the postcode's district it returns an error saying so."
+        inputSchema:
+          type: object
+          properties:
+            postcode: { type: string, description: "A full postcode or a postcode district, e.g. HX7 8AD or HX7" }
+          required: ["postcode"]
+      httpConfig:
+        endpoint: {{ $acct }}/wren/outage-status
+        method: POST
+        contentType: application/json
+
+    - name: get-weather-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: get_weather
+        description: "Daily weather for a postcode district in Wrenmoor Energy's area (HX7): the overnight minimum temperature in °C and the wind speed on Wrenmoor Edge in mph, for each day from `from` to `to` (at most 92 days)."
+        inputSchema:
+          type: object
+          properties:
+            postcode: { type: string, description: "A postcode or postcode district, e.g. HX7" }
+            from: { type: string, description: "First day, YYYY-MM-DD (default 2026-10-01)" }
+            to: { type: string, description: "Last day, YYYY-MM-DD (default today)" }
+      httpConfig:
+        endpoint: {{ $acct }}/wren/weather
+        method: POST
+        contentType: application/json
+{{- end }}

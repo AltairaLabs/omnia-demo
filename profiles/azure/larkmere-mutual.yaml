@@ -70,3 +70,8 @@ poppy:
   enabled: true
   domain: larkmere.azure.altairalabs.ai
   allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
+  # The Company Agent, larkmere-claims-desk, at https://<domain>/poppy.
+  agent:
+    enabled: true
+    company: larkmere
+    description: Home insurance claims and cover for Larkmere Mutual members

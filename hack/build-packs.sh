@@ -41,14 +41,25 @@ if [[ $# -gt 0 ]]; then
   demos=("$@")
 else
   demos=(mortgage-underwriting pii-chat card-line claims-triage sharepoint-adapter
-    incident-agent data-analyst field-service wren research)
+    incident-agent data-analyst field-service wren research
+    larkmere-claims-desk wrenmoor-outages)
 fi
+
+# A pack's Arena project is demos/<demo>/arena, except for the Poppy Company
+# Agents, which live beside the demo whose systems they front.
+arena_dir() {
+  case "$1" in
+    larkmere-claims-desk) echo "${ROOT}/demos/claims-triage/poppy" ;;
+    wrenmoor-outages) echo "${ROOT}/demos/wren/poppy" ;;
+    *) echo "${ROOT}/demos/$1/arena" ;;
+  esac
+}
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "${TMP}"' EXIT
 
 for demo in "${demos[@]}"; do
-  arena="${ROOT}/demos/${demo}/arena"
+  arena="$(arena_dir "${demo}")"
   compiled="${TMP}/${demo}.compiled.json"
   out="${OUT}/${demo}-pack.json"
 

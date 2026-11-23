@@ -956,3 +956,25 @@ poppy:
   omniaNamespace: omnia
   # -- The namespace of the `omnia-external` Gateway the route attaches to.
   gatewayNamespace: omnia
+  # The Company Agent: an AgentRuntime with a `poppy` facade, exposed at
+  # https://<domain>/poppy, that a Personal Agent holds conversations with. A
+  # separate agent from the tenant's own assistants, and kept out of the
+  # canary, Dreaming and evals. Needs poppy.enabled for its Company.
+  agent:
+    # -- Run the Company Agent.
+    enabled: false
+    # -- Which one: `larkmere` (larkmere-claims-desk, no tools, reads the
+    # society's member guidance from institutional memory when memory.enabled)
+    # or `wrenmoor` (wrenmoor-outages, outage_status and get_weather on the
+    # wren-account stub, so it needs wren.enabled).
+    company: ""
+    # -- What a Personal Agent can talk to it about (PAP §3.1), 1 to 1024
+    # characters. Required when enabled.
+    description: ""
+    # -- A Provider in the namespace for this agent alone. Wins over
+    # llm.providerRef; one of the two is required.
+    providerRef: ""
+    # -- Redis for the conversation context, as a redis:// URL. A poppy facade
+    # requires a Redis context store: PAP reads can reach any replica. The
+    # demo's shared Redis in the omnia namespace.
+    redisURL: redis://demo-redis.omnia.svc.cluster.local:6379

@@ -43,6 +43,16 @@ http://memory-{{ include "omnia-demo.workspaceName" . }}-{{ .Values.workspace.se
 {{- end -}}
 {{- end -}}
 
+{{/*
+The ambient-retrieval filter that keeps only Larkmere's guidance for members:
+documents under member-guidance/ in the memory bucket. The same institutional
+tier holds the society's claims-handling rules, which an agent that speaks to
+members must never read. An item with no source_ref (the Galaxy's) is dropped.
+*/}}
+{{- define "omnia-demo.memberGuidanceOnly" -}}
+!(has(metadata.source_ref) && metadata.source_ref.contains("/member-guidance/"))
+{{- end -}}
+
 {{/* The Galaxy's MemoryPolicy (cluster-scoped): galaxy.policyName, or <workspace>-memory. */}}
 {{- define "omnia-demo.galaxyPolicyName" -}}
 {{- default (printf "%s-memory" (include "omnia-demo.workspaceName" .)) .Values.galaxy.policyName -}}
