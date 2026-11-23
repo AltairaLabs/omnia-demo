@@ -71,7 +71,8 @@ type Reader struct {
 // cursor_expired reads from the beginning, skipping events already stored
 // (§8.5). It stops after a conversation_closed error, or a state event that
 // shows the conversation closed, and then marks it closed in the store.
-// Working notices are published with no ID and are not stored.
+// Working notices are published with no ID; they update the stored state
+// but are not stored as events.
 func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conversation, Event)) {
 	backoff := r.Backoff
 	if backoff <= 0 {
@@ -115,9 +116,12 @@ func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conver
 	}
 }
 
+// markClosed records the conversation as closed, with the state §8.7 gives
+// a closed conversation: not working, handoff none.
 func (r *Reader) markClosed(conv Conversation) {
 	conv.Closed = true
 	_ = r.Client.Store.SaveConversation(conv)
+	_ = r.Client.Store.SetState(conv.ID, false, "none", true)
 }
 
 // stream opens one stream and handles it until it ends. It returns how many
@@ -184,6 +188,9 @@ func (r *Reader) stream(ctx context.Context, conv Conversation, publish func(Con
 				return n, false, err
 			}
 		}
+		if err := c.saveState(conv.ID, rr); err != nil {
+			return n, false, err
+		}
 		return n, rr.Closed && !rr.HasMore, nil
 	}
 
@@ -222,6 +229,9 @@ func (r *Reader) stream(ctx context.Context, conv Conversation, publish func(Con
 				Working *bool `json:"working"`
 			}
 			if json.Unmarshal(payload, &w) == nil && w.Working != nil {
+				if err := c.Store.SetWorking(conv.ID, *w.Working); err != nil {
+					return n, false, err
+				}
 				publish(conv, Event{Type: "working", Working: w.Working, Raw: payload})
 			}
 		default:

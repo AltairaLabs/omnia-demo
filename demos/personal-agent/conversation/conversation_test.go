@@ -94,6 +94,7 @@ type fakeCompany struct {
 
 	mu   sync.Mutex
 	reqs []recorded
+	auds map[string]bool // accepted aud values: the Company identifiers in use
 }
 
 func newFakeCompany(t *testing.T, handle func(w http.ResponseWriter, r *http.Request, n int)) *fakeCompany {
@@ -109,6 +110,7 @@ func newFakeCompany(t *testing.T, handle func(w http.ResponseWriter, r *http.Req
 		Issuer:     "https://auth.wrenmoor.example.test",
 		Agents:     []discovery.AgentEntry{{Endpoint: f.srv.URL + "/poppy", Description: "support", Access: "session"}},
 	}
+	f.auds = map[string]bool{f.co.Identifier: true}
 	return f
 }
 
@@ -127,8 +129,11 @@ func (f *fakeCompany) serve(w http.ResponseWriter, r *http.Request) {
 		if hdr["typ"] != "poppy-session+jwt" || hdr["alg"] != "ES256" || hdr["poppy_dlg"] == nil {
 			f.t.Errorf("Session JWT header = %v", hdr)
 		}
-		if claims["aud"] != f.co.Identifier {
-			f.t.Errorf("aud = %v, want %s", claims["aud"], f.co.Identifier)
+		f.mu.Lock()
+		okAud := f.auds[fmt.Sprint(claims["aud"])]
+		f.mu.Unlock()
+		if !okAud {
+			f.t.Errorf("aud = %v, want the Company identifier", claims["aud"])
 		}
 		if claims["htm"] != r.Method {
 			f.t.Errorf("htm = %v, want %s", claims["htm"], r.Method)
@@ -224,7 +229,7 @@ func TestStartSendsSignedSession(t *testing.T) {
 	if reqs[0].Body["id"] == reqs[1].Body["id"] {
 		t.Errorf("two starts reused request id %v", reqs[0].Body["id"])
 	}
-	uid, _ := st.UserID(f.co.Domain)
+	uid, _ := st.UserID(f.co.Identifier)
 	if reqs[0].Claims["sub"] != uid {
 		t.Errorf("sub = %v, want the stored User ID %s", reqs[0].Claims["sub"], uid)
 	}
@@ -356,7 +361,7 @@ func TestReadOnceFollowsHasMoreAndSavesCursor(t *testing.T) {
 		case "":
 			writeJSON(w, 200, map[string]any{"conversation_id": "cnv_1", "events": []any{msgEvent("e1", "hi")}, "cursor": "e1", "has_more": true, "working": true, "handoff": "none", "responder": "agent", "closed": false})
 		case "e1":
-			writeJSON(w, 200, map[string]any{"conversation_id": "cnv_1", "events": []any{msgEvent("e2", "there")}, "cursor": "e2", "has_more": false, "working": false, "handoff": "none", "responder": "agent", "closed": false})
+			writeJSON(w, 200, map[string]any{"conversation_id": "cnv_1", "events": []any{msgEvent("e2", "there")}, "cursor": "e2", "has_more": false, "working": true, "handoff": "pending", "responder": "agent", "closed": false})
 		default:
 			t.Errorf("unexpected cursor %q", cur)
 		}
@@ -376,6 +381,10 @@ func TestReadOnceFollowsHasMoreAndSavesCursor(t *testing.T) {
 	}
 	if cur, _ := st.Cursor("cnv_1"); cur != "e2" {
 		t.Errorf("cursor = %q, want e2", cur)
+	}
+	// The last read's state fields are the state once has_more is false (§8.5).
+	if working, handoff, closed, err := st.State("cnv_1"); err != nil || !working || handoff != "pending" || closed {
+		t.Errorf("State = %v %q %v %v, want true pending false", working, handoff, closed, err)
 	}
 }
 
@@ -554,15 +563,15 @@ func TestReaderStopsWhenClosed(t *testing.T) {
 
 func TestUserIDsArePerCompanyAndRandom(t *testing.T) {
 	st := NewMemoryStore(nil, time.Now)
-	a, err := st.UserID("larkmere.example.test")
+	a, err := st.UserID("https://auth.larkmere.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := st.UserID("wrenmoor.example.test")
+	b, err := st.UserID("https://auth.wrenmoor.example.test")
 	if err != nil {
 		t.Fatal(err)
 	}
-	again, _ := st.UserID("larkmere.example.test")
+	again, _ := st.UserID("https://auth.larkmere.example.test")
 	if a == b || a != again {
 		t.Errorf("ids %q %q %q: want one stable ID per company", a, b, again)
 	}
@@ -598,5 +607,99 @@ func TestDelegationRenewsWithinAnHourOfExpiry(t *testing.T) {
 	}
 	if d4 == d1 || !d4.Expiry.After(d1.Expiry) {
 		t.Error("delegation within 1h of expiry was not renewed")
+	}
+}
+
+func TestSendInDirectConversationIsHuman(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		writeJSON(w, http.StatusAccepted, map[string]string{"conversation_id": "cnv_2"})
+	})
+	c, _ := newTestClient(t, f)
+	c.Remember(f.co)
+	ctx := context.Background()
+	agentConv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+	direct := Conversation{ID: "cnv_2", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint, ParentID: "cnv_1"}
+	if err := c.Send(ctx, agentConv, "from the assistant"); err != nil {
+		t.Fatal(err)
+	}
+	if err := c.Send(ctx, direct, "from Ellen"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := f.requests()
+	if got := messageAuthor(t, reqs[0].Body); got != "agent" {
+		t.Errorf("author.type in a conversation = %q, want agent", got)
+	}
+	if got := messageAuthor(t, reqs[1].Body); got != "human" || reqs[1].Path != "/poppy/cnv_2/messages" {
+		t.Errorf("author.type in a Direct Conversation = %q (%s), want human", got, reqs[1].Path)
+	}
+}
+
+func TestUserIDsAreScopedByIdentifier(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		writeJSON(w, http.StatusCreated, map[string]string{"conversation_id": fmt.Sprintf("cnv_%d", n)})
+	})
+	c, _ := newTestClient(t, f)
+	ctx := context.Background()
+	// The same domain, first with no issuer, then naming one (§3.2, §5.1).
+	before := *f.co
+	before.Identifier = "https://" + f.co.Domain
+	f.mu.Lock()
+	f.auds[before.Identifier] = true
+	f.mu.Unlock()
+	if _, err := c.Start(ctx, &before, before.Agents[0], "one"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.Start(ctx, f.co, f.co.Agents[0], "two"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := f.requests()
+	if reqs[0].Claims["aud"] != before.Identifier || reqs[1].Claims["aud"] != f.co.Identifier {
+		t.Fatalf("aud = %v, %v", reqs[0].Claims["aud"], reqs[1].Claims["aud"])
+	}
+	if reqs[0].Claims["sub"] == reqs[1].Claims["sub"] {
+		t.Error("two identifiers for one domain share a User ID")
+	}
+}
+
+func TestStateDefaults(t *testing.T) {
+	st := NewMemoryStore(nil, time.Now)
+	working, handoff, closed, err := st.State("cnv_unknown")
+	if err != nil || working || handoff != "none" || closed {
+		t.Errorf("State = %v %q %v %v, want false none false (§8.7)", working, handoff, closed, err)
+	}
+}
+
+func TestStateFollowsStream(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		startStream(w) // working: true
+		pending := stateEvent("e2", false)
+		pending["handoff"] = "pending"
+		sse(w, msgEvent("e1", "looking for someone"), pending)
+		fmt.Fprint(w, "event: working\ndata: {\"working\":false}\n\n")
+		sse(w, stateEvent("e3", true))
+	})
+	c, st := newTestClient(t, f)
+	c.Remember(f.co)
+	conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+
+	type snap struct {
+		working bool
+		handoff string
+		closed  bool
+	}
+	var mu sync.Mutex
+	var at []snap // the stored state as each event is published
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	(&Reader{Client: c, Backoff: time.Millisecond}).Run(ctx, conv, func(_ Conversation, e Event) {
+		w, h, cl, _ := st.State(conv.ID)
+		mu.Lock()
+		at = append(at, snap{w, h, cl})
+		mu.Unlock()
+	})
+	// Published: working(true), e1, e2 (pending), working(false), e3 (closed).
+	want := []snap{{true, "none", false}, {true, "none", false}, {true, "pending", false}, {false, "pending", false}, {false, "none", true}}
+	if fmt.Sprint(at) != fmt.Sprint(want) {
+		t.Errorf("state as published = %v, want %v", at, want)
 	}
 }

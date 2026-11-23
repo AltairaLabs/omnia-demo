@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -37,9 +38,10 @@ type Event struct {
 // conversations: one User ID per Company (§5.1), a delegated key per User
 // ID (§5.2), the conversations, their events and read cursors (§8.5).
 type Store interface {
-	// UserID returns the User ID for a Company's domain, creating a random
-	// one on first use.
-	UserID(company string) (string, error)
+	// UserID returns the User ID for a Company's identifier (§3.2, §5.1),
+	// creating a random one on first use. A Company that later names an
+	// issuer has a new identifier, and so a new User ID.
+	UserID(identifier string) (string, error)
 	// Delegation returns the delegated key for a User ID, delegating a new
 	// one when there is none or the current one expires within an hour.
 	Delegation(userID string) (*identity.Delegated, error)
@@ -49,6 +51,54 @@ type Store interface {
 	Events(convID string) ([]Event, error)
 	Cursor(convID string) (string, error)
 	SetCursor(convID, c string) error
+	// State is the conversation's last known state (§8.7): working from
+	// stream notices and reads, handoff and closed from state events and
+	// reads. A conversation with none yet is not working, handoff none,
+	// not closed. AppendEvent applies a state event's fields.
+	State(convID string) (working bool, handoff string, closed bool, err error)
+	// SetWorking records a working notice (§8.6).
+	SetWorking(convID string, working bool) error
+	// SetState records the state fields of a read once has_more is false
+	// (§8.5), or of a conversation known to be closed.
+	SetState(convID string, working bool, handoff string, closed bool) error
+}
+
+// stateUpdate is what a state event, or an event that carries working,
+// changes in a conversation's state. Nil fields are unchanged.
+type stateUpdate struct {
+	Working *bool   `json:"working"`
+	Handoff *string `json:"handoff"`
+	Closed  *bool   `json:"closed"`
+}
+
+func eventState(e Event) stateUpdate {
+	var u stateUpdate
+	if e.Type == "state" {
+		_ = json.Unmarshal(e.Raw, &u)
+	}
+	if e.Working != nil {
+		u.Working = e.Working
+	}
+	return u
+}
+
+// convState is a conversation's state as the stores keep it.
+type convState struct {
+	working bool
+	handoff string
+	closed  bool
+}
+
+func (cs *convState) apply(u stateUpdate) {
+	if u.Working != nil {
+		cs.working = *u.Working
+	}
+	if u.Handoff != nil {
+		cs.handoff = *u.Handoff
+	}
+	if u.Closed != nil {
+		cs.closed = *u.Closed
+	}
 }
 
 // renewBefore is how long before a delegation's expiry it is replaced.
@@ -108,6 +158,7 @@ type MemoryStore struct {
 	convs   map[string]Conversation
 	events  map[string][]Event
 	cursors map[string]string
+	states  map[string]convState
 }
 
 // NewMemoryStore returns an empty in-memory Store that delegates keys from
@@ -119,17 +170,18 @@ func NewMemoryStore(id *identity.Identity, now func() time.Time) *MemoryStore {
 		convs:       map[string]Conversation{},
 		events:      map[string][]Event{},
 		cursors:     map[string]string{},
+		states:      map[string]convState{},
 	}
 }
 
-func (s *MemoryStore) UserID(company string) (string, error) {
+func (s *MemoryStore) UserID(identifier string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if id, ok := s.users[company]; ok {
+	if id, ok := s.users[identifier]; ok {
 		return id, nil
 	}
 	id := newUserID()
-	s.users[company] = id
+	s.users[identifier] = id
 	return id, nil
 }
 
@@ -161,6 +213,40 @@ func (s *MemoryStore) AppendEvent(convID string, e Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.events[convID] = append(s.events[convID], e)
+	s.applyLocked(convID, eventState(e))
+	return nil
+}
+
+func (s *MemoryStore) applyLocked(convID string, u stateUpdate) {
+	cs, ok := s.states[convID]
+	if !ok {
+		cs = convState{handoff: "none"}
+	}
+	cs.apply(u)
+	s.states[convID] = cs
+}
+
+func (s *MemoryStore) State(convID string) (bool, string, bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cs, ok := s.states[convID]
+	if !ok {
+		return false, "none", false, nil
+	}
+	return cs.working, cs.handoff, cs.closed, nil
+}
+
+func (s *MemoryStore) SetWorking(convID string, working bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.applyLocked(convID, stateUpdate{Working: &working})
+	return nil
+}
+
+func (s *MemoryStore) SetState(convID string, working bool, handoff string, closed bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.applyLocked(convID, stateUpdate{Working: &working, Handoff: &handoff, Closed: &closed})
 	return nil
 }
 
@@ -185,11 +271,12 @@ func (s *MemoryStore) SetCursor(convID, c string) error {
 
 // RedisStore is a Store in Redis, with every key under "pa:":
 //
-//	pa:user:<company>     the User ID for a Company's domain
+//	pa:user:<identifier>  the User ID for a Company's identifier
 //	pa:convs              hash of conversation ID to its JSON
 //	pa:convs:order        list of conversation IDs, oldest first
 //	pa:events:<conv>      list of the conversation's events, as JSON
 //	pa:cursor:<conv>      the conversation's read cursor
+//	pa:state:<conv>       hash of working, handoff and closed (§8.7)
 //
 // Delegated keys are held in memory, not in Redis (see delegations).
 type RedisStore struct {
@@ -219,9 +306,9 @@ type storedEvent struct {
 	Raw        json.RawMessage `json:"raw"`
 }
 
-func (s *RedisStore) UserID(company string) (string, error) {
+func (s *RedisStore) UserID(identifier string) (string, error) {
 	ctx := context.Background()
-	key := "pa:user:" + company
+	key := "pa:user:" + identifier
 	// SetNX makes the first writer win when two requests race.
 	if _, err := s.rdb.SetNX(ctx, key, newUserID(), 0).Result(); err != nil {
 		return "", fmt.Errorf("conversation: %w", err)
@@ -285,10 +372,58 @@ func (s *RedisStore) AppendEvent(convID string, e Event) error {
 	if err != nil {
 		return err
 	}
-	if err := s.rdb.RPush(context.Background(), "pa:events:"+convID, b).Err(); err != nil {
+	ctx := context.Background()
+	pipe := s.rdb.TxPipeline()
+	pipe.RPush(ctx, "pa:events:"+convID, b)
+	if fields := stateFields(eventState(e)); len(fields) > 0 {
+		pipe.HSet(ctx, "pa:state:"+convID, fields)
+	}
+	if _, err := pipe.Exec(ctx); err != nil {
 		return fmt.Errorf("conversation: %w", err)
 	}
 	return nil
+}
+
+// stateFields is a stateUpdate as pa:state hash fields.
+func stateFields(u stateUpdate) map[string]any {
+	f := map[string]any{}
+	if u.Working != nil {
+		f["working"] = strconv.FormatBool(*u.Working)
+	}
+	if u.Handoff != nil {
+		f["handoff"] = *u.Handoff
+	}
+	if u.Closed != nil {
+		f["closed"] = strconv.FormatBool(*u.Closed)
+	}
+	return f
+}
+
+func (s *RedisStore) setState(convID string, u stateUpdate) error {
+	if err := s.rdb.HSet(context.Background(), "pa:state:"+convID, stateFields(u)).Err(); err != nil {
+		return fmt.Errorf("conversation: %w", err)
+	}
+	return nil
+}
+
+func (s *RedisStore) State(convID string) (bool, string, bool, error) {
+	f, err := s.rdb.HGetAll(context.Background(), "pa:state:"+convID).Result()
+	if err != nil {
+		return false, "", false, fmt.Errorf("conversation: %w", err)
+	}
+	handoff := f["handoff"]
+	if handoff == "" {
+		handoff = "none"
+	}
+	return f["working"] == "true", handoff, f["closed"] == "true", nil
+}
+
+func (s *RedisStore) SetWorking(convID string, working bool) error {
+	return s.setState(convID, stateUpdate{Working: &working})
+}
+
+func (s *RedisStore) SetState(convID string, working bool, handoff string, closed bool) error {
+	return s.setState(convID, stateUpdate{Working: &working, Handoff: &handoff, Closed: &closed})
 }
 
 func (s *RedisStore) Events(convID string) ([]Event, error) {

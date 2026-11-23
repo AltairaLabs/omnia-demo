@@ -192,13 +192,19 @@ func (c *Client) OpenDirect(ctx context.Context, parent Conversation, text strin
 	return conv, c.Store.SaveConversation(conv)
 }
 
-// Send sends another message in the Personal Agent's own words (§8.3).
+// Send sends another message (§8.3): in the Personal Agent's own words, or
+// in a Direct Conversation the User's.
 func (c *Client) Send(ctx context.Context, conv Conversation, text string) error {
 	co, err := c.company(ctx, conv.Company)
 	if err != nil {
 		return err
 	}
-	body := postBody{ID: randomID(), Message: &message{Author: author{Type: "agent"}, Text: text}}
+	// Every message in a Direct Conversation is the User's own (§8.8, §8.10).
+	who := "agent"
+	if conv.ParentID != "" {
+		who = "human"
+	}
+	body := postBody{ID: randomID(), Message: &message{Author: author{Type: who}, Text: text}}
 	_, err = c.post(ctx, co, convURL(conv, "messages"), body)
 	return err
 }
@@ -250,7 +256,22 @@ type readResponse struct {
 	Events  []json.RawMessage `json:"events"`
 	Cursor  string            `json:"cursor"`
 	HasMore bool              `json:"has_more"`
+	Working bool              `json:"working"`
+	Handoff string            `json:"handoff"`
 	Closed  bool              `json:"closed"`
+}
+
+// saveState records a read's state fields, which hold once has_more is
+// false (§8.5).
+func (c *Client) saveState(convID string, rr readResponse) error {
+	if rr.HasMore {
+		return nil
+	}
+	handoff := rr.Handoff
+	if handoff == "" {
+		handoff = "none"
+	}
+	return c.Store.SetState(convID, rr.Working, handoff, rr.Closed)
 }
 
 // ReadOnce reads the conversation's events after its stored cursor, holding
@@ -326,7 +347,7 @@ func (c *Client) read(ctx context.Context, conv Conversation, wait time.Duration
 			}
 		}
 		if !rr.HasMore {
-			return out, rr.Closed, nil
+			return out, rr.Closed, c.saveState(conv.ID, rr)
 		}
 	}
 }
@@ -353,7 +374,7 @@ func (c *Client) seen(convID string) (map[string]bool, error) {
 // returned as an *Error without a retry. On success the caller closes the
 // response body.
 func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string, body []byte, hdr http.Header) (*http.Response, error) {
-	userID, err := c.Store.UserID(co.Domain)
+	userID, err := c.Store.UserID(co.Identifier)
 	if err != nil {
 		return nil, err
 	}
