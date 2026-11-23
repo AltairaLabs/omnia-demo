@@ -15,7 +15,7 @@ foreseeable_misuse:
   - Treating an estimated restoration time as a promise
   - Relying on it in an emergency, which needs the emergency services
 
-# suggests: it reads public outage and weather data and changes nothing.
+# suggests: it reads public outage data and changes nothing.
 autonomy_level: suggests
 
 # A role, not a person.

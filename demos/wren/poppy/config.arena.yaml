@@ -25,11 +25,12 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # Two reads, both public: the outage feed by postcode and the local weather.
-  # Nothing here reads or changes a customer's account.
+  # One public read: the outage feed by postcode. Nothing here reads or
+  # changes a customer's account. Not get_weather: the stub serves it only for
+  # the signed-in customer, and with no identity it falls back to Amira's
+  # account, which would leak one customer into another's conversation.
   tools:
     - file: tools/outage-status.tool.yaml
-    - file: tools/get-weather.tool.yaml
 
   defaults:
     temperature: 0.2

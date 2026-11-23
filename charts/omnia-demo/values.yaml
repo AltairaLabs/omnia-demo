@@ -965,8 +965,8 @@ poppy:
     enabled: false
     # -- Which one: `larkmere` (larkmere-claims-desk, no tools, reads the
     # society's member guidance from institutional memory when memory.enabled)
-    # or `wrenmoor` (wrenmoor-outages, outage_status and get_weather on the
-    # wren-account stub, so it needs wren.enabled).
+    # or `wrenmoor` (wrenmoor-outages, outage_status on the wren-account
+    # stub, so it needs wren.enabled).
     company: ""
     # -- What a Personal Agent can talk to it about (PAP §3.1), 1 to 1024
     # characters. Required when enabled.

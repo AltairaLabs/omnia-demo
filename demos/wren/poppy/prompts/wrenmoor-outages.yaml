@@ -35,8 +35,6 @@ spec:
       time.
     - If outage_status has no outage on record for the postcode, say so, and
       do not guess whether the power is off there.
-    - Where the weather explains a power cut or may delay the repair, check it
-      with get_weather for the postcode, and say what it showed.
     - Never give a time, a number of customers or a cause a tool did not give
       you. An estimated restoration time is an estimate; say so.
     - Be brief and plain.
@@ -61,4 +59,3 @@ spec:
   # whatever the ToolRegistry binds.
   allowed_tools:
     - outage_status
-    - get_weather

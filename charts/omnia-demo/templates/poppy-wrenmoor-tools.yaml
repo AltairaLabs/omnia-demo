@@ -2,10 +2,13 @@
 {{- $ns := .Values.namespace }}
 {{- $acct := printf "http://wren-account.%s:8080" $ns }}
 ---
-# wrenmoor-outages' tools: two public reads on the Wrenmoor stub.
+# wrenmoor-outages' one tool, a public read on the Wrenmoor stub:
 #
 #   outage_status   the power cut at a postcode (outages.go, no customer needed)
-#   get_weather     the same endpoint Wren uses
+#
+# Not get_weather: /wren/weather serves only the signed-in customer, and with
+# no identity the stub falls back to Amira's account, which would leak one
+# customer into another's conversation.
 #
 # The descriptions and schemas here are the BINDING, not what the model reads.
 # PromptKit builds the model's tool descriptors from the pack
@@ -33,23 +36,6 @@ spec:
           required: ["postcode"]
       httpConfig:
         endpoint: {{ $acct }}/wren/outage-status
-        method: POST
-        contentType: application/json
-
-    - name: get-weather-handler
-      type: http
-      timeout: 30s
-      tool:
-        name: get_weather
-        description: "Daily weather for a postcode district in Wrenmoor Energy's area (HX7): the overnight minimum temperature in °C and the wind speed on Wrenmoor Edge in mph, for each day from `from` to `to` (at most 92 days)."
-        inputSchema:
-          type: object
-          properties:
-            postcode: { type: string, description: "A postcode or postcode district, e.g. HX7" }
-            from: { type: string, description: "First day, YYYY-MM-DD (default 2026-10-01)" }
-            to: { type: string, description: "Last day, YYYY-MM-DD (default today)" }
-      httpConfig:
-        endpoint: {{ $acct }}/wren/weather
         method: POST
         contentType: application/json
 {{- end }}
