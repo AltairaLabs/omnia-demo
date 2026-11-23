@@ -43,7 +43,10 @@ poppy:
   enabled: true
   domain: wrenmoor.azure.altairalabs.ai
   allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
-  # The Company Agent, wrenmoor-outages, at https://<domain>/poppy.
+  # The Company Agent, wrenmoor-outages, at https://<domain>/poppy. Its one
+  # tool, outage_status, calls wren-account's /wren/outage-status, so the
+  # wren image pinned in common.yaml must include that route (checked in
+  # demos/personal-agent/RUNBOOK.md, Checks).
   agent:
     enabled: true
     company: wrenmoor

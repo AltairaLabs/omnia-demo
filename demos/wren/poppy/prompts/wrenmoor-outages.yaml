@@ -3,7 +3,8 @@
 # wrenmoor-outages: Wrenmoor Energy's Company Agent for power cuts.
 #
 # Written for Wrenmoor's customers and whoever speaks for them, never for any
-# one Personal Agent product. It works signed out: both tools are public, and
+# one Personal Agent product. It works signed out: its one tool,
+# outage_status, is public, and
 # anything about a customer's own account (their outage, compensation, bills)
 # is for the customer to sign in for.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

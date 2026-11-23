@@ -18,10 +18,12 @@ set -euo pipefail
 # STAND-IN (docs/stand-ins.md, "Personal Agent"): a real Personal Agent keeps
 # its keys in an HSM or KMS. Here they are a cluster Secret.
 #
-# Idempotent: an existing Secret is left alone unless --force. Replacing it
-# changes the agent's identity: the Companies' facades refetch jwks.json when
-# they meet an unknown key id, but every conversation and User ID signed with
-# the old keys is lost to it. Restart the Deployment after --force.
+# Idempotent: an existing Secret is left alone unless --force. --force
+# replaces only the keys: the agent's client_id is unchanged, and the
+# Companies' facades refetch jwks.json when they meet an unknown key id. Its
+# conversations and User IDs are in Redis (pa:*), not here, so they stay; to
+# clear them, use the Reset in demos/personal-agent/RUNBOOK.md. Restart the
+# Deployment after --force so it signs with the new keys.
 #
 # CONTEXT is required and every kubectl names it: the current context is
 # shared by every terminal on the machine and can change under you.
@@ -37,7 +39,7 @@ force=false
 for arg in "$@"; do
   case "${arg}" in
     --force) force=true ;;
-    -h|--help) sed -n '4,30p' "$0"; exit 0 ;;
+    -h|--help) sed -n '4,32p' "$0"; exit 0 ;;
     *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
   esac
 done

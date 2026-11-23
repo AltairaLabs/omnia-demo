@@ -60,9 +60,10 @@ already has the demos you can skip what's done.
    ```bash
    CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
    ```
-   A second run leaves the Secret alone. `--force` replaces the keys, which
-   changes the assistant's identity under both companies and loses its
-   conversations and User IDs; restart `deploy/personal-agent` afterwards.
+   A second run leaves the Secret alone. `--force` replaces only the keys:
+   the `client_id` stays the same and the companies refetch `jwks.json`.
+   Its conversations and User IDs stay in Redis (`pa:*`; [Reset](#reset)
+   clears them). Restart `deploy/personal-agent` afterwards.
 5. **Images.** No published personal-agent image is pinned yet, and the
    pinned demo-sites image has no `ellens-assistant` site:
    ```bash
@@ -127,9 +128,34 @@ In `ellens-assistant` you should see `assistant`, `personal-agent` and
 
 ## Before each take
 
-Start from an empty strip. See [Reset](#reset). The Wrenmoor outage is fixed
-data (a storm outage on HX7, restoration estimated 16:00 UTC on 2026-11-23),
-so it never moves on between takes.
+Start from an empty strip. See [Reset](#reset). The Wrenmoor outage (a storm
+outage on HX7) never ends, and its times are relative to the clock:
+restoration is estimated for the top of the hour about three hours from now
+(UTC), and the cut started 18h20m before that. The estimate holds still
+within a take and moves on only once it is less than an hour away, so expect
+a different time from one session to the next, always on the day.
+
+Two checks, each a few seconds:
+
+```bash
+# Wrenmoor's outage route, from inside wrenmoor-energy. A 404 means the wren
+# image (pinned in profiles/azure/common.yaml) predates /wren/outage-status:
+# wrenmoor-outages would have no outage to report.
+kubectl --context aks-omnia-demo -n wrenmoor-energy run outage-check --rm -i --restart=Never \
+  --image=curlimages/curl:8.11.1 -- curl -sS -X POST -H 'Content-Type: application/json' \
+  -d '{"postcode":"HX7 6QA"}' -w '\n%{http_code}\n' http://wren-account.wrenmoor-energy:8080/wren/outage-status
+
+# After the Reset: the assistant's store is empty. personal-agent's
+# NetworkPolicy admits only the assistant and its page, so go through a
+# port-forward, which it does not filter.
+kubectl --context aks-omnia-demo -n ellens-assistant port-forward deploy/personal-agent 18080:8080 &
+curl -s http://localhost:18080/api/conversations   # []
+kill %1
+```
+
+The first answers `200` with `"district":"HX7","status":"off"` and today's
+`estimated_restoration`. The second answers `[]`; anything else is a
+conversation left from an earlier take, and the strip will show it.
 
 ## The line Ellen types
 
@@ -142,7 +168,8 @@ the dashboard sign-in) and type, word for word:
 
 1. **Both conversations appear in the strip**, one row each, as the
    assistant opens them: Larkmere Mutual and Wrenmoor Energy. Each row shows
-   where it stands: working, waiting for you, done or stopped.
+   where it stands: working, replied (the company spoke last), waiting for
+   you (the company asked for Ellen herself), done or stopped.
 2. **Wrenmoor reports the outage.** HX7, the storm damage to the 11kV line at
    Mytholm, and when power is due back. This needs no sign-in: outage status
    is public, as on a real outage page.
@@ -208,7 +235,11 @@ Between takes, close the conversations and clear the assistant's store.
 
 1. **Close them.** Tell the assistant: "Close both conversations." It calls
    `close_conversation` for each, and each company's agent closes its side.
-   Skip this if you are about to clear the store; the companies' sides then
+   This works only in the chat session that opened them: the assistant knows
+   a conversation's id from its own tool results, and has no tool to list
+   them, so a new chat session (as after a page reload) can't list or close
+   earlier conversations. That is why the reset relies on step 2. Skip this
+   step if you are about to clear the store; the companies' sides then
    expire with their context (24 hours).
 2. **Clear the assistant's keys in the shared Redis** (`pa:*`: its
    conversations, events and User IDs):
@@ -307,6 +338,9 @@ nothing.
 - **Larkmere answers "I don't have guidance for that"**, or has nothing about
   flood. The member guidance isn't ingested: redo Setup step 7.
 - **The assistant says it can't find a company.** `find_company` reports
-  `no Poppy agent at <domain>` when `poppy.json` isn't reachable from the
-  `personal-agent` pod, or has no `poppy` protocol. Check the `curl` in
-  *Checks* and the `PoppyDiscovery` condition.
+  `no Poppy agent at <domain>` when `poppy.json` answers 404 (or another
+  4xx), names a different domain, or has no `poppy` protocol. It reports
+  `couldn't reach <domain> right now` for a network error or a 5xx, and the
+  assistant tries once more. Check the `curl` in *Checks* and the
+  `PoppyDiscovery` condition, and `personal-agent`'s log, which has the
+  underlying error.
