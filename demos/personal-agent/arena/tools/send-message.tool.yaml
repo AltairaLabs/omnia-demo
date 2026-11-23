@@ -1,0 +1,37 @@
+# The model's descriptor for send_message. The ToolRegistry binding
+# (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
+# Served by the personal-agent service's POST /tools/send_message
+# (demos/personal-agent/server.go). A message, once sent, cannot be taken
+# back.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: send_message
+spec:
+  name: send_message
+  description: >-
+    Send another message in an open conversation with a company, for Ellen.
+    Not for a conversation Ellen has taken over herself (that one is hers),
+    nor a closed one. The company replies in its own time: read its reply with
+    read_conversation.
+  input_schema:
+    type: object
+    properties:
+      conversation_id:
+        type: string
+        description: The conversation_id start_conversation returned
+      text:
+        type: string
+        description: The message to the company
+    required: [conversation_id, text]
+  output_schema:
+    type: object
+    properties:
+      conversation_id: { type: string }
+      sent: { type: boolean }
+  action_scope: { effect: external, reversibility: irreversible, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 45000
+  mock_result:
+    conversation_id: conv-mock-1
+    sent: true

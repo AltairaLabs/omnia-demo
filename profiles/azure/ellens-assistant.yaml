@@ -1,0 +1,27 @@
+# Ellen's assistant: the PERSON's side of the Poppy demo, not a fourth
+# company. Ellen Whitcomb (a Larkmere Mutual member and a Wrenmoor Energy
+# customer) has her own assistant, which reaches those two Companies under the
+# Personal Agent Protocol.
+#
+# STAND-IN for a consumer Personal Agent (docs/stand-ins.md, "Personal
+# Agent"). The real one is another company's product, on its own
+# infrastructure; here it is a workspace on the same Omnia install as the
+# Companies, sharing nothing with them but public HTTPS.
+#
+# Before the first `make demos TENANTS=ellens-assistant`, create its identity
+# keys once: CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+workspace:
+  displayName: Ellen's assistant
+  description: Stand-in for a person's own Personal Agent (Ellen Whitcomb). Not a company; it talks to Larkmere Mutual and Wrenmoor Energy over Poppy.
+
+personalAgent:
+  enabled: true
+  host: assistant.azure.altairalabs.ai
+  # The Companies she has accounts at. Keep in step with the assistant's
+  # prompt (demos/personal-agent/arena/prompts/assistant.yaml).
+  knownCompanies:
+    - larkmere.azure.altairalabs.ai
+    - wrenmoor.azure.altairalabs.ai
+  # No pin: the sha-682590d build common.yaml pins predates the
+  # personal-agent image. Run it from `make images` (.images.env), or pin a
+  # publish of a later commit here.

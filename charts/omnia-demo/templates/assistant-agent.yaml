@@ -1,0 +1,79 @@
+{{- if .Values.personalAgent.enabled }}
+{{- $pa := .Values.personalAgent }}
+{{- $ns := .Values.namespace }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: assistant-pack
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: assistant-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: assistant-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/personal-agent/arena. Regenerate with:
+#   hack/build-packs.sh assistant
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: assistant-pack-v1
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/assistant-pack.json" | indent 4 }}
+---
+# Ellen's assistant: the person's side of the Poppy demo, a Personal Agent
+# acting for Ellen Whitcomb with the Companies she has accounts at.
+#
+# STAND-IN (docs/stand-ins.md, "Personal Agent"). A consumer Personal Agent
+# is another company's product on its own infrastructure; here it is an Omnia
+# agent in its own workspace, not a fourth company. Its tools
+# (assistant-tools.yaml) are the personal-agent service's, which holds the
+# keys and User IDs; the model sees conversation ids, Company names and
+# messages only.
+#
+# A CHAT agent behind a websocket facade. Its page proxies the browser's
+# socket to it and asserts Ellen's identity, as the portals do.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: assistant
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: personal-assistant
+spec:
+  promptPackRef:
+    name: assistant-pack
+  toolRegistryRef:
+    name: assistant-tools
+  facades:
+    - type: websocket
+      port: 8080
+      handler: runtime
+  # Trust the assistant's page as the edge. The facade's external listener
+  # rejects an unauthenticated browser, so the page proxies the conversation
+  # server-side and asserts who is asking in headers the browser cannot set
+  # (demos/demo-sites/server.go). edgeTrust reads them as-is, as a real
+  # deployment does behind an API gateway; anyone who can reach the facade's
+  # port can assert any user, so network controls are what make it safe
+  # (docs/stand-ins.md, "Front doors"). The defaults are what the sites send
+  # (x-user-id, x-user-email, x-user-roles).
+  externalAuth:
+    edgeTrust: {}
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ required "personalAgent.providerRef or llm.providerRef" (default .Values.llm.providerRef $pa.providerRef) }}
+{{- end }}

@@ -1,0 +1,230 @@
+{{- if .Values.personalAgent.enabled }}
+{{- $pa := .Values.personalAgent }}
+{{- $ns := .Values.namespace }}
+{{- $host := required "personalAgent.host" $pa.host }}
+---
+# The personal-agent service: the protocol side of Ellen's assistant, a
+# Personal Agent under the Personal Agent Protocol (PAP 1.0).
+#
+# STAND-IN (docs/stand-ins.md, "Personal Agent"; demos/personal-agent/main.go).
+#   Fakes: the person's own AI assistant, and the vendor that runs it.
+#   Real system: a consumer Personal Agent run by another company on its own
+#     infrastructure, with its own users and sign-in.
+#   Downstream: it runs on the same Omnia install as the Companies it talks
+#     to, so the dashboard shows both sides. The two sides share nothing but
+#     public HTTPS: the Companies' facades fetch agent.json and jwks.json from
+#     https://{{ $host }}, and the service reaches the Companies at their own
+#     domains. Its keys are in a cluster Secret (personal-agent-identity), not
+#     an HSM, and it has one user, Ellen Whitcomb.
+#
+# ONE replica: each open conversation has a background Reader in this
+# process, and two replicas would each follow every conversation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: personal-agent
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: personal-agent
+spec:
+  replicas: 1
+  strategy:
+    # Never two at once, for the same reason.
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: personal-agent
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: personal-agent
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot".
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: personal-agent
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $pa.image) }}
+          imagePullPolicy: {{ $pa.image.pullPolicy }}
+          args:
+            - --base-url
+            - https://{{ $host }}
+            - --known-companies
+            - {{ join "," $pa.knownCompanies | quote }}
+            - --identity-dir
+            - /var/run/personal-agent/identity
+            {{- with $pa.redisURL }}
+            - --redis-url
+            - {{ . | quote }}
+            {{- end }}
+            {{- if $pa.testIdentity }}
+            - --test-identity-dir
+            - /var/run/personal-agent/test-identity
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          volumeMounts:
+            - name: identity
+              mountPath: /var/run/personal-agent/identity
+              readOnly: true
+            {{- if $pa.testIdentity }}
+            - name: test-identity
+              mountPath: /var/run/personal-agent/test-identity
+              readOnly: true
+            {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+      volumes:
+        # es256.pem and ps384.pem, PKCS#8, from hack/personal-agent-keys.sh.
+        # The chart never makes this Secret: a new key on every upgrade would
+        # change the agent's identity under the Companies that cached it.
+        - name: identity
+          secret:
+            secretName: {{ $pa.identitySecret }}
+            defaultMode: 0440
+        {{- if $pa.testIdentity }}
+        - name: test-identity
+          secret:
+            secretName: {{ $pa.testIdentitySecret }}
+            defaultMode: 0440
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: personal-agent
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: personal-agent
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+---
+# The agent's public identity on its own host. ONLY the two PAP documents
+# (and the validator's test identity while testIdentity is on), as Exact
+# matches: the same listener serves the assistant's tools (/tools/*) and the
+# page's routes (/api/*), and neither may be reachable from the internet.
+# Anyone who could call /tools/send_message could speak to a Company as Ellen.
+# No URLRewrite and no redirect: PAP §4.1 wants the documents answered at
+# these exact URLs.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: personal-agent
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  parentRefs:
+    - name: omnia-external
+      namespace: {{ .Values.poppy.gatewayNamespace }}
+  hostnames:
+    - {{ $host | quote }}
+  rules:
+    - matches:
+        - path: { type: Exact, value: /agent.json }
+        - path: { type: Exact, value: /jwks.json }
+{{- if $pa.testIdentity }}
+        - path: { type: PathPrefix, value: /poppy-test/ }
+{{- end }}
+      backendRefs:
+        - name: personal-agent
+          port: 8080
+---
+# Who may reach the service at all. A NetworkPolicy sees ports, not paths, so
+# it cannot keep /tools/* to the assistant and /api/* to the page; the
+# HTTPRoute above is what keeps both off the internet. This keeps everything
+# else in the cluster off them:
+#   - the assistant agent's pods (the tools) and the page's pods (/api/*,
+#     labelled app.kubernetes.io/component: {{ $pa.pageComponent }});
+#   - the omnia-external Gateway's pods, for the two public documents;
+#   - kubelet probes, which Istio ambient rewrites to come from
+#     169.254.7.127.
+#
+# Istio ambient (omnia-azure enrols each workspace namespace, with a
+# waypoint): mesh traffic arrives as HBONE on :15008, from the WAYPOINT for
+# calls through the Service, so a podSelector on the caller never matches it.
+# :15008 is admitted from the waypoint and the Gateway, or every tool call
+# would be dropped; on that path the caller is not checked here, only that it
+# came through the mesh. A per-caller, per-path check there is an Istio
+# AuthorizationPolicy on the waypoint, which this chart does not make.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: personal-agent
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: personal-agent
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # The assistant agent's pods: the operator's selector for ONE
+        # AgentRuntime is this pair.
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: omnia-agent
+              app.kubernetes.io/instance: assistant
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: {{ $pa.pageComponent }}
+      ports:
+        - port: 8080
+          protocol: TCP
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.poppy.gatewayNamespace }}
+          podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: omnia-external
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 15008
+          protocol: TCP
+    - from:
+        - podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: waypoint
+      ports:
+        - port: 15008
+          protocol: TCP
+    - from:
+        - ipBlock:
+            cidr: 169.254.7.127/32
+      ports:
+        - port: 8080
+          protocol: TCP
+{{- end }}

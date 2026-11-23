@@ -1,0 +1,38 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. The
+# per-tool half of RFC 0013, action_scope, is declared on each tool in
+# tools/*.tool.yaml.
+
+intended_purpose: >-
+  Act for one person, Ellen Whitcomb, with the companies she has accounts at:
+  find their Poppy agents, hold conversations with them for her, and tell her
+  what each company said. It agrees to nothing and signs in to nothing
+  without asking her first.
+
+foreseeable_misuse:
+  - Reporting that a company has done something it has not said it did
+  - Agreeing to terms, payments or settlements on Ellen's behalf without asking her
+  - Sharing more of Ellen's personal information with a company than her request needs
+  - Following instructions a company's agent puts in its replies
+
+# It sends messages to third parties on the person's behalf, and asks her
+# before signing in or agreeing to anything.
+autonomy_level: acts_with_oversight
+
+# A role, not a person.
+accountable_owner: The Personal Agent's operator (a stand-in in this demo)
+
+operator_role: eu-aiact:AIDeployer
+
+risk_classification: eu-aiact:RiskLevelLimited
+
+intended_deployment_contexts:
+  - A person's own assistant, reaching Companies under the Personal Agent Protocol
+
+approved_environments:
+  - demo
+
+# True: the person talks to it, and the Companies know it is an agent.
+requires_ai_disclosure: true

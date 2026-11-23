@@ -24,7 +24,10 @@
 SHELL := bash
 
 PROFILE          ?= azure
-TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners halvern-research
+# ellens-assistant is not a company: it is the person's side of the Poppy demo
+# (profiles/azure/ellens-assistant.yaml). It needs hack/personal-agent-keys.sh
+# once before its first install.
+TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners halvern-research ellens-assistant
 KUBE_CONTEXT     ?= aks-omnia-demo
 OMNIA_AZURE      ?= ../omnia-azure
 CHART            ?= charts/omnia-demo

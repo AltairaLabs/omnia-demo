@@ -117,6 +117,38 @@ Add a row when you add a stand-in.
   - **referral-api stays ClusterIP.** The script needs kubectl access to the
     cluster, which a real handler would never have.
 
+### Personal Agent (`demos/personal-agent`, the `ellens-assistant` workspace)
+
+- **Fakes:** the person's own AI assistant, and the vendor that runs it.
+  Ellen Whitcomb's assistant is an Omnia agent (`assistant`) whose five tools
+  are the personal-agent service's `/tools/*` routes. It is not a fourth
+  company.
+- **Real system:** a consumer Personal Agent, run by another company on its
+  own infrastructure, with its own users, sign-in and key storage.
+- **What the stand-in does:** the service holds the agent's keys and Ellen's
+  User IDs, serves `agent.json` and `jwks.json` at
+  `https://assistant.azure.altairalabs.ai`, discovers Companies and holds
+  their conversations. The model sees conversation ids, Company names and
+  messages, never a key, a User ID or a Session JWT.
+- **Downstream:**
+  - **It runs on the same Omnia install as the Companies,** so the dashboard
+    shows both sides of a conversation. The two sides share nothing but
+    public HTTPS: the Companies fetch its documents from its public host, and
+    it reaches them at theirs.
+  - **Its keys are a cluster Secret** (`personal-agent-identity`, made once
+    by `hack/personal-agent-keys.sh`), not an HSM. Replacing them changes the
+    agent's identity under every Company.
+  - **One listener serves public and private routes.** The HTTPRoute exposes
+    only `/agent.json` and `/jwks.json` (and `/poppy-test/` while the PAP
+    validator runs). The tools and the page's `/api/*` are reached
+    in-cluster; anyone who can reach the Service's port can speak to a
+    Company as Ellen. The NetworkPolicy admits only the assistant agent, the
+    page and the Gateway on :8080, but under Istio ambient it must admit
+    :15008 from the waypoint, so there it checks that a caller came through
+    the mesh, not which caller it was.
+  - **It has one user.** The assistant's facade trusts its page as the edge
+    (`externalAuth.edgeTrust`), as the front doors do.
+
 ## Line-of-business systems
 
 ### Case, claims and account stubs (`demos/mortgage-underwriting`, one binary)

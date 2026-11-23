@@ -42,15 +42,17 @@ if [[ $# -gt 0 ]]; then
 else
   demos=(mortgage-underwriting pii-chat card-line claims-triage sharepoint-adapter
     incident-agent data-analyst field-service wren research
-    larkmere-claims-desk wrenmoor-outages)
+    larkmere-claims-desk wrenmoor-outages assistant)
 fi
 
 # A pack's Arena project is demos/<demo>/arena, except for the Poppy Company
-# Agents, which live beside the demo whose systems they front.
+# Agents, which live beside the demo whose systems they front, and Ellen's
+# assistant, which lives beside the personal-agent service its tools call.
 arena_dir() {
   case "$1" in
     larkmere-claims-desk) echo "${ROOT}/demos/claims-triage/poppy" ;;
     wrenmoor-outages) echo "${ROOT}/demos/wren/poppy" ;;
+    assistant) echo "${ROOT}/demos/personal-agent/arena" ;;
     *) echo "${ROOT}/demos/$1/arena" ;;
   esac
 }

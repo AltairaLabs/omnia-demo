@@ -1,0 +1,53 @@
+# The model's descriptor for read_conversation. The ToolRegistry binding
+# (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
+# Served by the personal-agent service's POST /tools/read_conversation
+# (demos/personal-agent/server.go): what the conversation's background Reader
+# has stored. It never calls the company itself.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: read_conversation
+spec:
+  name: read_conversation
+  description: >-
+    Read a conversation with a company so far: every message (role "user" is
+    what was sent for Ellen, role "company" is the company's reply; author
+    "agent" or "human" says whether a person at the company wrote it), whether the
+    company is still working on a reply (working), whether a person at the
+    company is taking it over (handoff "pending", else "none"), whether it is
+    closed, and, if the assistant can no longer follow it, why (stopped, for
+    example when the company asks for Ellen to sign in). Changes nothing.
+  input_schema:
+    type: object
+    properties:
+      conversation_id:
+        type: string
+        description: The conversation_id start_conversation returned
+    required: [conversation_id]
+  output_schema:
+    type: object
+    properties:
+      company: { type: string }
+      working: { type: boolean }
+      handoff: { type: string, enum: [none, pending] }
+      closed: { type: boolean }
+      stopped: { type: string }
+      messages:
+        type: array
+        items:
+          type: object
+          properties:
+            role: { type: string }
+            author: { type: string }
+            text: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 15000
+  mock_result:
+    company: Wrenmoor Energy
+    working: false
+    handoff: none
+    closed: false
+    messages:
+      - { role: user, author: agent, text: "Is the power off at HX7 8AD?" }
+      - { role: company, author: agent, text: "Yes. Supply has been off in HX7 since 21:40 last night, with restoration estimated for 16:00 today." }

@@ -978,3 +978,46 @@ poppy:
     # requires a Redis context store: PAP reads can reach any replica. The
     # demo's shared Redis in the omnia namespace.
     redisURL: redis://demo-redis.omnia.svc.cluster.local:6379
+
+# -- Ellen's assistant: the person's side of the Poppy demo, a STAND-IN for a
+# consumer Personal Agent run by another company (docs/stand-ins.md, "Personal
+# Agent"). Not a Company: it lives in its own workspace (profile
+# ellens-assistant). Two parts:
+#   - the personal-agent service (demos/personal-agent): the Personal Agent's
+#     keys, User IDs, discovery and conversations, with its public identity
+#     documents at https://<host>/agent.json and /jwks.json;
+#   - the assistant agent (AgentRuntime `assistant`, websocket facade), whose
+#     five tools are the service's /tools/* routes, reached in-cluster.
+# Before installing, create the identity Secret: hack/personal-agent-keys.sh.
+personalAgent:
+  # -- Run the service and the assistant.
+  enabled: false
+  image:
+    repository: ghcr.io/altairalabs/omnia-demo-personal-agent
+    # Empty: the chart's appVersion.
+    tag: ""
+    pullPolicy: IfNotPresent
+  # -- The agent's public host: client_id is https://<host>/agent.json. The
+  # HTTPRoute on omnia-external serves only the public documents there.
+  # Required when enabled.
+  host: ""
+  # -- The domains Ellen has accounts at (--known-companies). Keep in step
+  # with the assistant's prompt (demos/personal-agent/arena).
+  knownCompanies: []
+  # -- Redis for User IDs, conversations and events (keys prefixed pa:).
+  # Empty keeps them in memory, lost on restart. The demo's shared Redis in
+  # the omnia namespace.
+  redisURL: redis://demo-redis.omnia.svc.cluster.local:6379
+  # -- The Secret holding es256.pem and ps384.pem (PKCS#8), made by
+  # hack/personal-agent-keys.sh. Never made by the chart.
+  identitySecret: personal-agent-identity
+  # -- Serve the PAP validator's test identity at /poppy-test/ from Secret
+  # testIdentitySecret, and route it. Only while running the validator.
+  testIdentity: false
+  testIdentitySecret: personal-agent-test-identity
+  # -- The pod label the assistant's page carries; only it, the assistant
+  # agent and the Gateway may reach the service (NetworkPolicy).
+  pageComponent: assistant-page
+  # -- A Provider in the namespace for the assistant alone. Wins over
+  # llm.providerRef; one of the two is required.
+  providerRef: ""
