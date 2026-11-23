@@ -35,3 +35,8 @@ catalogue:
     # paths too.
     - path: /halvern-partners
       upstream: http://halvern-site.halvern-partners.svc.cluster.local:8080
+    # Ellen's assistant's page (the person's side of the Poppy storm demo).
+    # Relative paths; its updates stream passes through (personal-agent sets
+    # X-Accel-Buffering: no, and the proxy reads for up to an hour).
+    - path: /ellens-assistant
+      upstream: http://assistant-page.ellens-assistant.svc.cluster.local:8080

@@ -7,6 +7,7 @@ image (`ghcr.io/altairalabs/omnia-demo-sites`). `--site` picks the brand:
 |---|---|---|
 | `larkmere-mutual` | Larkmere Mutual's public site and member portal | `piiChat` (card support) |
 | `wrenmoor-energy` | Wrenmoor Energy's public site, customer portal and staff intranet ("Wrenmoor Hub") | `wren` |
+| `ellens-assistant` | Ellen's assistant: an unbranded, phone-shaped page (not a company) with a chat and a strip of the assistant's conversations with companies | `assistant` (`personalAgent`), with `--personal-agent-url` for the strip |
 
 Every site is fictional and carries synthetic content. Do not point one at a
 real customer system without adding authentication and security controls.
@@ -18,6 +19,7 @@ site/shared/            vendored React, ReactDOM, lucide; react-shim.js
 site/larkmere-mutual/   tokens, components, assets, ui_kits/{marketing,portal}
 site/wrenmoor-energy/   tokens, components, assets, ui_kits/{marketing,portal,intranet}
 site/halvern-partners/  tokens, assets, ui_kits/{marketing,practice-desk,design-system}
+site/ellens-assistant/  tokens, assets, ui_kits/phone
 ```
 
 A brand's directory is served over `shared/`, so `<site>/vendor/...` resolves
@@ -49,6 +51,7 @@ the design handoff's prototypes; they use none of the shared React scripts.
 | `/api/assistant/ws` | WebSocket proxy to `--agent-url` `/ws`, asserting the customer's identity (`x-user-id`, `x-user-email`, `x-user-roles`) for the AgentRuntime's `externalAuth.edgeTrust` |
 | `/api/assistant/consent` | POST, proxied to `--backend-url` `/wren/consent` (Wrenmoor Energy only) |
 | `/api/assistant/receipts` | GET, proxied to `--backend-url` `/wren/receipts` (Wrenmoor Energy only) |
+| `/api/conversations`, `/api/updates`, `/api/direct` | GET, GET (server-sent events, unbuffered) and POST, proxied to `--personal-agent-url` at the same paths (Ellen's assistant only). Never its `/tools/*`; nothing of the browser's identity passes |
 
 The Wrenmoor Energy pages address all of these relative to the page, so the
 site works under a path prefix with no rewrites. The Larkmere Mutual portal

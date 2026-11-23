@@ -1021,6 +1021,16 @@ personalAgent:
   # -- The pod label the assistant's page carries; only it, the assistant
   # agent and the Gateway may reach the service (NetworkPolicy).
   pageComponent: assistant-page
+  # -- Ellen's assistant's page (templates/assistant-page.yaml): the
+  # demo-sites image with --site ellens-assistant. Serve it through the
+  # catalogue's proxy (catalogue.proxies) at /ellens-assistant.
+  page:
+    enabled: true
+    image:
+      repository: ghcr.io/altairalabs/omnia-demo-sites
+      # Empty: the chart's appVersion.
+      tag: ""
+      pullPolicy: IfNotPresent
   # -- A Provider in the namespace for the assistant alone. Wins over
   # llm.providerRef; one of the two is required.
   providerRef: ""

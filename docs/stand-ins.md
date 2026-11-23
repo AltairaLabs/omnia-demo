@@ -159,6 +159,15 @@ Add a row when you add a stand-in.
     assistant agent's ServiceAccount and `/api/*` only from the page's.
   - **It has one user.** The assistant's facade trusts its page as the edge
     (`externalAuth.edgeTrust`), as the front doors do.
+  - **The page stands in for Ellen's signed-in app** (`assistant-page`,
+    `demos/demo-sites --site ellens-assistant`). It has no sign-in of its
+    own: the catalogue's dashboard sign-in is in front of it, and anyone past
+    that acts as Ellen. Like the front doors it signs a token for her
+    (`--issuer-url`), so its issuer must be in the operator's
+    `delegation.trustedIssuers` too, or the assistant's conversations have no
+    verified user. It forwards only `/api/conversations`, `/api/updates` and
+    `/api/direct` to personal-agent, never `/tools/*`, and nothing of the
+    browser's cookie, Authorization or identity headers.
 
 ## Line-of-business systems
 

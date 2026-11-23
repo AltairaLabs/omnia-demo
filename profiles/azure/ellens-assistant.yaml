@@ -30,5 +30,14 @@ personalAgent:
     - larkmere.azure.altairalabs.ai
     - wrenmoor.azure.altairalabs.ai
   # No pin: the sha-682590d build common.yaml pins predates the
-  # personal-agent image. Run it from `make images` (.images.env), or pin a
-  # publish of a later commit here.
+  # personal-agent image, and the demo-sites image it pins has no
+  # ellens-assistant site. Run both from `make images` (.images.env), or pin
+  # a publish of a later commit here.
+  #
+  # The page (templates/assistant-page.yaml) is served by the catalogue
+  # (halvern-partners.yaml, catalogue.proxies) at /ellens-assistant/. Its
+  # issuer, http://assistant-page.ellens-assistant.svc.cluster.local:8080,
+  # goes in omnia-azure's delegation.trustedIssuers beside the portals', or
+  # the assistant's conversations have no verified user.
+  page:
+    enabled: true

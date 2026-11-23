@@ -8,6 +8,9 @@
 //	halvern-partners  Halvern Partners' public site, its Practice Desk (the
 //	                  internal view of client engagements and agents) and its
 //	                  design-system reference.
+//	ellens-assistant  Not a company: Ellen Whitcomb's own assistant, an
+//	                  unbranded phone-shaped page, with the assistant's
+//	                  conversations from personal-agent (--personal-agent-url).
 //
 // Why a site at all rather than driving a demo from the dashboard Console: the
 // Console is an OPERATOR surface. Filming a customer typing into admin tooling
@@ -44,6 +47,8 @@ func main() {
 		"base URL of the voice agent's facade, served as the card line at "+phonePath+"; empty: no phone line")
 	backend := flag.String("backend-url", "",
 		"base URL of the account back end for the assistant's consent and receipt routes; empty: those routes are off")
+	personalAgent := flag.String("personal-agent-url", "",
+		"base URL of the personal-agent service, whose page routes are served at /api/conversations, /api/updates and /api/direct; empty: those routes are off")
 	var m member
 	flag.StringVar(&m.id, "member-id", "", "customer id asserted to the agent (x-user-id); empty: the site's default")
 	flag.StringVar(&m.email, "member-email", "", "customer email asserted to the agent (x-user-email); empty: the site's default")
@@ -70,7 +75,7 @@ func main() {
 			log.Fatalf("issuer: %v", err)
 		}
 	}
-	handler, err := newServer(b, *agent, *phone, *backend, iss, eu)
+	handler, err := newServer(b, *agent, *phone, *backend, iss, eu, *personalAgent)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

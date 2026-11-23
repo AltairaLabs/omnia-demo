@@ -1,12 +1,17 @@
 package main
 
 import (
+	"bufio"
 	"compress/gzip"
+	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 	"github.com/golang-jwt/jwt/v5"
@@ -18,7 +23,7 @@ func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, agentURL, "", backendURL, nil, endUserPlane{})
+	h, err := newServer(b, agentURL, "", backendURL, nil, endUserPlane{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,6 +49,7 @@ func TestEveryBrandServesItsPagesAndTheSharedScripts(t *testing.T) {
 		"larkmere-mutual":  {"/ui_kits/marketing/", "/ui_kits/portal/"},
 		"wrenmoor-energy":  {"/ui_kits/marketing/", "/ui_kits/portal/", "/ui_kits/intranet/"},
 		"halvern-partners": {"/ui_kits/marketing/", "/ui_kits/practice-desk/", "/ui_kits/design-system/", "/tokens/fonts.css", "/assets/larkmere-logo-lockup.svg"},
+		"ellens-assistant": {"/ui_kits/phone/", "/styles.css", "/tokens/colors.css", "/assets/favicon.svg"},
 	}
 	shared := []string{"/react-shim.js", "/vendor/react.production.min.js", "/vendor/react-dom.production.min.js"}
 	for name, paths := range pages {
@@ -244,7 +250,7 @@ func TestAssistantForwardsMemberToken(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, _ := lookupBrand("larkmere-mutual", member{})
-	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{})
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +289,7 @@ func myDataSite(t *testing.T) (*httptest.Server, *http.Request) {
 	}
 	b, _ := lookupBrand("larkmere-mutual", member{})
 	h, err := newServer(b, "http://127.0.0.1:1", "", "", iss,
-		endUserPlane{url: mgmt.URL, workspace: "larkmere-mutual", audience: "larkmere-members"})
+		endUserPlane{url: mgmt.URL, workspace: "larkmere-mutual", audience: "larkmere-members"}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -382,7 +388,7 @@ func TestDiscoveryServed(t *testing.T) {
 func TestMyDataNeedsIssuer(t *testing.T) {
 	b, _ := lookupBrand("larkmere-mutual", member{})
 	if _, err := newServer(b, "http://127.0.0.1:1", "", "", nil,
-		endUserPlane{url: "http://mgmt", workspace: "w", audience: "a"}); err == nil {
+		endUserPlane{url: "http://mgmt", workspace: "w", audience: "a"}, ""); err == nil {
 		t.Fatal("My data without an issuer would forward no credential")
 	}
 }
@@ -402,7 +408,7 @@ func TestAssistantRefusesWithoutAToken(t *testing.T) {
 	}
 	b := brands["larkmere-mutual"]
 	b.who.id = "" // demoidp refuses to sign a token for no one
-	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{})
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -436,7 +442,7 @@ func TestPhoneProxyAssertsIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, "http://127.0.0.1:1", phone.URL, "", nil, endUserPlane{})
+	h, err := newServer(b, "http://127.0.0.1:1", phone.URL, "", nil, endUserPlane{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -468,7 +474,7 @@ func TestPhoneStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	h, err := newServer(b, "http://127.0.0.1:1", "http://127.0.0.1:2", "", nil, endUserPlane{})
+	h, err := newServer(b, "http://127.0.0.1:1", "http://127.0.0.1:2", "", nil, endUserPlane{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -480,5 +486,131 @@ func TestPhoneStatus(t *testing.T) {
 	off := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
 	if resp, _ := get(t, off.URL+phoneStatusPath); resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("phone line off: status %d", resp.StatusCode)
+	}
+}
+
+// Ellen's assistant's page reads the personal-agent service through the site:
+// the snapshot, the updates stream (passed on as it arrives, not buffered)
+// and her own lines to a company. Nothing of the browser's identity passes,
+// and only those routes and methods do.
+func TestAssistantSiteProxiesUpdates(t *testing.T) {
+	var mu sync.Mutex
+	got := map[string]http.Header{}
+	var direct string
+	release := make(chan struct{})
+	pa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		got[r.Method+" "+r.URL.Path] = r.Header.Clone()
+		mu.Unlock()
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/updates":
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `data: {"conversation_id":"cnv_1","company":"Wrenmoor Energy","event":{"type":"working","working":true}}`+"\n\n")
+			w.(http.Flusher).Flush()
+			select { // held open, as the real stream is
+			case <-r.Context().Done():
+			case <-release:
+			}
+		case "GET /api/conversations":
+			_, _ = io.WriteString(w, `[]`)
+		case "POST /api/direct":
+			b, _ := io.ReadAll(r.Body)
+			mu.Lock()
+			direct = string(b)
+			mu.Unlock()
+			_, _ = io.WriteString(w, `{"conversation_id":"cnv_2"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer pa.Close()
+	defer close(release)
+
+	b, err := lookupBrand("ellens-assistant", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", nil, endUserPlane{}, pa.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	browser := map[string]string{
+		"Cookie": "session=operator", "Authorization": "Bearer from-the-browser",
+		"x-user-id": "someone-else", "X-Omnia-User-Id": "someone-else", "X-Omnia-User-Email": "someone@else.example",
+	}
+
+	// The first update arrives while the stream is still open.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/updates", nil)
+	for k, v := range browser {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("updates: %d %q", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	sc := bufio.NewScanner(resp.Body)
+	var line string
+	for sc.Scan() {
+		if line = sc.Text(); strings.HasPrefix(line, "data: ") {
+			break
+		}
+	}
+	_ = resp.Body.Close()
+	if !strings.Contains(line, `"conversation_id":"cnv_1"`) {
+		t.Fatalf("no update streamed through the site: %q (%v)", line, sc.Err())
+	}
+
+	if code := do(t, http.MethodGet, srv.URL+"/api/conversations", browser); code != http.StatusOK {
+		t.Fatalf("conversations: status %d", code)
+	}
+	if code := do(t, http.MethodPost, srv.URL+"/api/direct", browser); code != http.StatusOK {
+		t.Fatalf("direct: status %d", code)
+	}
+	mu.Lock()
+	if direct != `{}` {
+		t.Errorf("direct body %q", direct)
+	}
+	for _, route := range []string{"GET /api/updates", "GET /api/conversations", "POST /api/direct"} {
+		hdr, ok := got[route]
+		if !ok {
+			t.Errorf("%s never reached personal-agent", route)
+			continue
+		}
+		for k := range browser {
+			if hdr.Get(k) != "" {
+				t.Errorf("%s: the browser's %s passed through", route, k)
+			}
+		}
+	}
+	mu.Unlock()
+
+	// Only those routes and methods; no cross-origin take-over.
+	for _, c := range []struct {
+		method, path string
+		hdr          map[string]string
+		want         int
+	}{
+		{http.MethodGet, "/api/direct", nil, http.StatusMethodNotAllowed},
+		{http.MethodPost, "/api/updates", nil, http.StatusMethodNotAllowed},
+		{http.MethodPost, "/api/direct", map[string]string{"Origin": "https://elsewhere.example"}, http.StatusForbidden},
+		{http.MethodPost, "/tools/send_message", nil, http.StatusNotFound},
+	} {
+		if code := do(t, c.method, srv.URL+c.path, c.hdr); code != c.want {
+			t.Errorf("%s %s: status %d, want %d", c.method, c.path, code, c.want)
+		}
+	}
+
+	// Without a personal agent, the routes are off.
+	off := serve(t, "ellens-assistant", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, off.URL+"/api/conversations"); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("conversations with no personal agent: status %d", resp.StatusCode)
 	}
 }

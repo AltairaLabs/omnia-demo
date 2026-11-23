@@ -1,0 +1,41 @@
+/* Ellen's assistant: an UNBRANDED page. Not a company, and not any real
+   assistant's look: plain neutrals, one muted green for "this is yours",
+   the system font (the cluster has no egress, and a webfont would be a
+   brand). */
+:root {
+  --ea-page: #ecebe7;
+  --ea-phone: #fbfaf8;
+  --ea-panel: #ffffff;
+  --ea-ink: #22252a;
+  --ea-muted: #646a73;
+  --ea-line: #e3e1dc;
+  --ea-accent: #3f6b57;
+  --ea-accent-ink: #ffffff;
+  --ea-me: #e4ece7;
+  --ea-them: #f1f0ed;
+  --ea-working: #8a6d1d;
+  --ea-waiting: #3f6b57;
+  --ea-done: #646a73;
+  --ea-stopped: #a1453a;
+  --ea-radius: 14px;
+  --ea-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ea-page: #121417;
+    --ea-phone: #1a1d21;
+    --ea-panel: #22262b;
+    --ea-ink: #e8eaed;
+    --ea-muted: #9aa1ab;
+    --ea-line: #2f343a;
+    --ea-accent: #7fb59a;
+    --ea-accent-ink: #10231a;
+    --ea-me: #263a30;
+    --ea-them: #2a2e34;
+    --ea-working: #d9b85c;
+    --ea-waiting: #7fb59a;
+    --ea-done: #9aa1ab;
+    --ea-stopped: #e08a7f;
+  }
+}

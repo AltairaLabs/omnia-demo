@@ -440,6 +440,36 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
   </table>
 </section>
 
+<section class="tenant" id="ellens-assistant">
+  <div class="tenant-head">
+    <h2>Ellen's assistant</h2>
+    <span class="role">The person's side, not a company</span>
+    <a href="/agents?workspace=ellens-assistant">Open workspace &rarr;</a>
+  </div>
+  <p class="story">Ellen Whitcomb's own AI assistant, a stand-in for a consumer Personal Agent. It reaches Larkmere Mutual and Wrenmoor Energy on their own domains under the Personal Agent Protocol (Poppy), and each company's agent treats it like any other. <a href="/ellens-assistant/">Open Ellen's assistant &rarr;</a></p>
+  <table>
+    <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name"><a href="/ellens-assistant/">The storm</a></td>
+        <td>After a storm Ellen tells her assistant her kitchen has flooded and the power is off. It finds both companies from their own domains and talks to each at once: Wrenmoor confirms the outage in HX7 and when power is due back, and Larkmere explains what her cover includes and that reporting the claim needs her to sign in. The page shows each conversation's state, and Ellen can talk to a company herself.</td>
+        <td><span class="cap">Poppy facade</span><span class="cap">Personal Agent Protocol</span><span class="cap">Direct Conversations</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>The beats</h4>
+        <ol>
+          <li>Open <a href="/ellens-assistant/">Ellen's assistant</a> and say: <span class="say">"The storm's flooded the kitchen and the power's off. Sort it out."</span> A row for each company appears in the strip as the assistant opens each conversation.</li>
+          <li>The assistant reports each company's answer in a line each. The strip shows where each conversation stands: working, waiting for you, done or stopped.</li>
+          <li><b>Talk to them yourself</b> on Larkmere's row: Ellen's own message opens a Direct Conversation, and Larkmere answers her there.</li>
+          <li>Dashboard, <b>Sessions</b> in each company's workspace: the company's side of each conversation, tagged <code>poppy</code>.</li>
+        </ol>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/personal-agent/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
+    </tbody>
+  </table>
+</section>
+
 <footer>
   Larkmere Mutual, Wrenmoor Energy and Halvern Partners are fictional companies used in Altaira demos. All data in these demos is synthetic.
 </footer>

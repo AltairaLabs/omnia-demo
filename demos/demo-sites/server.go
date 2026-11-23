@@ -103,6 +103,15 @@ var brands = map[string]brand{
 		// talks to an agent yet; this is who it will be.
 		who: member{id: "hp-0042", email: "rhiannon.vale@example.com", roles: "staff"},
 	},
+	// Not a company: Ellen Whitcomb's own assistant, the person's side of the
+	// Poppy demo (docs/stand-ins.md, "Personal Agent"). Unbranded, one page.
+	// Ellen is asserted to HER assistant, whose user she is; the companies
+	// never see this identity, only the Personal Agent's (demos/personal-agent).
+	"ellens-assistant": {
+		dir:   "ellens-assistant",
+		index: "ui_kits/phone/",
+		who:   member{id: "ellen-whitcomb", email: "ellen.whitcomb@example.com", roles: "user"},
+	},
 }
 
 // brandNames lists the valid --site values, sorted, for error messages.
@@ -230,7 +239,7 @@ type endUserPlane struct {
 // end-user plane takes nothing but the member's token.
 //
 // phoneURL, when set, serves the voice agent at phonePath; empty: no phone line.
-func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane) (http.Handler, error) {
+func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane, personalAgentURL string) (http.Handler, error) {
 	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
@@ -280,6 +289,15 @@ func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issu
 		mux.HandleFunc(phoneStatusPath, func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusNoContent)
 		})
+	}
+	if personalAgentURL != "" {
+		pa, err := personalAgentProxy(personalAgentURL)
+		if err != nil {
+			return nil, err
+		}
+		for route := range personalAgentRoutes {
+			mux.Handle(route, pa)
+		}
 	}
 	if backendURL != "" {
 		account, err := accountProxy(backendURL, b.who)
@@ -507,6 +525,67 @@ func accountProxy(backendURL string, m member) (http.Handler, error) {
 		// customer's behalf.
 		if !sameOrigin(r) {
 			log.Printf("account: refused cross-origin %s from %q", r.URL.Path, r.Header.Get("Origin"))
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}), nil
+}
+
+// personalAgentRoutes are the personal-agent service's page routes, by path
+// and method, which Ellen's assistant's page reaches through this site at the
+// same paths. Never its /tools/*: those are the assistant agent's, and anyone
+// who could call them could speak to a company as Ellen.
+//
+//	GET  /api/conversations  every conversation's state and messages
+//	GET  /api/updates        server-sent events, one per new event
+//	POST /api/direct         Ellen's own line to a company (a Direct Conversation)
+var personalAgentRoutes = map[string]string{
+	"/api/conversations": http.MethodGet,
+	"/api/updates":       http.MethodGet,
+	"/api/direct":        http.MethodPost,
+}
+
+// personalAgentProxy forwards the page's routes to the personal-agent service.
+//
+// It asserts no identity: the service has one user, Ellen, and admits only
+// the page's pod (its NetworkPolicy). The page stands in for her signed-in
+// app, and the catalogue's dashboard sign-in in front of it is what vouches
+// for "Ellen" (docs/stand-ins.md, "Personal Agent"). The browser's cookie,
+// Authorization and identity headers never pass: they mean nothing to the
+// service, and the cookie is an operator's dashboard session.
+func personalAgentProxy(personalAgentURL string) (http.Handler, error) {
+	target, err := url.Parse(personalAgentURL)
+	if err != nil {
+		return nil, err
+	}
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.Out.URL.Path = pr.In.URL.Path
+			pr.Out.URL.RawPath = ""
+			pr.Out.URL.RawQuery = ""
+			for _, h := range []string{"Origin", "Cookie", "Authorization",
+				"X-User-Id", "X-User-Email", "X-User-Roles", "X-Omnia-User-Id", "X-Omnia-User-Email"} {
+				pr.Out.Header.Del(h)
+			}
+		},
+		// Pass each update on as it arrives: the stream is the point.
+		FlushInterval: -1,
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			log.Printf("personal-agent proxy failed: %v", err)
+			http.Error(w, "assistant unavailable", http.StatusBadGateway)
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if personalAgentRoutes[r.URL.Path] != r.Method {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// Taking a conversation over is a state change made from a browser:
+		// another site must not be able to speak to a company as Ellen.
+		if !sameOrigin(r) {
+			log.Printf("personal-agent: refused cross-origin %s %s from %q", r.Method, r.URL.Path, r.Header.Get("Origin"))
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
