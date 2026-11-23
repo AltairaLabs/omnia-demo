@@ -938,3 +938,21 @@ dreaming:
 images:
   registry: ""
   tag: ""
+
+# -- Publish this tenant as a Poppy Company (Personal Agent Protocol): a
+# `spec.poppy.companies[]` entry on the Workspace, and an HTTPRoute that sends
+# the Company's two well-known discovery paths on its own domain to Omnia's
+# management-api. Needs workspace.create.
+poppy:
+  # -- Publish the Company.
+  enabled: false
+  # -- The Company's own host, where PAP places `/.well-known/poppy.json`. A
+  # bare lowercase DNS name. Required when enabled.
+  domain: ""
+  # -- The `client_id` URLs of the Personal Agent products the Company admits.
+  # Never `any: true`: the allowlist is the consent gate.
+  allow: []
+  # -- The namespace of Omnia's management-api, and so of the discovery route.
+  omniaNamespace: omnia
+  # -- The namespace of the `omnia-external` Gateway the route attaches to.
+  gatewayNamespace: omnia

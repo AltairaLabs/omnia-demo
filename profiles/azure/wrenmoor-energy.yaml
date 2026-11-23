@@ -36,3 +36,10 @@ fieldService: { enabled: true }
 memory:
   enabled: true
   fixtures: wrenmoor-field-procedures
+
+# A Poppy Company: Personal Agents find it at its own domain. Only the demo's
+# Poppy assistant is admitted.
+poppy:
+  enabled: true
+  domain: wrenmoor-energy.azure.altairalabs.ai
+  allow: ["https://assistant.azure.altairalabs.ai/agent.json"]

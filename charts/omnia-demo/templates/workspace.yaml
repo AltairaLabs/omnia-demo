@@ -100,6 +100,19 @@ spec:
       issuer: {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" .) | quote }}
       audience: {{ required "piiChat.portal.myData.audience" $md.audience | quote }}
   {{- end }}
+  {{- if .Values.poppy.enabled }}
+  # A Poppy Company (Personal Agent Protocol). Omnia builds the Company's
+  # poppy.json from it and the agents that join it; poppy-routes.yaml serves it.
+  poppy:
+    companies:
+      - name: default
+        organization:
+          name: {{ default $name .Values.workspace.displayName | quote }}
+          domain: {{ required "poppy.domain" .Values.poppy.domain | quote }}
+        personalAgents:
+          allow:
+            {{- toYaml (required "poppy.allow" .Values.poppy.allow) | nindent 12 }}
+  {{- end }}
   {{- with .Values.workspace.costControls }}
   costControls:
     {{- toYaml . | nindent 4 }}
