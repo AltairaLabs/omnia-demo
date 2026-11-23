@@ -198,9 +198,9 @@ To turn it on: set `guardrail.enabled: true` in
 TENANTS=larkmere-mutual`. The gateway key comes from the persistent Key Vault
 (`vercel-ai-gateway-api-key`) through an ExternalSecret.
 
-- **On the readout:** `direction: input` and `fail_on_violation: true` are
-  set only so the pack readout labels the guardrail correctly (Omnia #4142).
-  The runtime gates the request either way.
+- **On the readout:** the guardrail is listed as Blocking, on the request.
+  Since Omnia #4147 (#4142) the readout takes both from the runtime's rules,
+  so the pack no longer sets `fail_on_violation` for it.
 - **The canary's candidate packs** (2.0, 2.1) carry the guardrail too, since
   they were rebuilt from the current 1.0.0, so promoting one keeps it. With
   the guardrail off the chart strips it from all three.
