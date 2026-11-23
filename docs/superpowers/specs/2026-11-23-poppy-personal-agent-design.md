@@ -326,6 +326,10 @@ it works.
   egress policy blocks it, neither side can verify the other. The fixes for
   that are in omnia-azure (allowing egress to the gateway IP), never
   Omnia's test-only switch. Milestone 0 exists to find out first.
+  **Checked 2026-11-23:** `curl https://omnia-demo.azure.altairalabs.ai/`
+  from pods in `larkmere-mutual`, `wrenmoor-energy` and `omnia` answered
+  `200` from `20.237.155.43`. Hairpin works and nothing blocks egress to the
+  gateway IP.
 - **Sign-in is the biggest piece** (milestone 2): a correct OAuth server, a
   consent page, token exchange, and stubs that take bearer tokens. It is a
   separate design once milestone 1 works.
