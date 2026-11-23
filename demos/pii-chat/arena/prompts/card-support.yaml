@@ -82,11 +82,10 @@ spec:
   # persuasion in the message can talk the agent round. The system prompt above
   # says nothing about scope on purpose. Prompt is guidance; this is control.
   #
-  # direction is written out although input is topic_policy's default: the pack
-  # readout shows "On the reply" for a guardrail with no direction (Omnia
-  # #4142). fail_on_violation is ignored by the runtime (validators always
-  # enforce) but the readout still sorts on it, so without it this guardrail is
-  # listed as audit-only.
+  # direction is input, topic_policy's default, written out so the pack says
+  # where the guardrail sits. Every enabled validator enforces, so it carries no
+  # fail_on_violation (deprecated and ignored); the pack readout shows it as
+  # Blocking, on the request, since Omnia #4147 (#4142).
   #
   # on_error and on_unknown are deny (their defaults, written out): if the
   # classifier is unreachable the assistant refuses rather than runs unguarded.
@@ -125,7 +124,6 @@ spec:
         small_talk: allow
         on_unknown: deny
         on_error: deny
-      fail_on_violation: true
 
   # The prompt's allow-list. memory__remember and memory__recall are listed for
   # documentation: PromptKit offers its implicit capabilities (memory__,

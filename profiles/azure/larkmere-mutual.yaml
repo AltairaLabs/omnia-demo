@@ -37,8 +37,7 @@ piiChat:
     # every workspace), off the agent's gpt-4o quota.
     judgeProviderRef: azure-foundry-gpt-5-4-mini
   # The scope guardrail on Jev. The gateway key is in the persistent Key Vault
-  # (vercel-ai-gateway-api-key). Needs Omnia #4144 (systemone admitted for
-  # role inference).
+  # (vercel-ai-gateway-api-key).
   guardrail:
     enabled: true
     clusterSecretStore: azure-kv

@@ -367,9 +367,8 @@ piiChat:
   # an unbound topic_policy fails closed and would refuse every turn.
   #
   # On: renders the gateway key's ExternalSecret, the `jev` Provider (role
-  # inference), and binds it to the pack's `guard` slot. Needs Omnia #4140:
-  # until it ships, the Provider CRD admits role inference only for
-  # huggingface, and the install fails on the Provider.
+  # inference), and binds it to the pack's `guard` slot. The Provider CRD
+  # admits `systemone` for role inference from Omnia #4144 (#4140).
   guardrail:
     enabled: false
     baseURL: https://ai-gateway.vercel.sh/typesafe/v1
