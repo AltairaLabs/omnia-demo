@@ -53,6 +53,23 @@ func seedWrenCustomer() wrenCustomer {
 	}
 }
 
+// wrenEllen is Ellen Whitcomb, whose Larkmere card is in identitydata.go, as a
+// Wrenmoor customer in the storm's district (HX7).
+//
+// STAND-IN: the stub holds her as data only. Bill, usage and tariff tools still
+// serve Amira alone, and userOf gives Ellen's email no account, so those tools
+// answer her "no account for this customer". A real account system would
+// serve both. Only the public outage lookup (outages.go) concerns her.
+var wrenEllen = wrenCustomer{
+	AccountID: "40021302",
+	Name:      "Ellen Whitcomb",
+	Address:   "4 Mytholm Steeps, Hebden Bridge",
+	Postcode:  "HX7 6QA",
+	Tariff:    "moor-steady",
+	MeterType: "Smart, half-hourly",
+	Heating:   "Gas central heating",
+}
+
 type billLine struct {
 	Label  string  `json:"label"`
 	Detail string  `json:"detail"`

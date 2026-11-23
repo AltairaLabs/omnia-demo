@@ -144,6 +144,7 @@ func (w *wren) register(mux *http.ServeMux) {
 	mux.HandleFunc("/wren/weather", w.tool("get_weather", "read", w.getWeather))
 	mux.HandleFunc("/wren/quote", w.tool("quote_tariff", "read", w.quoteTariff))
 	mux.HandleFunc("/wren/switch", w.tool("switch_tariff", "write", w.switchTariff))
+	mux.HandleFunc("/wren/outage-status", w.outageStatus) // public: no member needed
 	mux.HandleFunc("/wren/consent", w.giveConsent)
 	mux.HandleFunc("/wren/receipts", w.listReceipts)
 }
