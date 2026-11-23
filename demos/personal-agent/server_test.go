@@ -540,6 +540,73 @@ func TestResumeRestartsOpenReaders(t *testing.T) {
 	}
 }
 
+// The page loads the conversations it missed before it follows updates: each
+// conversation's state and messages, from the Store alone.
+func TestConversationsSnapshot(t *testing.T) {
+	h := newHarness(t, nil)
+	for _, c := range []conversation.Conversation{
+		{ID: "cnv_1", Company: "wrenmoor.example"},
+		{ID: "cnv_2", Company: "wrenmoor.example", ParentID: "cnv_1"},
+		{ID: "cnv_3", Company: "larkmere.example", Closed: true},
+	} {
+		if err := h.store.SaveConversation(c); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := h.store.AppendEvent("cnv_1", conversation.Event{ID: "e1", Type: "message", Role: "user", AuthorType: "agent", Text: "Is there a power cut at HX7?"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.AppendEvent("cnv_1", conversation.Event{ID: "e2", Type: "state", Raw: json.RawMessage(`{"type":"state","handoff":"pending"}`)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetWorking("cnv_1", true); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.store.SetStopped("cnv_2", "unauthorized (HTTP 401)"); err != nil {
+		t.Fatal(err)
+	}
+
+	resp, err := http.Get(h.http.URL + "/api/conversations")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "application/json") {
+		t.Fatalf("conversations = %d %q %s", resp.StatusCode, resp.Header.Get("Content-Type"), raw)
+	}
+	var got []struct {
+		ConversationID       string       `json:"conversation_id"`
+		Company              string       `json:"company"`
+		ParentConversationID string       `json:"parent_conversation_id"`
+		Working              bool         `json:"working"`
+		Handoff              string       `json:"handoff"`
+		Closed               bool         `json:"closed"`
+		Stopped              string       `json:"stopped"`
+		Messages             []messageOut `json:"messages"`
+	}
+	if err := json.Unmarshal(raw, &got); err != nil {
+		t.Fatalf("conversations is not a JSON list: %s", raw)
+	}
+	if len(got) != 3 || got[0].ConversationID != "cnv_1" || got[1].ConversationID != "cnv_2" || got[2].ConversationID != "cnv_3" {
+		t.Fatalf("conversations = %s", raw)
+	}
+	c1, c2, c3 := got[0], got[1], got[2]
+	if c1.Company != "wrenmoor.example" || !c1.Working || c1.Handoff != "pending" || c1.Closed || c1.Stopped != "" ||
+		len(c1.Messages) != 1 || c1.Messages[0] != (messageOut{Role: "user", Author: "agent", Text: "Is there a power cut at HX7?"}) {
+		t.Errorf("cnv_1 = %+v", c1)
+	}
+	if c2.ParentConversationID != "cnv_1" || c2.Stopped == "" || c2.Messages == nil {
+		t.Errorf("cnv_2 = %+v (messages must be a list, never null)", c2)
+	}
+	if !c3.Closed || c3.Working {
+		t.Errorf("cnv_3 = %+v", c3)
+	}
+	if strings.Contains(string(raw), "eyJ") {
+		t.Errorf("the snapshot holds what looks like a JWT: %s", raw)
+	}
+}
+
 func TestSlowSubscriberDoesNotBlockPublish(t *testing.T) {
 	var hb hub
 	_, stop := hb.subscribe() // never read

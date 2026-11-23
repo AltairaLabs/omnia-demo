@@ -117,6 +117,7 @@ func (s *server) handler() http.Handler {
 	// The page. Not tools: only Ellen takes a conversation over.
 	mux.HandleFunc("POST /api/direct", s.tool("direct", s.direct))
 	mux.HandleFunc("GET /api/updates", s.updates)
+	mux.HandleFunc("GET /api/conversations", s.conversations)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
 }
@@ -493,17 +494,22 @@ func (s *server) readConversation(_ context.Context, req toolRequest) (any, *too
 	if terr != nil {
 		return nil, terr
 	}
+	return s.read(c)
+}
+
+// read is a conversation as the Store holds it: its state and its messages.
+func (s *server) read(c conversation.Conversation) (readOut, *toolError) {
 	working, handoff, closed, err := s.store.State(c.ID)
 	if err != nil {
-		return nil, fail(http.StatusInternalServerError, "reading state: %v", err)
+		return readOut{}, fail(http.StatusInternalServerError, "reading state: %v", err)
 	}
 	stopped, err := s.store.Stopped(c.ID)
 	if err != nil {
-		return nil, fail(http.StatusInternalServerError, "reading state: %v", err)
+		return readOut{}, fail(http.StatusInternalServerError, "reading state: %v", err)
 	}
 	events, err := s.store.Events(c.ID)
 	if err != nil {
-		return nil, fail(http.StatusInternalServerError, "reading events: %v", err)
+		return readOut{}, fail(http.StatusInternalServerError, "reading events: %v", err)
 	}
 	out := readOut{
 		Company: s.name(c.Company), Working: working, Handoff: handoffOf(handoff),
@@ -518,6 +524,35 @@ func (s *server) readConversation(_ context.Context, req toolRequest) (any, *too
 		}
 	}
 	return out, nil
+}
+
+// snapshotOut is one conversation in /api/conversations.
+type snapshotOut struct {
+	ConversationID       string `json:"conversation_id"`
+	ParentConversationID string `json:"parent_conversation_id,omitempty"`
+	readOut
+}
+
+// conversations is every stored conversation, oldest first, with its state
+// and messages: what a page that has just loaded missed before it follows
+// /api/updates. Like read_conversation it answers from the Store alone.
+func (s *server) conversations(w http.ResponseWriter, _ *http.Request) {
+	convs, err := s.store.Conversations()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "reading conversations"})
+		log.Printf("conversations: %v", err)
+		return
+	}
+	out := make([]snapshotOut, 0, len(convs))
+	for _, c := range convs {
+		r, terr := s.read(c)
+		if terr != nil {
+			writeJSON(w, terr.status, map[string]string{"error": terr.msg})
+			return
+		}
+		out = append(out, snapshotOut{ConversationID: c.ID, ParentConversationID: c.ParentID, readOut: r})
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 // handoffOf is a stored handoff as the model sees it. §8.7 defines none and

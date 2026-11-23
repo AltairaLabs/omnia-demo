@@ -30,6 +30,7 @@ fakes and what that changes.
 | `POST /tools/read_conversation` | The assistant | `{"conversation_id"}` → `{"company","working","handoff","messages":[{"role","author","text"}],"closed"}`, plus `"stopped"` when the Reader gave up (e.g. a Company asking for sign-in). Read from the Store only. |
 | `POST /tools/close_conversation` | The assistant | `{"conversation_id"}`. |
 | `POST /api/direct` | The page | `{"conversation_id","text"}`: Ellen takes a conversation over. Her first line opens a Direct Conversation (§8.10); later lines go to the same one. |
+| `GET /api/conversations` | The page | Every stored conversation, oldest first: `[{"conversation_id","company","parent_conversation_id","working","handoff","closed","stopped","messages":[{"role","author","text"}]}]`, from the Store alone. A page loads it first, then follows `/api/updates`. |
 | `GET /api/updates` | The page | Server-sent events, one `{"conversation_id","company","event"}` line per new event (`parent_conversation_id` too on a Direct Conversation's). |
 | `GET /healthz` | Kubernetes | 200. |
 
