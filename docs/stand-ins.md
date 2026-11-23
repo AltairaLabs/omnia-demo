@@ -132,9 +132,17 @@ Add a row when you add a stand-in.
   messages, never a key, a User ID or a Session JWT.
 - **Downstream:**
   - **It runs on the same Omnia install as the Companies,** so the dashboard
-    shows both sides of a conversation. The two sides share nothing but
-    public HTTPS: the Companies fetch its documents from its public host, and
-    it reaches them at theirs.
+    shows both sides of a conversation. The protocol itself runs over public
+    HTTPS: the Companies fetch its documents from its public host, and it
+    reaches them at theirs.
+  - **Its store is the demo's shared Redis.** Ellen's User IDs and
+    conversation records (keys `pa:*`) live in `demo-redis.omnia`, which has
+    no authentication and which the Companies' agents also use for their
+    conversation context. Any pod that can reach that Redis can read or alter
+    them: learn Ellen's pairwise User IDs at each Company, or rewrite what the
+    assistant reads back as a Company's reply. A real Personal Agent's store
+    is its own, inside its vendor. Don't put anything there that the demo
+    would be harmed by another tenant reading.
   - **Its keys are a cluster Secret** (`personal-agent-identity`, made once
     by `hack/personal-agent-keys.sh`), not an HSM. Replacing them changes the
     agent's identity under every Company.
@@ -143,9 +151,12 @@ Add a row when you add a stand-in.
     validator runs). The tools and the page's `/api/*` are reached
     in-cluster; anyone who can reach the Service's port can speak to a
     Company as Ellen. The NetworkPolicy admits only the assistant agent, the
-    page and the Gateway on :8080, but under Istio ambient it must admit
-    :15008 from the waypoint, so there it checks that a caller came through
-    the mesh, not which caller it was.
+    page and the Gateway on :8080, but under Istio ambient (omnia-azure
+    enrols every workspace, with a waypoint) it must admit :15008 from the
+    waypoint, so there it checks that a caller came through the mesh, not
+    which caller it was. Accepted for the demo; the follow-up is an Istio
+    AuthorizationPolicy on the waypoint that allows `/tools/*` only from the
+    assistant agent's ServiceAccount and `/api/*` only from the page's.
   - **It has one user.** The assistant's facade trusts its page as the edge
     (`externalAuth.edgeTrust`), as the front doors do.
 

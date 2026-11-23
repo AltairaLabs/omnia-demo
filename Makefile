@@ -25,8 +25,11 @@ SHELL := bash
 
 PROFILE          ?= azure
 # ellens-assistant is not a company: it is the person's side of the Poppy demo
-# (profiles/azure/ellens-assistant.yaml). It needs hack/personal-agent-keys.sh
-# once before its first install.
+# (profiles/azure/ellens-assistant.yaml). Its first install needs, in order:
+# `make -C $(OMNIA_AZURE) workspace WS=ellens-assistant` (the namespace),
+# `CONTEXT=$(KUBE_CONTEXT) hack/personal-agent-keys.sh` (its keys) and
+# `make images` (no personal-agent image is pinned yet); without the keys or
+# the image, `make demos` waits out its 10m timeout.
 TENANTS          ?= larkmere-mutual wrenmoor-energy halvern-partners halvern-research ellens-assistant
 KUBE_CONTEXT     ?= aks-omnia-demo
 OMNIA_AZURE      ?= ../omnia-azure

@@ -6,10 +6,17 @@
 # STAND-IN for a consumer Personal Agent (docs/stand-ins.md, "Personal
 # Agent"). The real one is another company's product, on its own
 # infrastructure; here it is a workspace on the same Omnia install as the
-# Companies, sharing nothing with them but public HTTPS.
+# Companies, reaching them over public HTTPS, with its conversation store in
+# the demo's shared Redis (see docs/stand-ins.md for what that exposes).
 #
-# Before the first `make demos TENANTS=ellens-assistant`, create its identity
-# keys once: CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+# First install, in this order (the keys need the namespace, and the
+# Deployment cannot start without the keys, so helm --wait would hang):
+#   make -C ../omnia-azure workspace WS=ellens-assistant
+#   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+#   make images        # no published personal-agent image is pinned yet
+#   make demos TENANTS=ellens-assistant
+# Without `make images` (.images.env) the personal-agent pod sits in
+# ImagePullBackOff and make demos times out.
 workspace:
   displayName: Ellen's assistant
   description: Stand-in for a person's own Personal Agent (Ellen Whitcomb). Not a company; it talks to Larkmere Mutual and Wrenmoor Energy over Poppy.

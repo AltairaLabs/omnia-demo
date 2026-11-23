@@ -1012,7 +1012,10 @@ personalAgent:
   # hack/personal-agent-keys.sh. Never made by the chart.
   identitySecret: personal-agent-identity
   # -- Serve the PAP validator's test identity at /poppy-test/ from Secret
-  # testIdentitySecret, and route it. Only while running the validator.
+  # testIdentitySecret, and route it. Only while running the validator. That
+  # Secret must hold ONLY the public test documents (agent.json, jwks.json):
+  # every file in it is served on the internet, so never the validator's
+  # private key.
   testIdentity: false
   testIdentitySecret: personal-agent-test-identity
   # -- The pod label the assistant's page carries; only it, the assistant

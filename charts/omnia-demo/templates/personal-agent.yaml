@@ -11,11 +11,14 @@
 #   Real system: a consumer Personal Agent run by another company on its own
 #     infrastructure, with its own users and sign-in.
 #   Downstream: it runs on the same Omnia install as the Companies it talks
-#     to, so the dashboard shows both sides. The two sides share nothing but
-#     public HTTPS: the Companies' facades fetch agent.json and jwks.json from
+#     to, so the dashboard shows both sides. The protocol runs over public
+#     HTTPS: the Companies' facades fetch agent.json and jwks.json from
 #     https://{{ $host }}, and the service reaches the Companies at their own
-#     domains. Its keys are in a cluster Secret (personal-agent-identity), not
-#     an HSM, and it has one user, Ellen Whitcomb.
+#     domains. But its store (Ellen's User IDs and conversations, keys pa:*)
+#     is redisURL, by default the demo's shared, unauthenticated Redis that
+#     the Companies' agents also use: any pod that reaches it can read or
+#     alter them. Its keys are in a cluster Secret (personal-agent-identity),
+#     not an HSM, and it has one user, Ellen Whitcomb.
 #
 # ONE replica: each open conversation has a background Reader in this
 # process, and two replicas would each follow every conversation.

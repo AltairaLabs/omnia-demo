@@ -8,6 +8,9 @@ set -euo pipefail
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh           once
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh --force   new keys
 #
+# Order on a new install: make -C ../omnia-azure workspace WS=ellens-assistant
+# (makes the namespace), then this script, then make demos.
+#
 # Two keys, PKCS#8 PEM, as demos/personal-agent/identity.Load reads them:
 #   es256.pem   ECDSA P-256 (ES256)
 #   ps384.pem   RSA 3072 (PS384)
@@ -34,7 +37,7 @@ force=false
 for arg in "$@"; do
   case "${arg}" in
     --force) force=true ;;
-    -h|--help) sed -n '4,27p' "$0"; exit 0 ;;
+    -h|--help) sed -n '4,30p' "$0"; exit 0 ;;
     *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
   esac
 done
@@ -47,12 +50,22 @@ command -v openssl >/dev/null || { echo "openssl is required" >&2; exit 1; }
 
 kc() { kubectl --context "${CONTEXT}" "$@"; }
 
-if kc -n "${NAMESPACE}" get secret "${SECRET}" >/dev/null 2>&1; then
-  if [[ "${force}" != true ]]; then
-    echo "secret ${NAMESPACE}/${SECRET} already exists on ${CONTEXT}; leaving it (--force replaces the keys)"
-    exit 0
-  fi
-  echo "==> replacing ${NAMESPACE}/${SECRET} on ${CONTEXT} (--force)"
+# The namespace is made by omnia-azure's `make workspace WS=ellens-assistant`,
+# before this script and before `make demos` (profiles/azure/ellens-assistant.yaml).
+# Assigned, not tested inline: set -e stops on a failed assignment, but not on
+# a failed substitution inside [[ ]].
+ns="$(kc get namespace "${NAMESPACE}" --ignore-not-found -o name)"
+if [[ -z "${ns}" ]]; then
+  echo "namespace ${NAMESPACE} does not exist on ${CONTEXT}: run make -C ../omnia-azure workspace WS=${NAMESPACE} first" >&2
+  exit 1
+fi
+
+# --ignore-not-found: NotFound is an empty answer, and any other error (RBAC,
+# a timeout) fails the script under set -e instead of reading as "absent".
+existing="$(kc -n "${NAMESPACE}" get secret "${SECRET}" --ignore-not-found -o name)"
+if [[ -n "${existing}" && "${force}" != true ]]; then
+  echo "secret ${NAMESPACE}/${SECRET} already exists on ${CONTEXT}; leaving it (--force replaces the keys)"
+  exit 0
 fi
 
 TMP="$(mktemp -d)"
@@ -63,16 +76,27 @@ chmod 700 "${TMP}"
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "${TMP}/es256.pem" 2>/dev/null
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${TMP}/ps384.pem" 2>/dev/null
 
-# Rendered client-side and applied, so a --force replaces the Secret in place
-# and a first run creates it.
-kc -n "${NAMESPACE}" create secret generic "${SECRET}" \
-  --from-file=es256.pem="${TMP}/es256.pem" \
-  --from-file=ps384.pem="${TMP}/ps384.pem" \
-  --dry-run=client -o yaml \
-  | kc -n "${NAMESPACE}" label --local -f - app.kubernetes.io/part-of=omnia-demo -o yaml \
-  | kc apply -f - >/dev/null
+# Rendered client-side, then created or replaced. Never `kubectl apply`:
+# client-side apply copies the whole object, private keys included, into the
+# kubectl.kubernetes.io/last-applied-configuration annotation. `create` also
+# fails if the Secret appeared since the check, so existing keys are never
+# replaced without --force.
+render() {
+  kc -n "${NAMESPACE}" create secret generic "${SECRET}" \
+    --from-file=es256.pem="${TMP}/es256.pem" \
+    --from-file=ps384.pem="${TMP}/ps384.pem" \
+    --dry-run=client -o yaml \
+    | kc -n "${NAMESPACE}" label --local -f - app.kubernetes.io/part-of=omnia-demo -o yaml
+}
+
+if [[ -n "${existing}" ]]; then
+  echo "==> replacing ${NAMESPACE}/${SECRET} on ${CONTEXT} (--force)"
+  render | kc -n "${NAMESPACE}" replace -f - >/dev/null
+else
+  render | kc -n "${NAMESPACE}" create -f - >/dev/null
+fi
 
 echo "==> ${NAMESPACE}/${SECRET} on ${CONTEXT}: es256.pem, ps384.pem"
-if [[ "${force}" == true ]]; then
+if [[ -n "${existing}" ]]; then
   echo "    restart it: kubectl --context ${CONTEXT} -n ${NAMESPACE} rollout restart deploy/personal-agent"
 fi
