@@ -49,6 +49,7 @@ button, input, textarea { font: inherit; color: inherit; }
 .ea-state { font-size: 12px; font-weight: 600; margin-left: 6px; white-space: nowrap; }
 .ea-state.working { color: var(--ea-working); }
 .ea-state.waiting { color: var(--ea-waiting); }
+.ea-state.replied { color: var(--ea-muted); }
 .ea-state.done { color: var(--ea-done); }
 .ea-state.stopped { color: var(--ea-stopped); }
 

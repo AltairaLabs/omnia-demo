@@ -104,15 +104,17 @@ function apply(convs, u, replay) {
   return { ...convs, [id]: c };
 }
 
-// state is a conversation's row label: working, waiting for you, done or
-// stopped.
+// state is a conversation's row label: working, replied, waiting for you,
+// done or stopped. "Waiting for you" is only for what really needs Ellen (the
+// company asked for her, or for her sign-in); a company having spoken last is
+// just "Replied", since the assistant may well answer it.
 function state(c) {
   if (c.stopped) return { key: "stopped", label: "Stopped" };
   if (c.closed) return { key: "done", label: "Done" };
   if (c.needsYou) return { key: "waiting", label: "Waiting for you" };
   if (c.working) return { key: "working", label: c.handoff === "pending" ? "Passing you to a person" : "Working" };
   const last = c.messages[c.messages.length - 1];
-  if (last && last.role === "company") return { key: "waiting", label: "Waiting for you" };
+  if (last && last.role === "company") return { key: "replied", label: "Replied" };
   return { key: "working", label: "Working" };
 }
 
