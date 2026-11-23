@@ -64,4 +64,4 @@ spec:
     closed: false
     messages:
       - { role: user, author: agent, text: "Is the power off at HX7 6QA?" }
-      - { role: company, author: agent, text: "Yes. Supply has been off in HX7 since 21:40 last night, with restoration estimated for 16:00 today." }
+      - { role: company, author: agent, text: "Yes. Supply is off in HX7 after storm damage to the 11kV line at Mytholm. Restoration is estimated for later today." }

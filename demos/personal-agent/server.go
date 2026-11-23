@@ -535,7 +535,8 @@ type readOut struct {
 // the conversation closing or its Reader stopping. It wakes on the Readers'
 // updates (the hub), never by polling, and answers as soon as one of them
 // changes the conversation, or at the timeout, with the same shape either
-// way.
+// way. A conversation already closed, stopped or replied to (the company's
+// message last, not working) is answered at once.
 func (s *server) readConversation(ctx context.Context, req toolRequest) (any, *toolError) {
 	c, terr := s.lookup(req.ConversationID)
 	if terr != nil {
@@ -549,7 +550,7 @@ func (s *server) readConversation(ctx context.Context, req toolRequest) (any, *t
 	ch, stop := s.hub.subscribe()
 	defer stop()
 	before, terr := s.read(c)
-	if terr != nil || before.Closed || before.Stopped != "" {
+	if terr != nil || before.Closed || before.Stopped != "" || replied(before) {
 		return before, terr
 	}
 	timer := time.NewTimer(wait)
@@ -585,6 +586,14 @@ func changed(before, now readOut) bool {
 		(before.Working && !now.Working) ||
 		now.Handoff != before.Handoff ||
 		now.Closed || now.Stopped != ""
+}
+
+// replied reports whether the company has already answered: its message is
+// the last one and it is not working on more. A wait then has nothing to
+// wait for, so the reply is answered at once.
+func replied(r readOut) bool {
+	n := len(r.Messages)
+	return n > 0 && r.Messages[n-1].Role == "company" && !r.Working
 }
 
 func companyMessages(r readOut) int {

@@ -901,3 +901,24 @@ func TestCloseConversationAlreadyClosedIsRecorded(t *testing.T) {
 		t.Errorf("send_message after close = %d %s, want 409", status, raw)
 	}
 }
+
+// A reply already there when the wait starts is the answer: waiting for a
+// further change would hold the stage for up to 20s.
+func TestReadConversationWaitAnswersAtOnceWhenAlreadyReplied(t *testing.T) {
+	h := newHarness(t, nil)
+	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
+	if err := h.store.SaveConversation(conv); err != nil {
+		t.Fatal(err)
+	}
+	h.arrive(t, conv, msgEvent("w1", "Yes, the power is off in HX7."))
+	r := <-h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 20})
+	if r.err != nil || r.status != 200 {
+		t.Fatalf("read_conversation = %d %s (%v)", r.status, r.raw, r.err)
+	}
+	if r.elapsed > time.Second {
+		t.Errorf("returned after %v, want at once: the company has already replied", r.elapsed)
+	}
+	if msgs, _ := r.body["messages"].([]any); len(msgs) != 1 {
+		t.Errorf("read_conversation = %s, want the reply", r.raw)
+	}
+}
