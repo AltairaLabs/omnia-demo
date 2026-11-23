@@ -89,6 +89,7 @@ type wren struct {
 	consents map[string]*wrenConsent
 	receipts []wrenReceipt
 	newID    func() string
+	eta      time.Time // the HX7 outage's estimated restoration (outageETA)
 }
 
 // wrenSwitch is a scheduled tariff change.

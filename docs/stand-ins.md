@@ -179,8 +179,11 @@ Add a row when you add a stand-in.
   - the member's card (`get_card_status`, `freeze_card`, `unfreeze_card`);
   - claims (`claim_*`);
   - Wrenmoor's billing and tariff system.
-  - Wrenmoor's network outage feed (`outages.go`): one fixed storm outage
-    for HX7 that never moves on. Ellen Whitcomb is held as a Wrenmoor
+  - Wrenmoor's network outage feed (`outages.go`): one storm outage for HX7
+    that never ends. Its times are relative to the clock (restoration
+    estimated at the top of the hour about three hours ahead, the cut
+    started 18h20m before that), held still for a take and moved on once
+    the estimate is under an hour away. Ellen Whitcomb is held as a Wrenmoor
     customer in HX7 but the account tools still serve Amira only.
 - **Real system:** the customer's own systems of record.
 - **Downstream:**

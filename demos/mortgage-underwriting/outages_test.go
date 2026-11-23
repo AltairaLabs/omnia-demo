@@ -26,6 +26,8 @@ func outagePost(t *testing.T, path string, body any) (map[string]any, int) {
 }
 
 func TestOutageStatusHX7(t *testing.T) {
+	// newTestWren's clock is 2026-11-09 14:18 UTC: restoration is 14:18+3h
+	// truncated to the hour, and the cut started 18h20m before that.
 	out, status := outagePost(t, "/wren/outage-status", map[string]any{"postcode": "HX7 8AD"})
 	if status != http.StatusOK {
 		t.Fatalf("status %d: %v", status, out)
@@ -33,10 +35,38 @@ func TestOutageStatusHX7(t *testing.T) {
 	if out["status"] != "off" || out["district"] != "HX7" {
 		t.Fatalf("outage %v", out)
 	}
-	started, err1 := time.Parse(time.RFC3339, out["started"].(string))
-	eta, err2 := time.Parse(time.RFC3339, out["estimated_restoration"].(string))
-	if err1 != nil || err2 != nil || !eta.After(started) {
+	if out["estimated_restoration"] != "2026-11-09T17:00:00Z" || out["started"] != "2026-11-08T22:40:00Z" {
 		t.Fatalf("started %v, estimated_restoration %v", out["started"], out["estimated_restoration"])
+	}
+}
+
+// The times come from the clock: right on the day, still within a take, and
+// moved on once the estimate is less than an hour away.
+func TestOutageTimesFollowTheClock(t *testing.T) {
+	now := time.Date(2026, 11, 23, 9, 47, 0, 0, time.UTC)
+	w := newWren(func() time.Time { return now })
+	at := func() (string, string) {
+		o, ok := w.outage("HX7")
+		if !ok {
+			t.Fatal("no HX7 outage")
+		}
+		return o.Started, o.Estimated
+	}
+	started, eta := at()
+	if eta != "2026-11-23T12:00:00Z" || started != "2026-11-22T17:40:00Z" {
+		t.Fatalf("at 09:47: started %s, estimated %s", started, eta)
+	}
+	now = now.Add(40 * time.Minute) // 10:27, the same take
+	if _, e := at(); e != eta {
+		t.Fatalf("at 10:27 the estimate moved from %s to %s within a take", eta, e)
+	}
+	now = time.Date(2026, 11, 23, 11, 5, 0, 0, time.UTC) // under an hour to go
+	if s, e := at(); e != "2026-11-23T14:00:00Z" || s != "2026-11-22T19:40:00Z" {
+		t.Fatalf("at 11:05: started %s, estimated %s", s, e)
+	}
+	now = time.Date(2026, 11, 30, 8, 30, 0, 0, time.UTC) // a week later
+	if _, e := at(); e != "2026-11-30T11:00:00Z" {
+		t.Fatalf("a week later: estimated %s", e)
 	}
 }
 
