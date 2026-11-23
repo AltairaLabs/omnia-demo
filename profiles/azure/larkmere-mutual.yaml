@@ -68,5 +68,5 @@ galaxy: { enabled: true }
 # Poppy assistant is admitted.
 poppy:
   enabled: true
-  domain: larkmere-mutual.azure.altairalabs.ai
+  domain: larkmere.azure.altairalabs.ai
   allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
