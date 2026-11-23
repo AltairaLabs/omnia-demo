@@ -141,11 +141,11 @@ make canary-status        # at any point
   logs `arenaEval results errored` with the counts. On beta.23 it was a score
   of 0, and r9 rolled back the good 2.0 on 429s alone. The callers still hold
   two conversations at once with a 15s pause, to stay inside gpt-4o's quota.
-- **A candidate's sessions name the stable composition** (Omnia #4104): the
-  canary pod rejects its own composition at startup, and the sessions it
-  serves record the stable version's composition digest. The gate is not
-  affected (it filters on the variant), but don't show a canary session's
-  composition as the candidate's.
+- **A candidate's sessions name the candidate's composition** (Omnia #4104,
+  fixed in #4106): the canary pod's digest anchor is its own, so it loads its
+  composition and its sessions record 2.x.0's digest, not 1.0.0's. Check it
+  once on the first take: no `composition rejected` in the canary facade's
+  log, and a candidate session's composition names the candidate version.
 - **Takes:** 2.0 takes about 19 minutes to reach 100% (three gates 3 minutes
   apart at each step). 2.1 is rolled back at 20% in about 3–4 minutes.
 
