@@ -316,7 +316,8 @@ microphone; the button is absent if the portal has no phone line.
 
 **What should happen.** The disclosure is spoken first ("You are speaking with
 Larkmere Mutual's AI assistant. You can ask for a person at any time.") before
-the agent says anything. The card tools then act on the signed-in member,
+the agent says anything. The platform synthesises it with the line's tts
+Provider; the demo plays no recording. The card tools then act on the signed-in member,
 Ellen, with the same ToolPolicy and privacy policy as the chat: the card
 ending 4471 reads as active, then frozen. Next time Ellen opens the chat, the
 card is still frozen. Unfreeze it afterwards, as under Before each take.

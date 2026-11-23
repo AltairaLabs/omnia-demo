@@ -36,23 +36,6 @@ data:
   pack.json: |
 {{ .Files.Get "files/arena/card-line-pack.json" | indent 4 }}
 ---
-# The disclosure, pre-recorded. Played instead of synthesising
-# duplex.disclosure.text, so the call needs no working tts for it. It was added
-# for keyless Azure, where the synthesised disclosure failed (Omnia #4125, now
-# fixed); the clip is still what plays, and the text is the fallback. Recorded once with the line's own tts model
-# (gpt-4o-mini-tts, voice sage) and checked in; it says the same words as the
-# text, which stays as the fallback if the clip can't be read. Normalised to
-# about the realtime voice's loudness (peak-limited, ~2 dB under it).
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: card-line-disclosure
-  namespace: {{ .Values.namespace }}
-  labels:
-    app.kubernetes.io/part-of: {{ .Chart.Name }}
-binaryData:
-  disclosure.wav: {{ .Files.Get "files/card-line-disclosure.wav" | b64enc }}
----
 # The card line: the member assistant's voice twin.
 #
 # Everything that controls what it may do is pii-chat's, by reference, not by
@@ -96,11 +79,10 @@ spec:
   duplex:
     enabled: true
     mode: realtime
+    # Spoken by the platform: the runtime synthesises this text with the
+    # `disclosure` tts provider below, nothing in the demo stands in for it.
     disclosure:
       text: "You are speaking with Larkmere Mutual's AI assistant. You can ask for a person at any time."
-      clip:
-        name: card-line-disclosure
-        key: disclosure.wav
   providers:
     - name: default
       role: llm
