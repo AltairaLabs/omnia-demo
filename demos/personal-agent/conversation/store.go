@@ -61,6 +61,10 @@ type Store interface {
 	// SetState records the state fields of a read once has_more is false
 	// (§8.5), or of a conversation known to be closed.
 	SetState(convID string, working bool, handoff string, closed bool) error
+	// Stopped is why the conversation's Reader gave up for good, such as a
+	// 401 asking for sign-in, or "" while it hasn't. SetStopped records it.
+	Stopped(convID string) (string, error)
+	SetStopped(convID, reason string) error
 }
 
 // stateUpdate is what a state event, or an event that carries working,
@@ -159,6 +163,8 @@ type MemoryStore struct {
 	events  map[string][]Event
 	cursors map[string]string
 	states  map[string]convState
+	seen    map[string]map[string]bool // event IDs stored, by conversation
+	stopped map[string]string
 }
 
 // NewMemoryStore returns an empty in-memory Store that delegates keys from
@@ -171,6 +177,8 @@ func NewMemoryStore(id *identity.Identity, now func() time.Time) *MemoryStore {
 		events:      map[string][]Event{},
 		cursors:     map[string]string{},
 		states:      map[string]convState{},
+		seen:        map[string]map[string]bool{},
+		stopped:     map[string]string{},
 	}
 }
 
@@ -209,9 +217,20 @@ func (s *MemoryStore) Conversations() ([]Conversation, error) {
 	return out, nil
 }
 
+// AppendEvent stores e, or does nothing when the conversation already holds
+// an event with its ID.
 func (s *MemoryStore) AppendEvent(convID string, e Event) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if e.ID != "" {
+		if s.seen[convID][e.ID] {
+			return nil
+		}
+		if s.seen[convID] == nil {
+			s.seen[convID] = map[string]bool{}
+		}
+		s.seen[convID][e.ID] = true
+	}
 	s.events[convID] = append(s.events[convID], e)
 	s.applyLocked(convID, eventState(e))
 	return nil
@@ -250,6 +269,19 @@ func (s *MemoryStore) SetState(convID string, working bool, handoff string, clos
 	return nil
 }
 
+func (s *MemoryStore) Stopped(convID string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.stopped[convID], nil
+}
+
+func (s *MemoryStore) SetStopped(convID, reason string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.stopped[convID] = reason
+	return nil
+}
+
 func (s *MemoryStore) Events(convID string) ([]Event, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -275,8 +307,10 @@ func (s *MemoryStore) SetCursor(convID, c string) error {
 //	pa:convs              hash of conversation ID to its JSON
 //	pa:convs:order        list of conversation IDs, oldest first
 //	pa:events:<conv>      list of the conversation's events, as JSON
+//	pa:seen:<conv>        set of the IDs of the events in pa:events:<conv>
 //	pa:cursor:<conv>      the conversation's read cursor
-//	pa:state:<conv>       hash of working, handoff and closed (§8.7)
+//	pa:state:<conv>       hash of working, handoff and closed (§8.7), and
+//	                      stopped, why its Reader gave up
 //
 // Delegated keys are held in memory, not in Redis (see delegations).
 type RedisStore struct {
@@ -367,18 +401,55 @@ func (s *RedisStore) Conversations() ([]Conversation, error) {
 	return out, nil
 }
 
+// appendScript stores one event unless its ID is already in the
+// conversation's seen set, and applies its state fields, as one atomic step.
+// A MULTI can't do this: its commands are queued before SADD's answer is
+// known, so it could not skip the RPUSH.
+//
+//	KEYS: pa:seen:<conv>, pa:events:<conv>, pa:state:<conv>
+//	ARGV: event ID ("" for none), event JSON, then state field/value pairs
+var appendScript = redis.NewScript(`
+if ARGV[1] ~= "" and redis.call("SADD", KEYS[1], ARGV[1]) == 0 then
+  return 0
+end
+redis.call("RPUSH", KEYS[2], ARGV[2])
+if #ARGV > 2 then
+  redis.call("HSET", KEYS[3], unpack(ARGV, 3))
+end
+return 1
+`)
+
+// AppendEvent stores e, or does nothing when the conversation already holds
+// an event with its ID.
 func (s *RedisStore) AppendEvent(convID string, e Event) error {
 	b, err := json.Marshal(storedEvent(e))
 	if err != nil {
 		return err
 	}
-	ctx := context.Background()
-	pipe := s.rdb.TxPipeline()
-	pipe.RPush(ctx, "pa:events:"+convID, b)
-	if fields := stateFields(eventState(e)); len(fields) > 0 {
-		pipe.HSet(ctx, "pa:state:"+convID, fields)
+	args := []any{e.ID, b}
+	for k, v := range stateFields(eventState(e)) {
+		args = append(args, k, v)
 	}
-	if _, err := pipe.Exec(ctx); err != nil {
+	keys := []string{"pa:seen:" + convID, "pa:events:" + convID, "pa:state:" + convID}
+	if err := appendScript.Run(context.Background(), s.rdb, keys, args...).Err(); err != nil {
+		return fmt.Errorf("conversation: %w", err)
+	}
+	return nil
+}
+
+func (s *RedisStore) Stopped(convID string) (string, error) {
+	r, err := s.rdb.HGet(context.Background(), "pa:state:"+convID, "stopped").Result()
+	if errors.Is(err, redis.Nil) {
+		return "", nil
+	}
+	if err != nil {
+		return "", fmt.Errorf("conversation: %w", err)
+	}
+	return r, nil
+}
+
+func (s *RedisStore) SetStopped(convID, reason string) error {
+	if err := s.rdb.HSet(context.Background(), "pa:state:"+convID, "stopped", reason).Err(); err != nil {
 		return fmt.Errorf("conversation: %w", err)
 	}
 	return nil

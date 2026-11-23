@@ -669,6 +669,155 @@ func TestStateDefaults(t *testing.T) {
 	}
 }
 
+func TestAppendEventSkipsKnownID(t *testing.T) {
+	st := NewMemoryStore(nil, time.Now)
+	for _, e := range []map[string]any{msgEvent("e1", "one"), msgEvent("e2", "two"), msgEvent("e1", "one again")} {
+		raw, _ := json.Marshal(e)
+		ev, _ := parseEvent(raw)
+		if err := st.AppendEvent("cnv_1", ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stored, _ := st.Events("cnv_1")
+	if ids(stored) != "e1,e2" || stored[0].Text != "one" {
+		t.Errorf("stored %s (%+v), want e1,e2 with the first e1 kept", ids(stored), stored)
+	}
+	// The same ID in another conversation is a different event.
+	raw, _ := json.Marshal(msgEvent("e1", "elsewhere"))
+	ev, _ := parseEvent(raw)
+	if err := st.AppendEvent("cnv_2", ev); err != nil {
+		t.Fatal(err)
+	}
+	if other, _ := st.Events("cnv_2"); ids(other) != "e1" {
+		t.Errorf("cnv_2 stored %s, want e1", ids(other))
+	}
+}
+
+// TestRedisStoreEventsAndState runs only with PA_TEST_REDIS_URL set, such
+// as redis://localhost:6379/15, and flushes that database.
+func TestRedisStoreEventsAndState(t *testing.T) {
+	u := os.Getenv("PA_TEST_REDIS_URL")
+	if u == "" {
+		t.Skip("PA_TEST_REDIS_URL not set")
+	}
+	st, err := NewRedisStore(u, nil, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := st.rdb.FlushDB(context.Background()).Err(); err != nil {
+		t.Fatal(err)
+	}
+	pending := stateEvent("e2", false)
+	pending["handoff"] = "pending"
+	for _, e := range []map[string]any{msgEvent("e1", "one"), pending, msgEvent("e1", "one again")} {
+		raw, _ := json.Marshal(e)
+		ev, _ := parseEvent(raw)
+		if err := st.AppendEvent("cnv_1", ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	stored, err := st.Events("cnv_1")
+	if err != nil || ids(stored) != "e1,e2" || stored[0].Text != "one" {
+		t.Errorf("stored %s, %v; want e1,e2 with the first e1 kept", ids(stored), err)
+	}
+	if w, h, c, err := st.State("cnv_1"); err != nil || w || h != "pending" || c {
+		t.Errorf("State = %v %q %v %v, want false pending false", w, h, c, err)
+	}
+	if r, err := st.Stopped("cnv_1"); r != "" || err != nil {
+		t.Errorf("Stopped = %q, %v; want empty", r, err)
+	}
+	if err := st.SetStopped("cnv_1", "unauthorized (HTTP 401)"); err != nil {
+		t.Fatal(err)
+	}
+	if r, _ := st.Stopped("cnv_1"); r != "unauthorized (HTTP 401)" {
+		t.Errorf("Stopped = %q", r)
+	}
+	if _, h, _, _ := st.State("cnv_1"); h != "pending" {
+		t.Errorf("SetStopped changed handoff to %q", h)
+	}
+}
+
+// The poppy facade closes every stream after five minutes. A stream that
+// ends cleanly is not a failure, so the Reader must not back off further
+// each time, or replies arrive later and later.
+func TestReaderReconnectsAtBaseBackoffAfterCleanEnd(t *testing.T) {
+	var mu sync.Mutex
+	streams := 0
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		if r.Header.Get("Accept") != "text/event-stream" {
+			// The check for an expired conversation after an empty stream.
+			writeJSON(w, 200, map[string]any{"conversation_id": "cnv_1", "events": []any{}, "has_more": false, "working": false, "handoff": "none", "closed": false})
+			return
+		}
+		mu.Lock()
+		streams++
+		s := streams
+		mu.Unlock()
+		startStream(w)
+		if s == 4 {
+			sse(w, stateEvent("e1", true))
+		}
+		// Otherwise return: the stream ends cleanly with no event.
+	})
+	c, _ := newTestClient(t, f)
+	c.Remember(f.co)
+	conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+	var waits []time.Duration
+	r := &Reader{Client: c, Backoff: 10 * time.Millisecond}
+	r.sleep = func(ctx context.Context, d time.Duration) error {
+		waits = append(waits, d)
+		return ctx.Err()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	r.Run(ctx, conv, func(Conversation, Event) {})
+	if len(waits) != 3 {
+		t.Fatalf("waited %v, want three waits", waits)
+	}
+	for _, d := range waits {
+		if d != 10*time.Millisecond {
+			t.Errorf("waits = %v, want each the base 10ms after a clean end", waits)
+			break
+		}
+	}
+}
+
+// A Reader that stops because the Company refused it for good records why,
+// so read_conversation can tell the model.
+func TestReaderRecordsTerminalStop(t *testing.T) {
+	for _, tc := range []struct {
+		name, code string
+		status     int
+	}{
+		{"sign-in needed", "unauthorized", http.StatusUnauthorized},
+		{"version unsupported", "version_unsupported", http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+				writeJSON(w, tc.status, map[string]string{"error": tc.code, "error_description": "refused for the test"})
+			})
+			c, st := newTestClient(t, f)
+			c.Remember(f.co)
+			conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+			if err := st.SaveConversation(conv); err != nil {
+				t.Fatal(err)
+			}
+			runReader(t, c, conv)
+			reason, err := st.Stopped("cnv_1")
+			if err != nil || !strings.Contains(reason, tc.code) {
+				t.Errorf("Stopped = %q, %v; want a reason naming %s", reason, err, tc.code)
+			}
+			if _, _, closed, _ := st.State("cnv_1"); closed {
+				t.Error("a stopped conversation was marked closed")
+			}
+		})
+	}
+	st := NewMemoryStore(nil, time.Now)
+	if reason, err := st.Stopped("cnv_unknown"); reason != "" || err != nil {
+		t.Errorf("Stopped of an unknown conversation = %q, %v; want empty", reason, err)
+	}
+}
+
 func TestStateFollowsStream(t *testing.T) {
 	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
 		startStream(w) // working: true

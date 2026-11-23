@@ -61,22 +61,31 @@ func closes(e Event) bool {
 // (§8.6), stores each new one with the cursor after it, and publishes it.
 type Reader struct {
 	Client *Client
-	// Backoff is the wait before reconnecting; it doubles up to 30s and
-	// resets once a stream delivers an event.
+	// Backoff is the wait before reconnecting. It doubles up to 30s after a
+	// failed stream, and is back to Backoff after a stream that delivered
+	// an event or ended cleanly.
 	Backoff time.Duration
+
+	sleep func(context.Context, time.Duration) error // for tests; nil is sleep
 }
 
 // Run streams conv's events until ctx ends or the conversation closes. It
 // reconnects with Last-Event-ID after a dropped stream, and after
 // cursor_expired reads from the beginning, skipping events already stored
 // (§8.5). It stops after a conversation_closed error, or a state event that
-// shows the conversation closed, and then marks it closed in the store.
+// shows the conversation closed, and then marks it closed in the store. It
+// also stops on any other 4xx but 429, which no reconnect can fix, and
+// records the reason with Store.SetStopped.
 // Working notices are published with no ID; they update the stored state
 // but are not stored as events.
 func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conversation, Event)) {
 	backoff := r.Backoff
 	if backoff <= 0 {
 		backoff = time.Second
+	}
+	pause := r.sleep
+	if pause == nil {
+		pause = sleep
 	}
 	wait := backoff
 	for ctx.Err() == nil {
@@ -91,7 +100,11 @@ func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conver
 				continue // read from the beginning at once
 			}
 		case errors.As(err, &cerr) && cerr.Status >= 400 && cerr.Status < 500 && cerr.Status != http.StatusTooManyRequests:
-			return // conversation_not_found and the like: reconnecting can't help
+			// conversation_not_found, a 401 asking for sign-in,
+			// version_unsupported and the like: reconnecting can't help.
+			// Record why, so whoever reads the conversation can say so.
+			_ = r.Client.Store.SetStopped(conv.ID, strings.TrimPrefix(cerr.Error(), "conversation: "))
+			return
 		case err == nil && n == 0:
 			// A stream that ends without an event may be of a conversation
 			// that has expired, which reads as closed with no state event.
@@ -106,10 +119,13 @@ func (r *Reader) Run(ctx context.Context, conv Conversation, publish func(Conver
 				}
 			}
 		}
-		if n > 0 {
+		if n > 0 || err == nil {
+			// A stream that delivered events, or that simply ended (the
+			// poppy facade closes every stream after five minutes), is not
+			// a failure: reconnect at the base wait, not a growing one.
 			wait = backoff
 		}
-		if sleep(ctx, wait) != nil {
+		if pause(ctx, wait) != nil {
 			return
 		}
 		wait = min(wait*2, maxBackoff)
@@ -194,6 +210,21 @@ func (r *Reader) stream(ctx context.Context, conv Conversation, publish func(Con
 		return n, rr.Closed && !rr.HasMore, nil
 	}
 
+	// The event stream is parsed as the WHATWG HTML Standard's "Interpreting
+	// an event stream" says (§9.2.6,
+	// https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation):
+	//   - a line is split at its first colon into field and value, one
+	//     leading space is removed from the value, and a line with no colon
+	//     is a field with an empty value;
+	//   - a line starting with a colon is a comment;
+	//   - data lines are joined with "\n";
+	//   - a blank line dispatches the event, which is dropped when its data
+	//     is empty, and resets the event name;
+	//   - an event not ended by a blank line when the stream ends is
+	//     discarded.
+	// Two departures: bufio.ScanLines ends lines at LF or CRLF but not at a
+	// lone CR, and a leading BOM is not stripped. The id field is not
+	// tracked, because each event's JSON carries its own id (§8.6).
 	sc := bufio.NewScanner(resp.Body)
 	sc.Buffer(make([]byte, 0, 64*1024), maxLine)
 	var name string
