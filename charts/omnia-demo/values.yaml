@@ -436,15 +436,18 @@ piiChat:
   # the workspace's service group.
   canary:
     enabled: false
-    # The judge runs on the agent's own model (`default`): on Omnia
-    # 0.9.0-beta.23 a pack cannot name a separate judge provider (Omnia #3965,
-    # demos/pii-chat/canary/eval.jq).
+    # The Provider the judge runs on, bound on the agent as `judge`, the name
+    # the candidate packs' eval gives (demos/pii-chat/canary/eval.jq). Empty:
+    # the agent's own model. A separate model keeps the judge off the agent's
+    # quota and out of grading its own answers.
+    judgeProviderRef: ""
     # The gate: the candidate's average judge score, measured `count` times,
-    # `interval` apart, each at least minScore.
-    # The gate has no minimum sample (beta.23): it decides on whatever the
-    # candidate has had. At 20% with the callers below, three measurements 3m
-    # apart give the candidate about three disputed payments; at 90s with
-    # one caller, r8's 20% step saw only lost-card calls and passed 2.1.
+    # `interval` apart, each at least minScore. It counts only this agent's
+    # candidate results since the rollout started (Omnia #3997).
+    # The gate has no minimum sample: it decides on whatever the candidate has
+    # had. At 20% with the callers below, three measurements 3m apart give the
+    # candidate about three disputed payments; at 90s with one caller, r8's
+    # 20% step saw only lost-card calls and passed 2.1.
     gate:
       minScore: "0.8"
       count: 3
@@ -456,12 +459,14 @@ piiChat:
     # Scripted callers (demos/card-callers, in the sites image). Scaled to 0
     # until `make canary` starts them.
     # Stand-in for live traffic: enough for the gate to judge, and no more
-    # than gpt-4o's quota takes. The agent and its judge share the one
-    # deployment (150K TPM, omnia-azure), and on beta.23 a judge error is
-    # recorded as a score of 0: r9's four callers with a 5s pause hit 429s
-    # and rolled back the good 2.0. `parallel` conversations run at once in
-    # the one pod (it signs the callers' tokens with its own key, so it
-    # can't be scaled out).
+    # than gpt-4o's quota takes (150K TPM, omnia-azure), which the agent
+    # shares with the judge unless judgeProviderRef names another deployment.
+    # A judge error (a 429, say) is recorded as an error, not a score
+    # (Omnia #4086): the gate averages the scored results and holds, rather
+    # than fails, when more than half errored. So throttling matters for
+    # progress, not for the verdict. r9's four callers with a 5s pause hit
+    # 429s. `parallel` conversations run at once in the one pod (it signs the
+    # callers' tokens with its own key, so it can't be scaled out).
     callers:
       pause: 15s
       parallel: 2

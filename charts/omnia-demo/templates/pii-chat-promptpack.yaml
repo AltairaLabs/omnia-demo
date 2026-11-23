@@ -49,29 +49,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 data:
   pack.json: |
-{{- $pack := .Files.Get "files/arena/pii-chat-pack.json" }}
-{{- if not .Values.piiChat.guardrail.enabled }}
-{{- /* Without the classifier, drop the scope guardrail and the `guard` slot it
-     names rather than ship them unbound: an unbound topic_policy fails closed
-     and the assistant would refuse every turn. See piiChat.guardrail. */}}
-{{- $p := $pack | fromJson }}
-{{- range $id, $prompt := $p.prompts }}
-{{- $kept := list }}
-{{- range ($prompt.validators | default list) }}
-{{- if ne .type "topic_policy" }}{{ $kept = append $kept . }}{{ end }}
-{{- end }}
-{{- if $kept }}{{ $_ := set $prompt "validators" $kept }}{{ else }}{{ $_ := unset $prompt "validators" }}{{ end }}
-{{- end }}
-{{- if $p.requires }}
-{{- $reqs := list }}
-{{- range ($p.requires.providers | default list) }}
-{{- if ne (toString .key) "guard" }}{{ $reqs = append $reqs . }}{{ end }}
-{{- end }}
-{{- $_ := set $p.requires "providers" $reqs }}
-{{- end }}
-{{- $pack = $p | toPrettyJson }}
-{{- end }}
-{{ $pack | indent 4 }}
+{{ include "omnia-demo.piiChatPackJSON" (dict "root" $ "file" "files/arena/pii-chat-pack.json") | indent 4 }}
 {{- if .Values.piiChat.deterministic }}
 ---
 # The scripted model turns, mounted at the path the mock-provider annotation

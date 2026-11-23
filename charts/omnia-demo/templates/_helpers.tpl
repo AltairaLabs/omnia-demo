@@ -67,3 +67,33 @@ in the operator's delegation.trustedIssuers.
 {{- define "omnia-demo.issuerURL" -}}
 http://{{ .service }}.{{ .root.Values.namespace }}.svc.cluster.local:8080
 {{- end }}
+
+{{/*
+A card-support pack.json (1.0.0 or a canary candidate) as the install serves
+it. With piiChat.guardrail off, the scope guardrail and the `guard` slot it
+names are dropped rather than shipped unbound: an unbound topic_policy fails
+closed and the assistant would refuse every turn. See piiChat.guardrail.
+Call with (dict "root" $ "file" "files/arena/<pack>.json").
+*/}}
+{{- define "omnia-demo.piiChatPackJSON" -}}
+{{- $pack := .root.Files.Get .file -}}
+{{- if not .root.Values.piiChat.guardrail.enabled -}}
+{{- $p := $pack | fromJson -}}
+{{- range $id, $prompt := $p.prompts -}}
+{{- $kept := list -}}
+{{- range ($prompt.validators | default list) -}}
+{{- if ne .type "topic_policy" }}{{ $kept = append $kept . }}{{ end -}}
+{{- end -}}
+{{- if $kept }}{{ $_ := set $prompt "validators" $kept }}{{ else }}{{ $_ := unset $prompt "validators" }}{{ end -}}
+{{- end -}}
+{{- if $p.requires -}}
+{{- $reqs := list -}}
+{{- range ($p.requires.providers | default list) -}}
+{{- if ne (toString .key) "guard" }}{{ $reqs = append $reqs . }}{{ end -}}
+{{- end -}}
+{{- $_ := set $p.requires "providers" $reqs -}}
+{{- end -}}
+{{- $pack = $p | toPrettyJson -}}
+{{- end -}}
+{{- $pack -}}
+{{- end -}}

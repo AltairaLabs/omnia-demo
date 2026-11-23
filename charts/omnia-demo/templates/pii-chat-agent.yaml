@@ -306,10 +306,17 @@ spec:
         name: jev
 {{- end }}
 {{- if $pc.canary.enabled }}
-  # Realtime evals, for the canary gate. 1.0.0 declares none; the candidate
-  # packs declare the judge, and the eval worker (which runs llm_judge, and is
-  # the only path that records the variant the gate filters on) scores the
-  # candidate's sessions with the pack each session ran.
+    # The canary judge, under the name the candidate packs' llm_judge_session
+    # gives as params.provider. The runtime binds it by name and never makes it
+    # the agent's model; the eval worker judges with it (Omnia #3965).
+    - name: judge
+      providerRef:
+        name: {{ default (include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef)) $pc.canary.judgeProviderRef }}
+{{- end }}
+{{- if $pc.canary.enabled }}
+  # Realtime evals, for the canary gate. The candidate packs declare the
+  # judge, and the eval worker (which runs llm_judge) scores each session with
+  # the pack it ran, labelled with the session's variant.
   evals:
     enabled: true
 {{- end }}

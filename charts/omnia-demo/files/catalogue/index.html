@@ -215,7 +215,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/pii-c
       </tr>
       <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
         <h4>Before the take</h4>
-        <p>Scripted members talk to the assistant throughout, so there's live traffic to judge. Each version has one take per eval revision: <code>make canary</code> refuses to re-use one, and says to bump <code>EVAL_REVISION</code> in <code>hack/build-canary-packs.sh</code> and <code>evalDef</code> in <code>charts/omnia-demo/templates/pii-chat-canary.yaml</code>, then <code>make demos TENANTS=larkmere-mutual</code>.</p>
+        <p>Scripted members talk to the assistant throughout, so there's live traffic to judge. Run either version as often as you like: the gate counts only the current rollout's results.</p>
         <h4>The beats</h4>
         <ol>
           <li>The bad version first, because it's quick: 2.1 promises members their money back on a disputed payment.

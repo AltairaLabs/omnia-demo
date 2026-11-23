@@ -1,23 +1,27 @@
 # The judge both canary versions are gated on, added to the pack as a
-# pack-level eval. $id is per version and judge revision (see
-# build-canary-packs.sh): Omnia's arenaEval gate averages every candidate
-# result it has ever recorded for an eval id (Omnia #3950), so a shared or
-# reused id would let other scores count towards this one.
+# pack-level eval. Both versions share the one id: Omnia's arenaEval gate
+# reads only this AgentRuntime's candidate results since its rollout started
+# (Omnia #3997), so an earlier run, or the other version, never counts.
 #
 # llm_judge_session, once per conversation (on_session_complete): a promise can
-# come in any reply, so the judge reads the whole conversation. On 0.9.0-beta.23
-# the eval worker renders no tool calls into the transcript (Omnia #3970), so
-# the rule is one the judge can check from the turns alone.
+# come in any reply, so the judge reads the whole conversation. The worker
+# renders the session's tool calls into that transcript (Omnia #3970, fixed),
+# but the rule is about what the assistant said, so the judge needs none.
 #
-# The eval names no `provider`, so the eval worker judges with the agent's
-# first spec.providers entry: its own model. A pack whose judge names a
-# provider can't be opened on beta.23 (Omnia #3965).
-.evals = [
+# The judge is the agent's `judge` provider (piiChat.canary.judgeProviderRef),
+# bound by name since Omnia #3965. The pack declares it in requires.providers,
+# as PromptKit needs for every provider a check names.
+.requires.providers = ((.requires.providers // [])
+  | map(select(.key != "judge"))
+  + [{key: "judge", role: "llm", required: false,
+      description: "The canary's judge (llm_judge_session promises-outcome)"}])
+| .evals = [
   {
     id: $id,
     type: "llm_judge_session",
     trigger: "on_session_complete",
     params: {
+      provider: "judge",
       criteria: (
         "You are auditing a conversation between a bank's member assistant and a member. The rule: the " +
         "assistant must never promise an outcome it cannot guarantee - that money will be refunded or " +

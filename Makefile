@@ -114,7 +114,7 @@ images:
 # The rollout runs on the namespace's ambient waypoint (mesh routing), so each
 # step's weight is exact and each conversation, one WebSocket, stays on the
 # version it opened on. At every weight an analysis step reads the candidate's
-# average judge score (RolloutAnalysis card-support-gate-v<ver>), and a failed
+# average judge score (RolloutAnalysis card-support-gate), and a failed
 # gate rolls back on its own. mesh.waypoint is left unset on purpose: on Omnia
 # 0.9.0-beta.23 it puts istio.io/use-waypoint in the Service's selector, which
 # empties the Service (Omnia #3952). The namespace's own use-waypoint label
@@ -131,18 +131,11 @@ canary:
 	@set -euo pipefail; \
 	slug=$$(tr . - <<< "$(VERSION)"); \
 	$(KUBECTL) -n $(CANARY_NS) get promptpack "pii-chat-pack-v$$slug" -o name >/dev/null; \
-	: "The gate averages every result ever recorded for its eval id (Omnia #3950),"; \
-	: "so a second run on the same id is decided by the first. Each run stamps the"; \
-	: "gate with the id it used, and a run on a stamped id is refused."; \
-	analysis="rolloutanalysis/card-support-gate-v$$slug"; \
+	: "One gate for every version and run: it counts only this agent's candidate"; \
+	: "results since the rollout started (Omnia #3997)."; \
+	analysis="rolloutanalysis/card-support-gate"; \
 	evaldef=$$($(KUBECTL) -n $(CANARY_NS) get $$analysis -o jsonpath='{.spec.metrics[0].provider.arenaEval.evalDef}'); \
-	ran=$$($(KUBECTL) -n $(CANARY_NS) get $$analysis -o jsonpath='{.metadata.annotations.demo\.altairalabs\.ai/gated-eval}'); \
-	if [[ "$$ran" == "$$evaldef" ]]; then \
-	  echo "eval id $$evaldef already has results from an earlier run: bump EVAL_REVISION in hack/build-canary-packs.sh (and evalDef in pii-chat-canary.yaml), then make demos" >&2; \
-	  exit 1; \
-	fi; \
-	$(KUBECTL) -n $(CANARY_NS) annotate $$analysis --overwrite "demo.altairalabs.ai/gated-eval=$$evaldef" >/dev/null; \
-	gate="{\"analysis\":{\"templateName\":\"card-support-gate-v$$slug\"}}"; \
+	gate="{\"analysis\":{\"templateName\":\"card-support-gate\"}}"; \
 	: "The candidate is the same pack (packName pii-chat-pack) at the new version."; \
 	patch=$$(jq -n -c --arg ver "$(VERSION).0" --argjson gate "$$gate" '{spec: {rollout: { \
 	  candidate: {promptPackRef: {name: "pii-chat-pack", version: $$ver}}, \

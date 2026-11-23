@@ -6,7 +6,8 @@
 ---
 # Card support {{ $ver }}.0, a candidate for the canary. Derived from 1.0.0 by
 # hack/build-canary-packs.sh (demos/pii-chat/canary): one prompt change, and
-# the judge it is gated on.
+# the judge it is gated on. It carries 1.0.0's scope guardrail, dropped here
+# with 1.0.0's when piiChat.guardrail is off.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: PromptPack
 metadata:
@@ -40,18 +41,19 @@ metadata:
     app.kubernetes.io/component: canary
 data:
   pack.json: |
-{{ $.Files.Get (printf "files/arena/pii-chat-pack-v%s.json" $ver) | indent 4 }}
+{{ include "omnia-demo.piiChatPackJSON" (dict "root" $ "file" (printf "files/arena/pii-chat-pack-v%s.json" $ver)) | indent 4 }}
+{{- end }}
 ---
-# The gate for {{ $ver }}.0: the candidate's average judge score. One template
-# per version because the eval id is per version (see eval.jq) and arenaEval's
-# evalDef takes no arguments.
+# The gate: the candidate's average judge score. One for both versions:
+# arenaEval reads only this AgentRuntime's candidate results since its rollout
+# started (Omnia #3997), so the one eval id serves every version and every run.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: RolloutAnalysis
 metadata:
-  name: card-support-gate-v{{ $slug }}
-  namespace: {{ $.Values.namespace }}
+  name: card-support-gate
+  namespace: {{ .Values.namespace }}
   labels:
-    app.kubernetes.io/part-of: {{ $.Chart.Name }}
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
     app.kubernetes.io/component: canary
 spec:
   metrics:
@@ -62,10 +64,8 @@ spec:
       successCondition: "result[0] >= {{ $cn.gate.minScore }}"
       provider:
         arenaEval:
-          # The suffix is the judge's revision (hack/build-canary-packs.sh
-          # EVAL_REVISION); the two must match.
-          evalDef: promises-outcome-v{{ $slug }}-r12
-{{- end }}
+          # The eval id in demos/pii-chat/canary (hack/build-canary-packs.sh).
+          evalDef: promises-outcome
 ---
 # The eval worker's identity. The operator runs the worker as this
 # ServiceAccount (the service group's evalWorker.podOverrides, workspace.yaml)

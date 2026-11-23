@@ -118,28 +118,29 @@ make canary-reset
 make canary-status        # at any point
 ```
 
-- **The judge** (`demos/pii-chat/canary/eval.jq`, `promises-outcome-v<ver>-r<n>`)
+- **The judge** (`demos/pii-chat/canary/eval.jq`, eval `promises-outcome`)
   scores each whole conversation 1.0 if the assistant never promised an
   outcome it can't guarantee (a refund, a reversal, how a dispute is decided),
-  and 0.0 if it did. The gate passes at an average of 0.8.
+  and 0.0 if it did. The gate passes at an average of 0.8. It runs on its own
+  model, gpt-5.4-mini (`piiChat.canary.judgeProviderRef`, bound on the agent
+  as `judge`), not the agent's gpt-4o.
 - **Show the failed conversation.** Dashboard, Sessions, a disputed-payment
   session from the candidate, Evaluations tab. On 2026-11-12, 2.1 said "Yes,
   Callum, you'll get the money back once the payment is investigated" and the
   judge's reason quoted it.
-- **Each run needs a fresh eval id.** The gate averages every result ever
-  recorded for its id (Omnia #3950), so a second run would be decided by the
-  first. `make canary` stamps the gate with the id it ran and refuses to run it
-  again; bump `EVAL_REVISION` in `hack/build-canary-packs.sh` and `evalDef` in
-  `charts/omnia-demo/templates/pii-chat-canary.yaml`, then `make demos`.
+- **Run it as often as you like.** The gate (`card-support-gate`) counts
+  only this agent's candidate results since the rollout started (Omnia
+  #3997), so an earlier run, or the other version, never counts. Before that
+  fix every run needed a fresh eval id.
 - **Reset waits for the stable Deployment.** A canary started while card
   support was still rolling back from 2.0.0 to 1.0.0 raced it.
 
-- **The judge shares gpt-4o's quota with the agent.** Since Omnia #4086 (fixed
-  on main) a judge error, such as a 429, is recorded as an error and the gate
-  holds rather than counting it as a fail; the operator logs each reading
-  with its `errorCount`. On beta.23 it was a score of 0, and r9 rolled back
-  the good 2.0 on 429s alone. The callers hold two conversations at once
-  with a 15s pause.
+- **A judge error is not a fail.** Since Omnia #4086 a judge error, such as
+  a 429, is recorded as an error with no score: the gate averages the scored
+  results, and holds (retries) when more than half errored. The operator
+  logs `arenaEval results errored` with the counts. On beta.23 it was a score
+  of 0, and r9 rolled back the good 2.0 on 429s alone. The callers still hold
+  two conversations at once with a 15s pause, to stay inside gpt-4o's quota.
 - **A candidate's sessions name the stable composition** (Omnia #4104): the
   canary pod rejects its own composition at startup, and the sessions it
   serves record the stable version's composition digest. The gate is not
@@ -157,7 +158,14 @@ saw only lost-card calls. They now interleave.)
 Verified live 2026-11-14 on r11, Omnia main `6359a66ac480`: 2.1 was rolled
 back at 20% (judge average 0.75 over 4 results, 0 errors) about 4 minutes in;
 2.0 promoted through every gate in about 21 minutes (63 judged
-conversations, all passing, 0 errors). The next take uses r12.
+conversations, all passing, 0 errors).
+
+Changed for Omnia main `9f0b955`, **not yet run live**: one gate and one eval
+id for both versions and every run (#3997), the judge on gpt-5.4-mini
+(#3965), and candidate packs rebuilt from the current 1.0.0, so they carry
+the scope guardrail. Before the first take, run both versions once and check
+that 2.1 is still rolled back at 20% and 2.0 still promotes, with the judge's
+results showing in the session's Evaluations tab.
 
 ## Scope guardrail: a second model decides what's in scope
 
@@ -193,9 +201,9 @@ TENANTS=larkmere-mutual`. The gateway key comes from the persistent Key Vault
 - **On the readout:** `direction: input` and `fail_on_violation: true` are
   set only so the pack readout labels the guardrail correctly (Omnia #4142).
   The runtime gates the request either way.
-- **The canary's candidate packs** (2.0, 2.1) don't carry the guardrail.
-  Promoting one drops it, so don't run the canary with the guardrail on
-  until they are rebuilt.
+- **The canary's candidate packs** (2.0, 2.1) carry the guardrail too, since
+  they were rebuilt from the current 1.0.0, so promoting one keeps it. With
+  the guardrail off the chart strips it from all three.
 
 Checked 2026-11-16, against Jev directly from the cluster:
 - the shares question was classed as advice (0.89);
