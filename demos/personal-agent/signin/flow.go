@@ -438,7 +438,8 @@ func (f *Flow) lock(identifier, userID string) *sync.Mutex {
 // Otherwise:
 //   - invalid_grant deletes the tokens and answers "" (§5.5);
 //   - any other refusal (unauthorized_client, invalid_client, a bad
-//     response...) deletes them too and answers "": the agent continues
+//     response, issuer metadata that fails its checks...) deletes them
+//     too and answers "": the agent continues
 //     signed out (§4.1, §5.5), so the Company's 401 asks for sign-in
 //     instead of a loop of retries;
 //   - a network error, 429 or 5xx is an error, worth trying again.
@@ -502,6 +503,14 @@ func (f *Flow) refresh(ctx context.Context, co *discovery.Company, userID string
 	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
 	defer cancel()
 	md, err := FetchMetadata(ctx, f.HTTP, co.Issuer, co.Domain)
+	var bad *invalidMetadataError
+	if errors.As(err, &bad) {
+		// Metadata that fails its checks (another issuer, a domain it doesn't
+		// protect, no token endpoint) won't pass on a retry: continue signed
+		// out rather than retry the refresh forever. A network error, 5xx or
+		// 404 stays an error worth trying again.
+		return "", fmt.Errorf("%w: %w", errRefused, err)
+	}
 	if err != nil {
 		return "", err
 	}

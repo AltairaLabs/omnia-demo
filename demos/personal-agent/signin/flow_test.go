@@ -780,3 +780,65 @@ func TestRefreshRefusalContinuesSignedOut(t *testing.T) {
 		}
 	}
 }
+
+// Issuer metadata that fails its checks at a refresh is a refusal, not a
+// failure that may pass: an expired token is dropped and the agent continues
+// signed out, rather than trying the same refresh forever. A network error,
+// a 5xx or a 404 may pass, so the tokens are kept for the next try.
+func TestRefreshInvalidMetadataContinuesSignedOut(t *testing.T) {
+	expired := func(t *testing.T, f *fakeIssuer, hc *http.Client) (*Flow, *MemoryTokenStore, *discovery.Company) {
+		t.Helper()
+		store := NewMemoryTokenStore()
+		co := &discovery.Company{Name: "Larkmere Mutual", Domain: testDomain, Identifier: f.issuer, Issuer: f.issuer}
+		if err := store.Put(co.Identifier, ellen, Tokens{Access: "a0", Refresh: "r0", Scopes: []string{"policies:read"}, Expiry: time.Now().Add(-time.Second)}); err != nil {
+			t.Fatal(err)
+		}
+		return NewFlow(hc, signintest.NewIdentity(t), store), store, co
+	}
+	for name, edit := range map[string]func(map[string]any){
+		"issuer mismatch":                    func(doc map[string]any) { doc["issuer"] = "https://elsewhere.example/tenant" },
+		"protected_resources missing domain": func(doc map[string]any) { doc["protected_resources"] = []string{"https://wrenmoor.example"} },
+		"no token_endpoint":                  func(doc map[string]any) { delete(doc, "token_endpoint") },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFakeIssuer(t, edit, nil)
+			flow, store, co := expired(t, f, f.srv.Client())
+			for _, call := range []func(context.Context, *discovery.Company, string) (string, error){flow.AccessToken, flow.Refresh} {
+				if err := store.Put(co.Identifier, ellen, Tokens{Access: "a0", Refresh: "r0", Scopes: []string{"policies:read"}, Expiry: time.Now().Add(-time.Second)}); err != nil {
+					t.Fatal(err)
+				}
+				if got, err := call(context.Background(), co, ellen); got != "" || err != nil {
+					t.Errorf("= %q, %v; want empty and no error: refused, so signed out", got, err)
+				}
+				if tok, _ := store.Get(co.Identifier, ellen); tok != nil {
+					t.Errorf("tokens still stored after invalid metadata: %v", tok)
+				}
+			}
+		})
+	}
+	for name, serve := range map[string]http.HandlerFunc{
+		"503": func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusServiceUnavailable) },
+		"404": func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f := newFakeIssuer(t, nil, serve)
+			flow, store, co := expired(t, f, f.srv.Client())
+			if _, err := flow.AccessToken(context.Background(), co, ellen); err == nil {
+				t.Error("AccessToken answered no error; want one, to try again")
+			}
+			if tok, _ := store.Get(co.Identifier, ellen); tok == nil {
+				t.Error("a failure that may pass deleted the tokens")
+			}
+		})
+	}
+	t.Run("network error", func(t *testing.T) {
+		f := newFakeIssuer(t, nil, nil)
+		flow, store, co := expired(t, f, &http.Client{Transport: failingTransport{}})
+		if _, err := flow.AccessToken(context.Background(), co, ellen); err == nil {
+			t.Error("AccessToken answered no error; want one, to try again")
+		}
+		if tok, _ := store.Get(co.Identifier, ellen); tok == nil {
+			t.Error("a network error deleted the tokens")
+		}
+	})
+}

@@ -78,7 +78,7 @@ func FetchMetadata(ctx context.Context, hc *http.Client, issuer, domain string) 
 		return nil, err
 	}
 	if err := checkMetadata(doc, issuer, domain); err != nil {
-		return nil, err
+		return nil, &invalidMetadataError{err: err}
 	}
 	return &Metadata{
 		Issuer:                doc.Issuer,
@@ -120,6 +120,14 @@ func getMetadata(ctx context.Context, hc *http.Client, wellKnown string) (*metad
 	}
 	return &doc, nil
 }
+
+// invalidMetadataError is metadata the issuer served that fails checkMetadata:
+// the issuer's answer, not a failure that may pass, unlike a network error, a
+// 5xx or a 404. Its message is checkMetadata's.
+type invalidMetadataError struct{ err error }
+
+func (e *invalidMetadataError) Error() string { return e.err.Error() }
+func (e *invalidMetadataError) Unwrap() error { return e.err }
 
 func checkMetadata(doc *metadataDoc, issuer, domain string) error {
 	switch {
