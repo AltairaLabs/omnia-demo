@@ -5,14 +5,19 @@
 # Protocol (the AgentRuntime's poppy facade,
 # charts/omnia-demo/templates/poppy-company-agent.yaml).
 #
-# No tools in milestone 1. It answers from the society's guidance for members
-# in institutional memory, retrieved into {{memory_context}} the way the
-# claims assessor reads it. Reporting a claim needs the member signed in,
-# which needs the Company's issuer (milestone 2).
+# It answers from the society's guidance for members in institutional memory,
+# retrieved into {{memory_context}} the way the claims assessor reads it. Its
+# three tools act on the signed-in member's own claims (claim_open,
+# claim_add_item, claim_status). They are bound only with Company sign-in
+# (poppy.auth.enabled, charts/omnia-demo/templates/poppy-account-tools.yaml),
+# and every call carries the member's exchanged token: signed out, the call
+# is refused and the member is asked to sign in.
 #
 # The chart ships a COMPILED pack
 # (charts/omnia-demo/files/arena/larkmere-claims-desk-pack.json) with the
-# governance block merged in.
+# governance block and each tool's action_scope merged in. The account tools'
+# ToolPolicy refuses a tool with no action_scope, so the scopes are not
+# decoration.
 #
 # Regenerate with: hack/build-packs.sh larkmere-claims-desk
 apiVersion: promptkit.altairalabs.ai/v1alpha1
@@ -26,6 +31,13 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+
+  # The signed-in member's claims, as the member. Two writes to Larkmere's own
+  # claims system and a read; none reaches outside the Company.
+  tools:
+    - file: tools/claim-open.tool.yaml
+    - file: tools/claim-add-item.tool.yaml
+    - file: tools/claim-status.tool.yaml
 
   defaults:
     temperature: 0.2

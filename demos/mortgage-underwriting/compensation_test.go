@@ -1,9 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -124,6 +127,30 @@ func TestAccountOutageNoOutageInDistrict(t *testing.T) {
 	res, ok := w.outageFor(wrenCustomer{AccountID: "1", Postcode: "LS1 4AP"})
 	if ok || res["status"] != "on" {
 		t.Errorf("got %v, %v", res, ok)
+	}
+}
+
+// The guard logs each refusal under the tool's own name, the one the
+// ToolRegistry and the pack give it, so a log line can be traced to a call.
+func TestAccountRoutesLogTheirToolNames(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+
+	e := newWrenAccountEnv(t)
+	for path, tool := range map[string]string{
+		"/api/account/outage":       "my_outage",
+		"/api/account/compensation": "compensation_status",
+	} {
+		buf.Reset()
+		rec := httptest.NewRecorder()
+		e.srv.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
+		if rec.Code != http.StatusUnauthorized {
+			t.Fatalf("%s without a token: %d", path, rec.Code)
+		}
+		if !strings.Contains(buf.String(), "tool="+tool+" ") {
+			t.Errorf("%s logged %q, want tool=%s", path, buf.String(), tool)
+		}
 	}
 }
 

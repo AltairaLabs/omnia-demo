@@ -144,8 +144,13 @@ spec:
           scopeHints:
             {{- toYaml (required "poppy.auth.scopeHints" $auth.scopeHints) | nindent 12 }}
           accessTokens:
+            {{- /* Omitted when empty, so Omnia's default applies:
+                 https://<organization.domain>. An empty list would be refused
+                 (1-8 entries). */}}
+            {{- with $auth.accessTokens.audiences }}
             audiences:
-              {{- toYaml (required "poppy.auth.accessTokens.audiences" $auth.accessTokens.audiences) | nindent 14 }}
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
             clientIDClaim: {{ $auth.accessTokens.clientIDClaim }}
             scopeClaim: {{ $auth.accessTokens.scopeClaim }}
         {{- end }}

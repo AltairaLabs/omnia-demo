@@ -25,12 +25,18 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # One public read: the outage feed by postcode. Nothing here reads or
-  # changes a customer's account. Not get_weather: the stub serves it only for
+  # One public read, the outage feed by postcode, and two reads of the
+  # signed-in customer's own account (my_outage, compensation_status). The
+  # account reads are bound only with Company sign-in (poppy.auth.enabled,
+  # charts/omnia-demo/templates/poppy-account-tools.yaml) and carry the
+  # customer's exchanged token: signed out, the call is refused and the
+  # customer is asked to sign in. Not get_weather: the stub serves it only for
   # the signed-in customer, and with no identity it falls back to Amira's
   # account, which would leak one customer into another's conversation.
   tools:
     - file: tools/outage-status.tool.yaml
+    - file: tools/my-outage.tool.yaml
+    - file: tools/compensation-status.tool.yaml
 
   defaults:
     temperature: 0.2

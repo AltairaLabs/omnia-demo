@@ -994,8 +994,12 @@ poppy:
     # -- Offer sign-in: the Workspace Company's `auth`, and the account tools,
     # their Connection, ToolPolicy and public route.
     enabled: false
-    # -- The Company's OAuth issuer, for a provider that already does PAP
-    # natively. Ignored when gateway.enabled: the gateway is the issuer.
+    # -- The Company's OAuth issuer. Without the gateway, the Workspace's
+    # `auth.issuer`, for a provider that already does PAP natively; with
+    # gateway.enabled the Workspace omits it (the gateway is the issuer), but
+    # it is still the default for account.subjectIssuer: the issuer the
+    # Connection exchanges tokens from and the stub's --obo-issuer. Set it to
+    # the gateway's issuer URL then, or set account.subjectIssuer.
     issuer: ""
     # Omnia's Poppy issuer gateway in front of an ordinary OIDC provider (Omnia
     # #4443, proposed). The Workspace field does not exist until it ships, so
@@ -1021,6 +1025,7 @@ poppy:
     scopeHints: {}
     accessTokens:
       # -- The `aud` values of the Company's own access tokens (not the API's).
+      # Empty: omitted, and Omnia defaults it to `https://<poppy.domain>`.
       audiences: []
       # -- The claim naming the client a token was issued to.
       clientIDClaim: client_id

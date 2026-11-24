@@ -1,20 +1,26 @@
 # RFC 0013 governance declarations, merged into the compiled pack under
 # metadata.governance by hack/build-packs.sh.
 #
-# ASSERTED, not evidence: typed by a human and verified by nothing.
+# ASSERTED, not evidence: typed by a human and verified by nothing. The
+# per-tool half of RFC 0013, action_scope (including the pii data class), is
+# declared on each tool in tools/*.tool.yaml: this block has no data-class
+# field.
 
 intended_purpose: >-
   Tell Larkmere Mutual's members, or someone acting for them, what home cover
-  usually includes for storm and flood damage, what to do first, and that a
-  claim is reported through the member's own account.
+  usually includes for storm and flood damage and what to do first, and, once
+  the member has signed in, report a home claim on their policy, add the
+  damaged items to it and say where it stands.
 
 foreseeable_misuse:
-  - Asking it to confirm a named member's cover or the state of their claim without that member signed in
+  - Asking it to report or read a named member's claim without that member signed in
   - Treating its general description of cover as a promise that a claim will be paid
   - Relying on it in an emergency, which needs the emergency services
 
-# suggests: it has no tools and changes nothing.
-autonomy_level: suggests
+# acts_with_oversight: signed in, it reports a claim and adds items on its own,
+# as the member asked; a claims handler reviews every claim before anything is
+# settled. Signed out it only explains.
+autonomy_level: acts_with_oversight
 
 # A role, not a person.
 accountable_owner: Larkmere Mutual Claims Operations

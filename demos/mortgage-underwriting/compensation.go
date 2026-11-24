@@ -94,7 +94,7 @@ func registerWrenAccount(mux *http.ServeMux, v *oboVerifier, w *wren) {
 		out, _ := w.outageFor(c)
 		writeAccountJSON(rw, http.StatusOK, out)
 	}))
-	mux.HandleFunc("/api/account/compensation", v.guard("my_compensation", "outages", func(member string, rw http.ResponseWriter, _ *http.Request) {
+	mux.HandleFunc("/api/account/compensation", v.guard("compensation_status", "outages", func(member string, rw http.ResponseWriter, _ *http.Request) {
 		c, ok := wrenAccounts[strings.ToLower(member)]
 		if !ok {
 			writeAccountError(rw, http.StatusNotFound, errNoAccount)
