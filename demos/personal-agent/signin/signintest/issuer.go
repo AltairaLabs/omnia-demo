@@ -107,6 +107,7 @@ type Issuer struct {
 	next   []canned
 	reqs   []Request
 	codes  map[string]grant
+	jtis   map[string]bool // client assertion jti values already used
 }
 
 // NewIssuer starts an issuer for the Company at domain, whose metadata lists
@@ -120,6 +121,7 @@ func NewIssuer(t testing.TB, id *identity.Identity, domain string) *Issuer {
 		domain: domain,
 		scopes: []string{"claims:read", "policies:read"},
 		codes:  map[string]grant{},
+		jtis:   map[string]bool{},
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /.well-known/oauth-authorization-server", iss.metadata)
@@ -159,7 +161,8 @@ func (i *Issuer) Requests() []Request {
 }
 
 // Approve stands in for the User approving the sign-in at authURL. It checks
-// the authorization request, issues a one-time code bound to its
+// the authorization request (including prompt=consent and no resource, PAP
+// §4.2, §4.5), issues a one-time code bound to its
 // code_challenge and redirect_uri, and returns the query of the redirect
 // back to the agent: code, state and iss.
 func (i *Issuer) Approve(authURL string) url.Values {
@@ -196,6 +199,7 @@ func (i *Issuer) checkAuthorization(authURL string) url.Values {
 		"client_id":             i.id.ClientID,
 		"redirect_uri":          i.id.RedirectURI,
 		"code_challenge_method": "S256",
+		"prompt":                "consent",
 	} {
 		if got := q.Get(k); got != want {
 			i.t.Fatalf("signintest: authorization request %s = %q, want %q", k, got, want)
@@ -205,6 +209,9 @@ func (i *Issuer) checkAuthorization(authURL string) url.Values {
 		if q.Get(k) == "" {
 			i.t.Fatalf("signintest: authorization request has no %s", k)
 		}
+	}
+	if q.Has("resource") {
+		i.t.Fatalf("signintest: authorization request names a resource %q; a sign-in leaves it out (§4.5)", q.Get("resource"))
 	}
 	return q
 }
@@ -290,6 +297,15 @@ func (i *Issuer) authenticate(w http.ResponseWriter, r *http.Request) (url.Value
 	form := r.PostForm
 	claims, err := i.verifyAssertion(form)
 	i.mu.Lock()
+	if err == nil {
+		// RFC 7523 §3: an assertion's jti is used once.
+		jti, _ := claims["jti"].(string)
+		if i.jtis[jti] {
+			err = fmt.Errorf("client assertion jti %q was already used", jti)
+			claims = nil
+		}
+		i.jtis[jti] = true
+	}
 	i.reqs = append(i.reqs, Request{Path: r.URL.Path, Form: form, Claims: claims})
 	i.mu.Unlock()
 	if err != nil {
@@ -302,7 +318,7 @@ func (i *Issuer) authenticate(w http.ResponseWriter, r *http.Request) (url.Value
 // verifyAssertion checks the private_key_jwt client assertion (PAP §4.1, RFC
 // 7523): ES256 under a key in the agent's jwks.json, iss = sub = client_id,
 // aud the issuer as a single string, unexpired, living at most 5 minutes,
-// with a jti.
+// with a jti. authenticate refuses a jti used before.
 func (i *Issuer) verifyAssertion(form url.Values) (jwt.MapClaims, error) {
 	if form.Get("client_assertion_type") != assertionType {
 		return nil, fmt.Errorf("client_assertion_type %q", form.Get("client_assertion_type"))

@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,20 @@ const (
 	attempts        = 3
 	retryAfterCap   = 10 * time.Second
 )
+
+// CodeSignInRequired is the Error.Code of a 401 that a refresh can't fix:
+// the request needs the User to sign in at the Company (§5.4, section 7).
+const CodeSignInRequired = "sign_in_required"
+
+// TokenSource gives the access token to send to a Company for a User ID.
+// Tokens are kept per Company identifier and User ID, so one is only ever
+// found for the Company that granted it.
+type TokenSource interface {
+	// AccessToken is the current token, refreshed when it expires within a minute; "" for none.
+	AccessToken(ctx context.Context, co *discovery.Company, userID string) (string, error)
+	// Refresh refreshes after the Company refused the token; "" when the tokens are gone.
+	Refresh(ctx context.Context, co *discovery.Company, userID string) (string, error)
+}
 
 var (
 	_ Store = (*MemoryStore)(nil)
@@ -75,6 +90,9 @@ type Client struct {
 	// Discover finds a Company not seen since this process started, such as
 	// one a stored conversation names after a restart.
 	Discover func(ctx context.Context, domain string) (*discovery.Company, error)
+	// Tokens gives the access tokens of signed-in Users. nil means every
+	// request is signed out.
+	Tokens TokenSource
 
 	mu        sync.Mutex
 	companies map[string]*discovery.Company // by domain
@@ -374,16 +392,18 @@ func (c *Client) seen(convID string) (map[string]bool, error) {
 // It waits at least Retry-After (§5.6), and gives up instead when that is
 // longer than retryAfterCap. A POST retry sends
 // the same body, and so the same request ID (§8.3). session_ended starts a
-// new Session and sends the request once more (§5.5). Any other 4xx is
-// returned as an *Error without a retry. On success the caller closes the
-// response body.
+// new Session and sends the request once more (§5.5). A 401 invalid_token
+// for a token sent refreshes it and sends the request once more, freshly
+// signed (§5.5); any other 401 is CodeSignInRequired. Neither resend counts
+// as an attempt. Any other 4xx is returned as an *Error without a retry. On
+// success the caller closes the response body.
 func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string, body []byte, hdr http.Header) (*http.Response, error) {
 	userID, err := c.Store.UserID(co.Identifier)
 	if err != nil {
 		return nil, err
 	}
 	backoff := c.Backoff
-	rotated := false
+	rotated, refreshed := false, false
 	var wait time.Duration // before the next send
 	var lastErr error
 	for attempt := 0; attempt < attempts; attempt++ {
@@ -392,7 +412,7 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 		}
 		wait = backoff
 		backoff *= 2
-		resp, err := c.send(ctx, co, userID, method, u, body, hdr)
+		resp, sent, err := c.send(ctx, co, userID, method, u, body, hdr)
 		if err != nil {
 			if ctx.Err() != nil {
 				return nil, ctx.Err()
@@ -403,8 +423,23 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 			return resp, nil
 		}
+		bearer := bearerError(resp.Header)
 		cerr := readError(resp)
 		switch {
+		case resp.StatusCode == http.StatusUnauthorized && sent && bearer == "invalid_token" && !refreshed:
+			refreshed = true
+			if _, err := c.Tokens.Refresh(ctx, co, userID); err != nil {
+				// Not an *Error: the issuer failing is no reason to stop
+				// following a conversation, so a Reader tries again later.
+				return nil, fmt.Errorf("conversation: refreshing the token for %s: %w", co.Name, err)
+			}
+			attempt-- // a fresh token is not a retry of the same request
+			wait = 0
+			continue
+		case resp.StatusCode == http.StatusUnauthorized:
+			// The Company's description is dropped: the reason a Reader
+			// records is the same for every sign-in it needs.
+			return nil, &Error{Status: http.StatusUnauthorized, Code: CodeSignInRequired}
 		case cerr.Code == "session_ended" && !rotated:
 			rotated = true
 			c.sid(userID, true)
@@ -425,16 +460,28 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 	return nil, lastErr
 }
 
-func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method, u string, body []byte, hdr http.Header) (*http.Response, error) {
+// send sends one request, signed now. It asks Tokens for the User's
+// current access token at every send, so a retry carries a refreshed one,
+// and reports whether it sent one.
+func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method, u string, body []byte, hdr http.Header) (*http.Response, bool, error) {
+	var token string
+	if c.Tokens != nil && mayCarryToken(co, u) {
+		t, err := c.Tokens.AccessToken(ctx, co, userID)
+		if err != nil {
+			return nil, false, err
+		}
+		token = t
+	}
 	d, err := c.Store.Delegation(userID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	jwt, err := d.SignSession(identity.SessionClaims{
 		Aud: co.Identifier, Sub: userID, Sid: c.sid(userID, false), Method: method, URL: u,
+		AccessToken: token,
 	}, c.Now())
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var rd io.Reader
 	if body != nil {
@@ -442,10 +489,13 @@ func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u, rd)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	for k, v := range hdr {
 		req.Header[k] = v
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
 	}
 	req.Header.Set("Poppy-Session", jwt)
 	req.Header.Set("Poppy-Version", protocolVersion)
@@ -455,8 +505,44 @@ func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method
 	if req.Header.Get("Accept") == "" {
 		req.Header.Set("Accept", "application/json")
 	}
-	return c.HTTP.Do(req)
+	resp, err := c.HTTP.Do(req)
+	return resp, token != "", err
 }
+
+// mayCarryToken reports whether a request to u may carry co's default
+// access token (§4.5): u is one of co's discovered conversation endpoints,
+// or under one, and that endpoint's metadata names no resource of its own.
+// Such an endpoint takes only tokens issued for it, which this agent does
+// not request, so it is used signed out.
+func mayCarryToken(co *discovery.Company, u string) bool {
+	for _, a := range co.Agents {
+		ep := strings.TrimSuffix(a.Endpoint, "/")
+		if u != ep && !strings.HasPrefix(u, ep+"/") && !strings.HasPrefix(u, ep+"?") {
+			continue
+		}
+		return a.Resource == "" || a.Resource == "https://"+co.Domain
+	}
+	return false
+}
+
+// bearerError is the error parameter of a Bearer challenge in
+// WWW-Authenticate (RFC 6750 §3), or "" when there is none.
+func bearerError(h http.Header) string {
+	for _, v := range h.Values("WWW-Authenticate") {
+		scheme, params, _ := strings.Cut(strings.TrimSpace(v), " ")
+		if !strings.EqualFold(scheme, "Bearer") {
+			continue
+		}
+		if m := bearerErrorParam.FindStringSubmatch(params); m != nil {
+			return m[1] + m[2]
+		}
+	}
+	return ""
+}
+
+// bearerErrorParam matches error="..." or error=token among a challenge's
+// parameters.
+var bearerErrorParam = regexp.MustCompile(`(?:^|[\s,])error\s*=\s*(?:"([^"]*)"|([^\s,"]+))`)
 
 func readError(resp *http.Response) *Error {
 	defer resp.Body.Close()

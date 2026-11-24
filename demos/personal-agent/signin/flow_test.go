@@ -12,6 +12,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -453,6 +454,284 @@ func TestFlowNeverLogsSecrets(t *testing.T) {
 	for _, s := range secrets {
 		if s != "" && strings.Contains(out, s) {
 			t.Errorf("a secret reached the log or an error: %q", s)
+		}
+	}
+}
+
+// putTokens stores tokens for Ellen at the fixture's Company, expiring in d.
+func (fx *flowFixture) putTokens(t *testing.T, access, refresh string, d time.Duration) {
+	t.Helper()
+	if err := fx.store.Put(fx.co.Identifier, ellen, Tokens{Access: access, Refresh: refresh, Scopes: []string{"policies:read"}, Expiry: time.Now().Add(d)}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func (fx *flowFixture) requestsTo(path string) []signintest.Request {
+	var out []signintest.Request
+	for _, r := range fx.iss.Requests() {
+		if r.Path == path {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func TestAccessTokenUnexpiredNeedsNoRefresh(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 5*time.Minute)
+	got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen)
+	if err != nil || got != "a0" {
+		t.Fatalf("AccessToken = %q, %v; want a0", got, err)
+	}
+	if n := len(fx.iss.Requests()); n != 0 {
+		t.Errorf("issuer saw %d requests, want none", n)
+	}
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, "user-nobody"); got != "" || err != nil {
+		t.Errorf("AccessToken for a User with no tokens = %q, %v; want empty", got, err)
+	}
+}
+
+func TestRefreshBeforeExpiry(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 30*time.Second)
+	fx.iss.Next(http.StatusOK, tokenBody("a1", "r1", nil))
+
+	got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen)
+	if err != nil || got != "a1" {
+		t.Fatalf("AccessToken = %q, %v; want the refreshed a1", got, err)
+	}
+	reqs := fx.requestsTo("/token")
+	if len(reqs) != 1 {
+		t.Fatalf("token endpoint saw %d requests, want 1", len(reqs))
+	}
+	r := reqs[0]
+	if r.Claims == nil {
+		t.Error("the refresh's client assertion failed verification")
+	}
+	if r.Form.Get("grant_type") != "refresh_token" || r.Form.Get("refresh_token") != "r0" || r.Form.Has("scope") {
+		t.Errorf("refresh form: grant_type %q, refresh_token %q, scope present %v",
+			r.Form.Get("grant_type"), r.Form.Get("refresh_token"), r.Form.Has("scope"))
+	}
+	tok, _ := fx.store.Get(fx.co.Identifier, ellen)
+	if tok == nil || tok.Access != "a1" || tok.Refresh != "r1" || !slices.Equal(tok.Scopes, []string{"policies:read"}) {
+		t.Fatalf("stored %v, want a1, the rotated r1 and the same scopes", tok)
+	}
+	if d := time.Until(tok.Expiry); d < 59*time.Minute {
+		t.Errorf("expiry %v from now, want about an hour", d)
+	}
+	// A rotated refresh token is not revoked: the issuer already retired it
+	// (RFC 6749 §6), and presenting it again can look like reuse.
+	if n := len(fx.requestsTo("/revoke")); n != 0 {
+		t.Errorf("revocation endpoint saw %d requests, want none", n)
+	}
+}
+
+func TestRefreshKeepsRefreshTokenNotRotated(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 30*time.Second)
+	fx.iss.Next(http.StatusOK, tokenBody("a1", "", map[string]any{"refresh_token": nil}))
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); err != nil || got != "a1" {
+		t.Fatalf("AccessToken = %q, %v", got, err)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil || tok.Refresh != "r0" {
+		t.Errorf("stored %v, want the old refresh token kept", tok)
+	}
+}
+
+func TestRefreshInvalidGrantDeletesTokens(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 5*time.Minute)
+	fx.iss.Next(http.StatusBadRequest, map[string]any{"error": "invalid_grant"})
+	got, err := fx.flow.Refresh(context.Background(), fx.co, ellen)
+	if got != "" || err != nil {
+		t.Fatalf("Refresh = %q, %v; want empty and no error (signed out)", got, err)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok != nil {
+		t.Errorf("tokens still stored: %v", tok)
+	}
+}
+
+func TestRefreshFailureKeepsUnexpiredToken(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 30*time.Second)
+	fx.iss.Next(http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "a0" || err != nil {
+		t.Errorf("AccessToken = %q, %v; want the unexpired a0", got, err)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil || tok.Access != "a0" || tok.Refresh != "r0" {
+		t.Errorf("stored %v, want it unchanged", tok)
+	}
+
+	// Expired, the same failure is an error, and the tokens are kept for
+	// the next try.
+	fx.putTokens(t, "a0", "r0", -time.Second)
+	fx.iss.Next(http.StatusServiceUnavailable, map[string]any{"error": "temporarily_unavailable"})
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "" || err == nil {
+		t.Errorf("AccessToken = %q, %v; want an error", got, err)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil {
+		t.Error("a failed refresh deleted the tokens")
+	}
+
+	// A network error with an unexpired token answers it too.
+	fx.putTokens(t, "a0", "r0", 30*time.Second)
+	broken := NewFlow(&http.Client{Transport: failingTransport{}}, fx.id, fx.store)
+	if got, err := broken.AccessToken(context.Background(), fx.co, ellen); got != "a0" || err != nil {
+		t.Errorf("AccessToken over a broken network = %q, %v; want a0", got, err)
+	}
+}
+
+type failingTransport struct{}
+
+func (failingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("network down")
+}
+
+func TestRefreshIsOncePerUserAtATime(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", 30*time.Second)
+	var wg sync.WaitGroup
+	got := make([]string, 4)
+	for i := range got {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			got[i], _ = fx.flow.AccessToken(context.Background(), fx.co, ellen)
+		}()
+	}
+	wg.Wait()
+	if n := len(fx.requestsTo("/token")); n != 1 {
+		t.Errorf("token endpoint saw %d refreshes, want 1", n)
+	}
+	for _, g := range got[1:] {
+		if g != got[0] || g == "a0" || g == "" {
+			t.Errorf("AccessToken answers %q, want one refreshed token for all", got)
+			break
+		}
+	}
+}
+
+func TestRefreshRefusesExtraScopeAndRevokesItsRefreshToken(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a0", "r0", -time.Second)
+	fx.iss.Next(http.StatusOK, tokenBody("a1", "r1", map[string]any{"scope": "policies:read claims:read"}))
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "" || err == nil {
+		t.Errorf("AccessToken = %q, %v; want a refusal", got, err)
+	}
+	revs := fx.requestsTo("/revoke")
+	if len(revs) != 1 || revs[0].Form.Get("token") != "r1" || revs[0].Form.Get("token_type_hint") != "refresh_token" || revs[0].Claims == nil {
+		t.Errorf("revocations = %+v, want r1 revoked with an assertion", revs)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil || tok.Access != "a0" {
+		t.Errorf("stored %v, want it unchanged", tok)
+	}
+}
+
+func TestCompleteRevokesReplacedRefreshToken(t *testing.T) {
+	fx := newFlowFixture(t)
+	fx.putTokens(t, "a-old", "r-old", time.Hour)
+	authURL := fx.begin(t, "claims:read")
+	fx.iss.Next(http.StatusOK, tokenBody("a-new", "r-new", nil))
+	if _, err := fx.flow.Complete(context.Background(), fx.iss.Approve(authURL)); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	revs := fx.requestsTo("/revoke")
+	if len(revs) != 1 || revs[0].Form.Get("token") != "r-old" || revs[0].Form.Get("token_type_hint") != "refresh_token" {
+		t.Errorf("revocations = %+v, want r-old revoked", revs)
+	}
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil || tok.Refresh != "r-new" {
+		t.Errorf("stored %v, want r-new", tok)
+	}
+}
+
+func TestCompleteRevokesDiscardedRefreshToken(t *testing.T) {
+	cases := map[string]map[string]any{
+		"extra scope": {"scope": "policies:read claims:read"},
+		"empty grant": {"scope": ""},
+		"DPoP":        {"token_type": "DPoP"},
+	}
+	for name, edit := range cases {
+		t.Run(name, func(t *testing.T) {
+			fx := newFlowFixture(t)
+			authURL := fx.begin(t, "policies:read")
+			fx.iss.Next(http.StatusOK, tokenBody("a", "r-discarded", edit))
+			_, _ = fx.flow.Complete(context.Background(), fx.iss.Approve(authURL))
+			revs := fx.requestsTo("/revoke")
+			if len(revs) != 1 || revs[0].Form.Get("token") != "r-discarded" {
+				t.Errorf("revocations = %+v, want r-discarded revoked", revs)
+			}
+			if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok != nil {
+				t.Error("tokens were stored")
+			}
+		})
+	}
+}
+
+func TestCompleteClampsExpiresIn(t *testing.T) {
+	fx := newFlowFixture(t)
+	authURL := fx.begin(t, "policies:read")
+	fx.iss.Next(http.StatusOK, tokenBody("a", "r", map[string]any{"expires_in": int64(1) << 62}))
+	if _, err := fx.flow.Complete(context.Background(), fx.iss.Approve(authURL)); err != nil {
+		t.Fatalf("Complete: %v", err)
+	}
+	tok, _ := fx.store.Get(fx.co.Identifier, ellen)
+	if d := time.Until(tok.Expiry); d <= 23*time.Hour || d > 24*time.Hour {
+		t.Errorf("expiry %v from now, want it clamped to 24h", d)
+	}
+}
+
+func TestBeginCapsPendingSignInsPerUser(t *testing.T) {
+	fx := newFlowFixture(t)
+	other, err := fx.flow.Begin(context.Background(), fx.co, "user-other", []string{"policies:read"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var urls []string
+	for range maxPendingPerUser + 1 {
+		urls = append(urls, fx.begin(t, "policies:read"))
+	}
+	if _, err := fx.flow.Complete(context.Background(), fx.iss.Approve(urls[0])); !errors.Is(err, ErrUnknownState) {
+		t.Errorf("the oldest sign-in past the cap: Complete error = %v, want ErrUnknownState", err)
+	}
+	if _, err := fx.flow.Complete(context.Background(), fx.iss.Approve(urls[len(urls)-1])); err != nil {
+		t.Errorf("the newest sign-in: %v", err)
+	}
+	if _, err := fx.flow.Complete(context.Background(), fx.iss.Approve(other)); err != nil {
+		t.Errorf("another User's sign-in: %v", err)
+	}
+	fx.flow.mu.Lock()
+	n := len(fx.flow.pending)
+	fx.flow.mu.Unlock()
+	if n > maxPendingPerUser {
+		t.Errorf("%d sign-ins pending, want at most %d", n, maxPendingPerUser)
+	}
+}
+
+func TestRefreshNeverLogsSecrets(t *testing.T) {
+	var buf bytes.Buffer
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(os.Stderr) })
+	fx := newFlowFixture(t)
+	var errs []string
+	for _, c := range []struct {
+		status int
+		body   map[string]any
+	}{
+		{http.StatusOK, tokenBody("access-secret-1", "refresh-secret-2", nil)},
+		{http.StatusOK, tokenBody("access-secret-3", "refresh-secret-4", map[string]any{"token_type": "DPoP"})},
+		{http.StatusInternalServerError, map[string]any{"error": "server_error", "error_description": "access-secret-5"}},
+		{http.StatusBadRequest, map[string]any{"error": "invalid_grant", "error_description": "refresh-secret-6"}},
+	} {
+		fx.putTokens(t, "access-secret-0", "refresh-secret-0", -time.Second)
+		fx.iss.Next(c.status, c.body)
+		if _, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	out := buf.String() + "\n" + strings.Join(errs, "\n")
+	for _, s := range []string{"access-secret", "refresh-secret"} {
+		if strings.Contains(out, s) {
+			t.Errorf("a secret reached the log or an error:\n%s", out)
 		}
 	}
 }

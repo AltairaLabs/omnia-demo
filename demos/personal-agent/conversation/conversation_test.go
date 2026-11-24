@@ -6,10 +6,12 @@ import (
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,6 +26,8 @@ import (
 
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/discovery"
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/identity"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin/signintest"
 )
 
 // testIdentity generates the two identity keys in-process and loads them as
@@ -79,6 +83,7 @@ func decodeJWT(compact string) (map[string]any, map[string]any, error) {
 // recorded is one request the fake Company saw.
 type recorded struct {
 	Method, Path, LastEventID, Accept string
+	Authorization                     string
 	Query                             url.Values
 	Claims                            map[string]any
 	Body                              map[string]any
@@ -118,6 +123,7 @@ func (f *fakeCompany) serve(w http.ResponseWriter, r *http.Request) {
 	rec := recorded{
 		Method: r.Method, Path: r.URL.Path, Query: r.URL.Query(),
 		LastEventID: r.Header.Get("Last-Event-ID"), Accept: r.Header.Get("Accept"),
+		Authorization: r.Header.Get("Authorization"),
 	}
 	if v := r.Header.Get("Poppy-Version"); v != "1.0" {
 		f.t.Errorf("Poppy-Version = %q, want 1.0", v)
@@ -815,11 +821,12 @@ func TestReaderCursorExpiredWithoutCursorBacksOff(t *testing.T) {
 // so read_conversation can tell the model.
 func TestReaderRecordsTerminalStop(t *testing.T) {
 	for _, tc := range []struct {
-		name, code string
-		status     int
+		name, code, want string
+		status           int
 	}{
-		{"sign-in needed", "unauthorized", http.StatusUnauthorized},
-		{"version unsupported", "version_unsupported", http.StatusBadRequest},
+		// Any 401 but invalid_token on a token sent asks for sign-in.
+		{"sign-in needed", "unauthorized", "sign_in_required (HTTP 401)", http.StatusUnauthorized},
+		{"version unsupported", "version_unsupported", "version_unsupported", http.StatusBadRequest},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
@@ -833,8 +840,8 @@ func TestReaderRecordsTerminalStop(t *testing.T) {
 			}
 			runReader(t, c, conv)
 			reason, err := st.Stopped("cnv_1")
-			if err != nil || !strings.Contains(reason, tc.code) {
-				t.Errorf("Stopped = %q, %v; want a reason naming %s", reason, err, tc.code)
+			if err != nil || !strings.Contains(reason, tc.want) {
+				t.Errorf("Stopped = %q, %v; want a reason naming %s", reason, err, tc.want)
 			}
 			if _, _, closed, _ := st.State("cnv_1"); closed {
 				t.Error("a stopped conversation was marked closed")
@@ -879,5 +886,202 @@ func TestStateFollowsStream(t *testing.T) {
 	want := []snap{{true, "none", false}, {true, "none", false}, {true, "pending", false}, {false, "pending", false}, {false, "none", true}}
 	if fmt.Sprint(at) != fmt.Sprint(want) {
 		t.Errorf("state as published = %v, want %v", at, want)
+	}
+}
+
+// setIdentifier makes issuer f's Company's issuer and identifier.
+func (f *fakeCompany) setIdentifier(issuer string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.co.Issuer, f.co.Identifier = issuer, issuer
+	f.auds[issuer] = true
+}
+
+// signedIn is a Client whose TokenSource is a real signin.Flow against a
+// fake issuer for f's Company.
+type signedIn struct {
+	c      *Client
+	st     Store
+	iss    *signintest.Issuer
+	tokens *signin.MemoryTokenStore
+}
+
+func newSignedInClient(t *testing.T, f *fakeCompany) *signedIn {
+	t.Helper()
+	id := signintest.NewIdentity(t)
+	st := NewMemoryStore(id, time.Now)
+	c := NewClient(f.srv.Client(), st)
+	c.Backoff = time.Millisecond
+	iss := signintest.NewIssuer(t, id, f.co.Domain)
+	f.setIdentifier(iss.URL)
+	ts := signin.NewMemoryTokenStore()
+	c.Tokens = signin.NewFlow(iss.Client(), id, ts)
+	return &signedIn{c: c, st: st, iss: iss, tokens: ts}
+}
+
+// put stores tokens for the User at co, expiring in d.
+func (s *signedIn) put(t *testing.T, co *discovery.Company, access, refresh string, d time.Duration) {
+	t.Helper()
+	uid, err := s.st.UserID(co.Identifier)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.tokens.Put(co.Identifier, uid, signin.Tokens{Access: access, Refresh: refresh, Scopes: []string{"policies:read"}, Expiry: time.Now().Add(d)}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func athOf(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return base64.RawURLEncoding.EncodeToString(sum[:])
+}
+
+func created(w http.ResponseWriter, _ *http.Request, n int) {
+	writeJSON(w, http.StatusCreated, map[string]string{"conversation_id": fmt.Sprintf("cnv_%d", n)})
+}
+
+func TestSignedInRequestCarriesBearerAndAth(t *testing.T) {
+	f := newFakeCompany(t, created)
+	s := newSignedInClient(t, f)
+	s.put(t, f.co, "t1", "r1", time.Hour)
+	if _, err := s.c.Start(context.Background(), f.co, f.co.Agents[0], "Has my claim been paid?"); err != nil {
+		t.Fatal(err)
+	}
+	r := f.requests()[0]
+	if r.Authorization != "Bearer t1" {
+		t.Errorf("Authorization = %q, want Bearer t1", r.Authorization)
+	}
+	if r.Claims["ath"] != athOf("t1") {
+		t.Errorf("ath = %v, want the hash of t1", r.Claims["ath"])
+	}
+}
+
+func TestSignedOutRequestHasNoAth(t *testing.T) {
+	f := newFakeCompany(t, created)
+	c, _ := newTestClient(t, f)
+	if _, err := c.Start(context.Background(), f.co, f.co.Agents[0], "Is there an outage?"); err != nil {
+		t.Fatal(err)
+	}
+	r := f.requests()[0]
+	if r.Authorization != "" {
+		t.Errorf("Authorization = %q, want none", r.Authorization)
+	}
+	if _, ok := r.Claims["ath"]; ok {
+		t.Errorf("ath = %v, want none", r.Claims["ath"])
+	}
+}
+
+func TestInvalidTokenRefreshesOnceAndRetries(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		if n == 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer realm="larkmere", error="invalid_token", error_description="expired"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		created(w, r, n)
+	})
+	s := newSignedInClient(t, f)
+	s.put(t, f.co, "t1", "r1", time.Hour)
+	s.iss.Next(http.StatusOK, map[string]any{"access_token": "t2", "token_type": "Bearer", "expires_in": 3600, "refresh_token": "r2"})
+	if _, err := s.c.Start(context.Background(), f.co, f.co.Agents[0], "hello"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := f.requests()
+	if len(reqs) != 2 {
+		t.Fatalf("%d requests, want 2", len(reqs))
+	}
+	if reqs[0].Claims["jti"] == reqs[1].Claims["jti"] {
+		t.Error("the retry reused the Session JWT's jti")
+	}
+	if reqs[0].Body["id"] != reqs[1].Body["id"] {
+		t.Error("the retry changed the request id")
+	}
+	if reqs[1].Authorization != "Bearer t2" || reqs[1].Claims["ath"] != athOf("t2") {
+		t.Errorf("retry Authorization %q, ath %v; want t2 and its hash", reqs[1].Authorization, reqs[1].Claims["ath"])
+	}
+
+	// Refused again after the refresh, it gives up: no third send.
+	g := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	s = newSignedInClient(t, g)
+	s.put(t, g.co, "t1", "r1", time.Hour)
+	_, err := s.c.Start(context.Background(), g.co, g.co.Agents[0], "hello")
+	var cerr *Error
+	if !errors.As(err, &cerr) || cerr.Status != http.StatusUnauthorized || cerr.Code != CodeSignInRequired {
+		t.Errorf("Start error = %v, want sign_in_required (HTTP 401)", err)
+	}
+	if n := len(g.requests()); n != 2 {
+		t.Errorf("%d requests, want 2: one refresh, one resend", n)
+	}
+}
+
+func TestInvalidGrantDropsTokensAndStopsSignedOut(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		if r.Header.Get("Authorization") != "" {
+			t.Errorf("request %d carried a token after invalid_grant", n)
+		}
+		w.Header().Set("WWW-Authenticate", `Bearer realm="larkmere"`)
+		w.WriteHeader(http.StatusUnauthorized)
+	})
+	s := newSignedInClient(t, f)
+	s.c.Remember(f.co)
+	s.put(t, f.co, "t1", "r1", 30*time.Second)
+	s.iss.Next(http.StatusBadRequest, map[string]any{"error": "invalid_grant"})
+	conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+	if err := s.st.SaveConversation(conv); err != nil {
+		t.Fatal(err)
+	}
+	runReader(t, s.c, conv)
+	uid, _ := s.st.UserID(f.co.Identifier)
+	if tok, _ := s.tokens.Get(f.co.Identifier, uid); tok != nil {
+		t.Errorf("tokens still stored after invalid_grant: %v", tok)
+	}
+	if reason, _ := s.st.Stopped("cnv_1"); reason != "sign_in_required (HTTP 401)" {
+		t.Errorf("Stopped = %q, want sign_in_required (HTTP 401)", reason)
+	}
+	if n := len(f.requests()); n != 1 {
+		t.Errorf("%d requests, want 1", n)
+	}
+}
+
+func TestTokenNeverSentToAnotherCompany(t *testing.T) {
+	a := newFakeCompany(t, created)
+	b := newFakeCompany(t, created)
+	s := newSignedInClient(t, a)
+	s.put(t, a.co, "token-for-a", "r1", time.Hour)
+	ctx := context.Background()
+	if _, err := s.c.Start(ctx, b.co, b.co.Agents[0], "hello b"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.c.Start(ctx, a.co, a.co.Agents[0], "hello a"); err != nil {
+		t.Fatal(err)
+	}
+	if r := b.requests()[0]; r.Authorization != "" || r.Claims["ath"] != nil {
+		t.Errorf("Company B saw Authorization %q, ath %v; want neither", r.Authorization, r.Claims["ath"])
+	}
+	if r := a.requests()[0]; r.Authorization != "Bearer token-for-a" {
+		t.Errorf("Company A saw Authorization %q, want its own token", r.Authorization)
+	}
+}
+
+func TestTokenWithheldFromEndpointWithOwnResource(t *testing.T) {
+	f := newFakeCompany(t, created)
+	s := newSignedInClient(t, f)
+	s.put(t, f.co, "t1", "r1", time.Hour)
+	f.co.Agents[0].Resource = f.co.Agents[0].Endpoint
+	ctx := context.Background()
+	conv, err := s.c.Start(ctx, f.co, f.co.Agents[0], "hello")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := s.c.Send(ctx, conv, "more"); err != nil {
+		t.Fatal(err)
+	}
+	for _, r := range f.requests() {
+		if r.Authorization != "" || r.Claims["ath"] != nil {
+			t.Errorf("%s %s carried Authorization %q, ath %v; want neither", r.Method, r.Path, r.Authorization, r.Claims["ath"])
+		}
 	}
 }
