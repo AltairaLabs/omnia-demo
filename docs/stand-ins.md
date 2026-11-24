@@ -273,17 +273,31 @@ Add a row when you add a stand-in.
     the issuer withdraws keeps verifying tokens here until then. A real API
     would refresh its keys on a schedule as well.
 
-### The Poppy issuer gateway and the upstream provider (`poppy.auth`, Omnia #4443)
+### The Companies' Auth0 tenants behind the issuer gateway (`poppy.auth`, Omnia #4443)
 
-- **Fakes:** each Company's own Poppy-capable OAuth issuer. A real Company's
-  identity provider would speak PAP natively (a client-assertion client,
-  `resource`-less authorization, token exchange).
-- **Real system:** the Company's identity provider, named in the Workspace
-  Company's `auth.issuer`.
-- **What the stand-in does:** the Workspace names Omnia's issuer gateway
-  (`auth.gateway`, proposed on Omnia #4443) as the issuer, in front of an
-  ordinary OIDC tenant. The gateway does the PAP parts the tenant cannot, and
-  maps `email` and `email_verified` from the tenant into the tokens it issues.
+The issuer gateway is not a stand-in. It is Omnia's own component (Omnia
+#4443, proposed): the product path for a Company whose identity provider does
+not speak PAP, and what a real Company would run here too. The stand-ins are
+what sits behind and beside it.
+
+- **Fakes:**
+  - **The upstream identity provider:** each Company's customer identity
+    provider is a free Auth0 tenant holding one test user, Ellen (see "Ellen
+    at the upstream identity provider" below).
+  - **The account link:** the stub links a customer to a policy or account by
+    the verified `email` the gateway copies from the tenant (see "Home claims
+    belong to the signed-in member" above).
+- **Real system:** the Company's own customer identity provider, with its
+  real customers, and a link from each identity to the policyholder or
+  account holder, made at registration. Whether the Workspace names that
+  provider (`auth.issuer`, when it speaks PAP natively) or the gateway in
+  front of it (`auth.gateway`) is the Company's choice, not a demo shortcut.
+- **What the demo does:** the Workspace names Omnia's issuer gateway
+  (`auth.gateway`) as the issuer, in front of the Auth0 tenant. The gateway
+  does the PAP parts the tenant cannot, and maps `email` and `email_verified`
+  from the tenant into the tokens it issues. The account tools' Connection and
+  the stub accept tokens only from the gateway (`https://<gateway.host>`; the
+  chart refuses a `poppy.account.subjectIssuer` that names anything else).
 - **Why not Auth0 directly:** Auth0's Poppy-relevant gaps, measured on
   2026-11-24, are that it accepts no ES256 or PS384 client assertions (the
   algorithms PAP names for a Personal Agent) and has no `protected_resources`
@@ -298,8 +312,10 @@ Add a row when you add a stand-in.
   - **One scope per Company** (Larkmere `claims`, Wrenmoor `outages`), and one
     Auth0 tenant per Company (Larkmere's existing one, a second free tenant for
     Wrenmoor), so the two issuers are distinct (`PoppyIssuerConflict`).
-  - **A gateway that does not map both `email` and `email_verified` locks
-    every customer out:** the stub refuses the token (401).
+  - **The email link means whoever controls a verified email at the tenant is
+    that customer**, and a gateway that does not map both `email` and
+    `email_verified` locks every customer out: the stub refuses the token
+    (401).
 
 ### Ellen at the upstream identity provider
 

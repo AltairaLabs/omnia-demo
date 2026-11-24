@@ -58,14 +58,22 @@ already has the demos you can skip what's done.
    ```bash
    make -C ../omnia-azure workspace WS=ellens-assistant
    ```
-4. **Its keys**, made once into Secret `personal-agent-identity`:
+4. **Its keys**, in two Secrets the Deployment mounts:
+   `personal-agent-identity` (its identity keys) and `personal-agent-token-key`
+   (the key its sign-in tokens are sealed under in Redis):
    ```bash
    CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
    ```
-   A second run leaves the Secret alone. `--force` replaces only the keys:
-   the `client_id` stays the same and the companies refetch `jwks.json`.
-   Its conversations and User IDs stay in Redis (`pa:*`; [Reset](#reset)
-   clears them). Restart `deploy/personal-agent` afterwards.
+   The script creates whichever Secret is missing and leaves an existing one
+   alone. **On an existing cluster, run it again before the next
+   `make demos`:** a cluster set up before the token key has only
+   `personal-agent-identity`, and the pod then sits in `ContainerCreating`
+   waiting for `personal-agent-token-key`.
+   `--force` replaces the keys of both: the `client_id` stays the same and the
+   companies refetch `jwks.json`, but every stored sign-in becomes unreadable,
+   so Ellen signs in again. Its conversations and User IDs stay in Redis
+   (`pa:*`; [Reset](#reset) clears them). Restart `deploy/personal-agent`
+   afterwards.
 5. **Images.** No published personal-agent image is pinned yet, and the
    pinned demo-sites image has no `ellens-assistant` site:
    ```bash
@@ -248,19 +256,42 @@ The live run is deferred.
    renders `auth.issuer` and ignores the gateway's host and upstream. Give it
    the `host` (`auth.larkmere.azure.altairalabs.ai`,
    `auth.wrenmoor.azure.altairalabs.ai`) and the `upstream` tenant (`issuer`,
-   `clientID`, `clientSecretRef`). Auth0 can't
-   be the issuer itself: it accepts no ES256 or PS384 client assertions and has
+   `clientID`, `clientSecretRef`). The account tools then accept tokens from
+   `https://<host>` only: leave `poppy.account.subjectIssuer` empty, as the
+   chart refuses any other value. Auth0 can't be the issuer itself: it accepts no ES256 or PS384 client assertions and has
    no `protected_resources` (measured 2026-11-24). The gateway must also put
    `email` and `email_verified: true` in the tokens it issues, copied from the
    upstream user. The stub matches Ellen to her policy and account by that
    verified email. There is no account-links table and no `sub` to copy in
    by hand.
+   The gateway hosts need DNS and a certificate SAN like the Company hosts.
+   omnia-azure's `poppyHosts` and `make poppy-dns` (branch `feat/poppy-hosts`)
+   already list `auth.larkmere.` and `auth.wrenmoor.`, so milestone 1 Setup
+   step 1 made them. Check them before turning the gateway on:
+   ```bash
+   dig +short auth.larkmere.azure.altairalabs.ai
+   dig +short auth.wrenmoor.azure.altairalabs.ai
+   kubectl --context aks-omnia-demo -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
+   ```
+   Both names must resolve to the omnia-external gateway's address and appear
+   in `dnsNames`, and the certificate must be `READY True`. If either is
+   missing, run `make -C ../omnia-azure poppy-dns` from that branch again.
 2. **[needs Auth0] One tenant per Company.** Larkmere uses its existing Auth0
    tenant and Wrenmoor a second free one, so the issuers differ
    (`PoppyIssuerConflict` otherwise). In each, create Ellen Whitcomb as a test
    user, `ellen.whitcomb@example.com`, with the email marked verified, and a
-   regular web application for the gateway, whose ID and secret go in the
-   profile's `poppy.auth.gateway.upstream` (`clientID`, `clientSecretRef`).
+   regular web application for the gateway, whose ID goes in the profile's
+   `poppy.auth.gateway.upstream.clientID`. Its secret goes in a Secret in the
+   Company's namespace, never in a values file:
+   ```bash
+   kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-gateway-upstream \
+     --from-literal=clientSecret=<the Auth0 application's client secret>
+   ```
+   Do the same in `wrenmoor-energy` (`wrenmoor-gateway-upstream`), and name
+   each Secret in that profile's `poppy.auth.gateway.upstream.clientSecretRef`.
+   (#4443 has not fixed the key the gateway reads; `clientSecret` matches the
+   exchange client's Secret in step 3. Check it, and any label the gateway
+   requires, when #4443 ships.)
    One scope per Company: Larkmere `claims`, Wrenmoor `outages`.
 3. **[needs #4443] The exchange client's secret.** The account tools swap the
    token Ellen's assistant holds for one for the Company's API (RFC 8693,
@@ -289,14 +320,11 @@ The live run is deferred.
    by hand. `rm .images.env` goes back to the pins. (To pin instead, set those
    two keys in `profiles/azure/common.yaml`.)
 6. **The token key.** The Personal Agent seals its sign-in tokens under Secret
-   `personal-agent-token-key`, made by the keys script alongside the identity
-   keys. On a cluster that already has `personal-agent-identity`, running it
-   creates only what is missing and leaves existing keys alone:
+   `personal-agent-token-key`. It is made in milestone 1 Setup step 4; check
+   it exists:
    ```bash
-   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+   kubectl --context aks-omnia-demo -n ellens-assistant get secret personal-agent-token-key
    ```
-   Restart `deploy/personal-agent` afterwards. `--force` replaces both keys and
-   orphans every stored sign-in.
 7. **[needs #4443] Turn sign-in on.** Set `poppy.auth.enabled: true` in
    `profiles/azure/larkmere-mutual.yaml` and `wrenmoor-energy.yaml`, together
    with `poppy.auth.gateway.enabled: true`, its `host` and `upstream` (step 1

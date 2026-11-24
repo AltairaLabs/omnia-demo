@@ -1063,7 +1063,10 @@ poppy:
 #     documents at https://<host>/agent.json and /jwks.json;
 #   - the assistant agent (AgentRuntime `assistant`, websocket facade), whose
 #     five tools are the service's /tools/* routes, reached in-cluster.
-# Before installing, create the identity Secret: hack/personal-agent-keys.sh.
+# Before installing, create both Secrets, identitySecret and tokenKeySecret:
+# hack/personal-agent-keys.sh. With redisURL set the Deployment mounts both, so
+# on an existing cluster that has only the identity Secret, run the script
+# again before upgrading (it creates whichever is missing).
 personalAgent:
   # -- Run the service and the assistant.
   enabled: false

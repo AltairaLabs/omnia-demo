@@ -11,7 +11,10 @@ set -euo pipefail
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh --force   new keys
 #
 # Order on a new install: make -C ../omnia-azure workspace WS=ellens-assistant
-# (makes the namespace), then this script, then make demos.
+# (makes the namespace), then this script, then make demos. The Deployment
+# mounts both Secrets, so on an existing cluster that has only
+# personal-agent-identity, run this again before the next make demos: it
+# creates whichever Secret is missing and leaves the other alone.
 #
 # Two keys, PKCS#8 PEM, as demos/personal-agent/identity.Load reads them:
 #   es256.pem   ECDSA P-256 (ES256)
@@ -22,9 +25,10 @@ set -euo pipefail
 # STAND-IN (docs/stand-ins.md, "Personal Agent"): a real Personal Agent keeps
 # its keys in an HSM or KMS. Here they are a cluster Secret.
 #
-# Idempotent: an existing Secret is left alone unless --force. --force
-# replaces the keys of both Secrets (a new token key leaves every stored
-# sign-in unreadable, so Ellen signs in again; the identity change is below): the agent's client_id is unchanged, and the
+# Idempotent: each of the two Secrets is made only if it is missing, and an
+# existing one is left alone unless --force. --force replaces the keys of both
+# Secrets. A new token key leaves every stored sign-in unreadable, so Ellen
+# signs in again. New identity keys keep the agent's client_id, and the
 # Companies' facades refetch jwks.json when they meet an unknown key id. Its
 # conversations and User IDs are in Redis (pa:*), not here, so they stay; to
 # clear them, use the Reset in demos/personal-agent/RUNBOOK.md. Restart the
@@ -46,7 +50,7 @@ force=false
 for arg in "$@"; do
   case "${arg}" in
     --force) force=true ;;
-    -h|--help) sed -n '4,38p' "$0"; exit 0 ;;
+    -h|--help) sed -n '4,42p' "$0"; exit 0 ;;
     *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
   esac
 done
