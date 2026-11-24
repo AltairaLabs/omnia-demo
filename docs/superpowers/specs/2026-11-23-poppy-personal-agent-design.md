@@ -282,8 +282,15 @@ Three ways to build the assistant were considered.
    Conversation. Shows: discovery, the allowlist, Session verification,
    parallel conversations, and the person taking over. The dashboard shows
    the Poppy sessions with their `poppy-sid` and `poppy-agent` tags.
-2. **Signed in.** The demo identity provider (`demos/demoidp`) becomes a real
-   OAuth issuer for Larkmere and for Wrenmoor:
+2. **Signed in.** *Revised 2026-11-24:* no mainstream provider meets PAP's
+   issuer requirements on its own. Auth0, measured live, has CIMD but accepts
+   no ES256 or PS384 client assertions and publishes no `protected_resources`.
+   The issuer is therefore an Omnia component, the Poppy issuer gateway
+   (Omnia #4443), in front of an Auth0 tenant, and is not built in this repo.
+   This repo builds the Personal Agent's half: Direct Sign-In, the callback,
+   token storage and refresh, and a `sign_in` tool. It also makes the stubs
+   verify the exchanged token. The list below was the original plan for a
+   custom issuer; the gateway now owns it:
    - RFC 8414 metadata listing the Company's domain in
      `protected_resources`;
    - the authorization code grant with PKCE and a consent page;
