@@ -2,7 +2,7 @@
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
   "compilation": {
     "compiled_with": "packc-v2.7.0",
-    "created_at": "2026-11-24T15:21:31Z",
+    "created_at": "2026-11-24T16:21:11Z",
     "schema": "v1"
   },
   "description": "Pack containing 1 prompts",
@@ -167,7 +167,7 @@
       }
     },
     "sign_in": {
-      "description": "Start a sign-in for Ellen at a company, so its agent can reach her account there. Call it only after Ellen has clearly said yes. It puts a sign-in button on her screen; she signs in on the company's own page, and you never see her password or any code. Returns the company, the scopes asked for, the authorization_url and a note saying where the button is. Pass the scopes read_conversation showed (sign_in.scopes), space-separated; leave them out only when it showed none.",
+      "description": "Start a sign-in for Ellen at a company, so its agent can reach her account there. Call it only after Ellen has clearly said yes. It puts a sign-in button on her screen; she signs in on the company's own page, and you never see her password, any code or the sign-in link. Returns the company, the scopes asked for, the status and a note saying where the button is, or, when no conversation with the company is open, that one must be started first. Pass the scopes read_conversation showed (sign_in.scopes), space-separated; leave them out only when it showed none.",
       "name": "sign_in",
       "parameters": {
         "properties": {

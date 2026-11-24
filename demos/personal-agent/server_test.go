@@ -13,12 +13,14 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -483,12 +485,12 @@ func TestToolsNeverExposeUserIDOrKeys(t *testing.T) {
 	add(h.call(t, "/tools/find_company", map[string]string{"domain": co.domain}))
 	add(h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "outage?"}))
 	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e2" })
-	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	status, _, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
 	if status != 200 {
 		t.Fatalf("sign_in = %d %s", status, raw)
 	}
 	bodies = append(bodies, raw)
-	_, _, page := h.callback(t, h.iss.Approve(body["authorization_url"].(string)))
+	_, _, page := h.callback(t, h.iss.Approve(pendingURL(t, ups)))
 	bodies = append(bodies, page)
 	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["status"] == "signed_in" })
 	add(h.call(t, "/tools/send_message", map[string]string{"conversation_id": "cnv_1", "text": "thanks"}))
@@ -1154,8 +1156,8 @@ func TestSignInToolReturnsURLNeverToken(t *testing.T) {
 	}
 	// A first sign-in, so there are tokens, a code and a verifier the next
 	// answer must not hold.
-	_, first, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
-	if status, _, page := h.callback(t, h.iss.Approve(first["authorization_url"].(string))); status != 200 {
+	_, _, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status, _, page := h.callback(t, h.iss.Approve(pendingURL(t, ups))); status != 200 {
 		t.Fatalf("first sign-in: callback = %d %s (sign_in %s)", status, page, raw)
 	}
 	tok := h.tokens(t)
@@ -1167,10 +1169,6 @@ func TestSignInToolReturnsURLNeverToken(t *testing.T) {
 	if status != 200 {
 		t.Fatalf("sign_in = %d %s", status, raw)
 	}
-	authURL, _ := body["authorization_url"].(string)
-	if !strings.HasPrefix(authURL, h.iss.URL+"/authorize?") {
-		t.Errorf("authorization_url = %q, want the issuer's authorization endpoint", authURL)
-	}
 	note, _ := body["note"].(string)
 	if body["status"] != "pending" || body["company"] != "Larkmere Mutual" || body["scopes"] != "claims claims:read" ||
 		!strings.Contains(note, "Sign in to Larkmere Mutual") {
@@ -1181,11 +1179,13 @@ func TestSignInToolReturnsURLNeverToken(t *testing.T) {
 			t.Errorf("sign_in's answer holds a token, code or verifier %q: %s", sec, raw)
 		}
 	}
-	u := waitFor(t, ups, func(u map[string]any) bool {
-		ev, _ := u["event"].(map[string]any)
-		return ev["type"] == "signin" && ev["status"] == "pending" && ev["authorization_url"] == authURL
-	})
-	if ev := u["event"].(map[string]any); u["conversation_id"] != "cnv_1" || ev["scope"] != "claims claims:read" {
+	// The page gets the URL, as the button's link.
+	u := waitFor(t, ups, isSignIn("pending"))
+	ev := u["event"].(map[string]any)
+	if authURL, _ := ev["authorization_url"].(string); !strings.HasPrefix(authURL, h.iss.URL+"/authorize?") {
+		t.Errorf("authorization_url = %q, want the issuer's authorization endpoint", authURL)
+	}
+	if u["conversation_id"] != "cnv_1" || ev["scope"] != "claims claims:read" {
 		t.Errorf("update = %v", u)
 	}
 	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
@@ -1198,6 +1198,67 @@ func TestSignInToolReturnsURLNeverToken(t *testing.T) {
 	status, body, _ = plain.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
 	if status != http.StatusBadRequest || body["error"] != "sign-in isn't set up on this assistant" {
 		t.Errorf("sign_in without a Flow = %d %v", status, body)
+	}
+}
+
+// pendingURL waits for the pending sign-in update the page gets and returns
+// its authorization URL: the only place the URL, and the state in it, goes.
+func pendingURL(t *testing.T, ups <-chan map[string]any) string {
+	t.Helper()
+	u := waitFor(t, ups, isSignIn("pending"))
+	ev, _ := u["event"].(map[string]any)
+	authURL, _ := ev["authorization_url"].(string)
+	if authURL == "" {
+		t.Fatalf("pending sign-in update has no authorization_url: %v", u)
+	}
+	return authURL
+}
+
+// sign_in's answer goes to the model, so into the assistant's session
+// transcript. It must not hold the authorization URL or its live state: whoever
+// reads the transcript could complete the sign-in as someone else's account.
+// The page gets the URL over /api/updates instead.
+func TestSignInToolAnswerHoldsNoURLOrState(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.setStream("cnv_1", authEvent("e1", "claims"))
+	h := newSignInHarness(t, co)
+
+	// With no conversation open, nothing can show the button: the note says
+	// to start one first.
+	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
+	}
+	if note, _ := body["note"].(string); !strings.Contains(note, "Start a conversation with Larkmere Mutual first") {
+		t.Errorf("sign_in with no conversation = %s, want a note to start a conversation first", raw)
+	}
+	if strings.Contains(raw, "authorization_url") || strings.Contains(raw, "/authorize") {
+		t.Errorf("sign_in with no conversation holds the authorization URL: %s", raw)
+	}
+
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	status, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
+	}
+	authURL := pendingURL(t, ups)
+	u, err := url.Parse(authURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := u.Query().Get("state")
+	if state == "" {
+		t.Fatalf("authorization URL has no state: %s", authURL)
+	}
+	if strings.Contains(raw, state) || strings.Contains(raw, "authorization_url") || strings.Contains(raw, "/authorize") {
+		t.Errorf("sign_in's answer holds the authorization URL or its state: %s", raw)
+	}
+	want := []string{"company", "note", "scopes", "status"}
+	if got := slices.Sorted(maps.Keys(body)); !slices.Equal(got, want) {
+		t.Errorf("sign_in answer keys = %v, want %v", got, want)
 	}
 }
 
@@ -1233,10 +1294,10 @@ func TestCallbackSignsInAndResumesStoppedReader(t *testing.T) {
 
 			// The assistant passes on sign_in.scopes as it reads them.
 			_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": si["scopes"].(string)})
-			authURL, _ := body["authorization_url"].(string)
-			if authURL == "" || body["scopes"] != tc.asked {
+			if body["scopes"] != tc.asked {
 				t.Fatalf("sign_in = %s, want a sign-in for %q", raw, tc.asked)
 			}
+			authURL := pendingURL(t, ups)
 			q := h.iss.Approve(authURL)
 			status, hdr, page := h.callback(t, q)
 			if status != 200 || !strings.Contains(page, "Signed in to Wrenmoor Energy. You can close this tab and go back to your assistant.") {
@@ -1297,12 +1358,10 @@ func TestSignInRacingA401ResumesReader(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
-	authURL, _ := body["authorization_url"].(string)
-	if authURL == "" {
-		t.Fatalf("sign_in = %s", raw)
+	if status, _, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"}); status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
 	}
-	if status, _, page := h.callback(t, h.iss.Approve(authURL)); status != 200 {
+	if status, _, page := h.callback(t, h.iss.Approve(pendingURL(t, ups))); status != 200 {
 		t.Fatalf("callback = %d %s", status, page)
 	}
 	waitFor(t, ups, isSignIn("signed_in"))
@@ -1360,11 +1419,16 @@ func TestSignInFallbackScopes(t *testing.T) {
 	if note, _ := body["note"].(string); !strings.Contains(note, "No conversation with Larkmere Mutual is open") {
 		t.Errorf("sign_in with no conversation = %s, want a note that no button is showing", raw)
 	}
+	// With one open, the page gets the button.
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
 	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain})
 	if body["scopes"] != "claims:read" {
 		t.Errorf("sign_in = %s, want the scopes last asked for", raw)
 	}
-	if status, _, page := h.callback(t, h.iss.Approve(body["authorization_url"].(string))); status != 200 {
+	if status, _, page := h.callback(t, h.iss.Approve(pendingURL(t, ups))); status != 200 {
 		t.Fatalf("callback = %d %s", status, page)
 	}
 	co.mu.Lock()
@@ -1398,18 +1462,16 @@ func TestCallbackDeclineKeepsConversationOpen(t *testing.T) {
 		t.Fatalf("start = %d %s", status, raw)
 	}
 	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e1" })
-	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
-	authURL, _ := body["authorization_url"].(string)
-	if authURL == "" {
-		t.Fatalf("sign_in = %s", raw)
+	if status, _, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"}); status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
 	}
-	status, hdr, page := h.callback(t, h.iss.Decline(authURL))
+	status, hdr, page := h.callback(t, h.iss.Decline(pendingURL(t, ups)))
 	if status != 200 || !strings.Contains(page, "You didn&#39;t sign in to Larkmere Mutual.") {
 		t.Fatalf("callback = %d %s", status, page)
 	}
 	checkPageHeaders(t, hdr)
 	waitFor(t, ups, isSignIn("declined"))
-	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
 	if body["closed"] != false || body["stopped"] != nil {
 		t.Errorf("read_conversation = %s, want open", raw)
 	}
@@ -1457,12 +1519,10 @@ func TestCallbackUnknownStateIsPlainRefusal(t *testing.T) {
 	}
 
 	// A redirect from another issuer is refused too, and the sign-in failed.
-	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
-	authURL, _ := body["authorization_url"].(string)
-	if authURL == "" {
-		t.Fatalf("sign_in = %s", raw)
+	if status, _, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"}); status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
 	}
-	q = h.iss.Approve(authURL)
+	q = h.iss.Approve(pendingURL(t, ups))
 	q.Set("iss", "https://elsewhere.example")
 	if status, _, page := h.callback(t, q); status != http.StatusBadRequest || !strings.Contains(page, "refused") {
 		t.Errorf("callback from another issuer = %d %s", status, page)

@@ -1076,10 +1076,11 @@ func (s *server) fallbackScopes(co *discovery.Company, userID string) []string {
 }
 
 // signInTool begins a Direct Sign-In (PAP §4.2) at a Company for scopes.
-// It answers the authorization URL, which the page shows Ellen as a button;
-// she signs in on the Company's own page, and the redirect comes back to
-// /signin/callback. Nothing it answers or publishes holds a token, code or
-// verifier: the URL carries only the state and the code challenge.
+// It publishes the authorization URL to the page (/api/updates), which shows
+// Ellen a button; she signs in on the Company's own page, and the redirect
+// comes back to /signin/callback. The tool's answer, which the model sees,
+// holds no URL or state. Nothing it answers or publishes holds a token, code
+// or verifier: the URL carries only the state and the code challenge.
 func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolError) {
 	if s.signIn == nil {
 		return nil, fail(http.StatusBadRequest, "sign-in isn't set up on this assistant")
@@ -1138,14 +1139,17 @@ func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolErr
 	})
 	note := fmt.Sprintf("A 'Sign in to %s' button is on Ellen's screen; she signs in on %s's own page.", co.Name, co.Name)
 	if s.publishDomain(domain, b) == 0 {
-		note = fmt.Sprintf("No conversation with %s is open on Ellen's screen, so no sign-in button is showing; she can open authorization_url to sign in on %s's own page.", co.Name, co.Name)
+		note = fmt.Sprintf("No conversation with %s is open on Ellen's screen, so there is nowhere to show the sign-in button. Start a conversation with %s first, then call sign_in again.", co.Name, co.Name)
 	}
+	// The URL goes only to the page, in the update above. This answer goes to
+	// the model and so into the assistant's session transcript, and the URL's
+	// state completes the sign-in for whoever began it: anyone who read it
+	// there could finish the sign-in with their own account at the Company.
 	return map[string]string{
-		"company":           co.Name,
-		"scopes":            asked,
-		"authorization_url": authURL,
-		"status":            "pending",
-		"note":              note,
+		"company": co.Name,
+		"scopes":  asked,
+		"status":  "pending",
+		"note":    note,
 	}, nil
 }
 

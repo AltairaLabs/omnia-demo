@@ -2,9 +2,10 @@
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/sign_in
 # (demos/personal-agent/server.go): begins a Direct Sign-In (PAP §4.2) at a
-# company and answers the authorization URL, which Ellen's screen shows as a
-# button. Ellen signs in on the company's own page; the assistant never sees
-# a password, code or token. effect is external because the company is
+# company and sends the authorization URL to Ellen's screen, which shows it as
+# a button. The answer holds no URL: it would put the sign-in's live state in
+# the session transcript. Ellen signs in on the company's own page; the
+# assistant never sees a password, code, token or sign-in link. effect is external because the company is
 # contacted (discovery and the issuer's metadata); it is reversible because a
 # sign-in changes nothing until Ellen completes it herself.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
@@ -17,8 +18,10 @@ spec:
     Start a sign-in for Ellen at a company, so its agent can reach her
     account there. Call it only after Ellen has clearly said yes. It puts a
     sign-in button on her screen; she signs in on the company's own page, and
-    you never see her password or any code. Returns the company, the scopes
-    asked for, the authorization_url and a note saying where the button is.
+    you never see her password, any code or the sign-in link. Returns the
+    company, the scopes asked for, the status and a note saying where the
+    button is, or, when no conversation with the company is open, that one
+    must be started first.
     Pass the scopes read_conversation showed (sign_in.scopes), space-separated;
     leave them out only when it showed none.
   input_schema:
@@ -38,7 +41,6 @@ spec:
     properties:
       company: { type: string }
       scopes: { type: string }
-      authorization_url: { type: string }
       status: { type: string }
       note: { type: string }
   action_scope: { effect: external, reversibility: reversible, data_classes: [] }
@@ -47,6 +49,5 @@ spec:
   mock_result:
     company: Larkmere Mutual
     scopes: "policy:read"
-    authorization_url: https://larkmere.example.com/authorize?placeholder=1
     status: pending
     note: "A 'Sign in to Larkmere Mutual' button is on Ellen's screen; she signs in on Larkmere Mutual's own page."
