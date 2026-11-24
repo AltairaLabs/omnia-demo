@@ -124,8 +124,15 @@ type caseNoteResponse struct {
 	FiledFor string `json:"filed_for_review_by"`
 }
 
-// newServer returns the handler for every stub back-office service.
+// newServer returns the handler for every stub back-office service, with no
+// Company account routes.
 func newServer() http.Handler {
+	return newServerWith(accountConfig{})
+}
+
+// newServerWith is newServer plus the account routes acct names (obo.go),
+// each answering only a verified on-behalf-of token.
+func newServerWith(acct accountConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/case", jsonTool("case_fetch", fetchCase))
 	mux.HandleFunc("/credit-report", jsonTool("credit_report", fetchCredit))
@@ -153,6 +160,7 @@ func newServer() http.Handler {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	acct.register(mux)
 	return mux
 }
 
