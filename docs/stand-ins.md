@@ -310,8 +310,8 @@ Add a row when you add a stand-in.
   marked verified and a password kept by the presenter.
 - **Downstream:** anyone with that password signs in as Ellen at both
   Companies. The stub links her to her policy or account by that verified
-  email, so a test user created with a different email is "no account for
-  this customer".
+  email, so a test user created with a different email gets 404 "no account
+  for this customer".
 
 ## Models
 

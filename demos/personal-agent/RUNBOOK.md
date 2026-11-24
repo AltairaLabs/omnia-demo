@@ -1,4 +1,4 @@
-# Ellen's assistant: the storm (Poppy, milestone 1)
+# Ellen's assistant: the storm (Poppy, milestones 1 and 2)
 
 After a storm, Ellen Whitcomb tells her own AI assistant to sort it out. The
 assistant finds her insurer (Larkmere Mutual) and her energy supplier
@@ -243,9 +243,12 @@ The live run is deferred.
 ### Setup [needs #4443 + Auth0]
 
 1. **[needs #4443] The gateway.** Each Company's Workspace names Omnia's
-   issuer gateway instead of an issuer (`auth.gateway`, rendered from the
-   profile's `poppy.auth.gateway`): its host (`auth.larkmere.azure.altairalabs.ai`,
-   `auth.wrenmoor.azure.altairalabs.ai`) and the upstream tenant. Auth0 can't
+   issuer gateway instead of an issuer (`auth.gateway`). Set
+   `poppy.auth.gateway.enabled: true` in the profile: without it the chart
+   renders `auth.issuer` and ignores the gateway's host and upstream. Give it
+   the `host` (`auth.larkmere.azure.altairalabs.ai`,
+   `auth.wrenmoor.azure.altairalabs.ai`) and the `upstream` tenant (`issuer`,
+   `clientID`, `clientSecretRef`). Auth0 can't
    be the issuer itself: it accepts no ES256 or PS384 client assertions and has
    no `protected_resources` (measured 2026-11-24). The gateway must also put
    `email` and `email_verified: true` in the tokens it issues, copied from the
@@ -275,13 +278,16 @@ The live run is deferred.
    `poppy.account.encryption` (`{kmsProvider, keyID, secretRef: {name}}`) seals
    the exchanged tokens. omnia-azure configures none today, so a key and its
    credentials Secret come first.
-5. **Rebuild and re-pin the stub image.** The pinned stub image
-   (`mortgageUnderwriting`, `wren` in `profiles/azure/common.yaml`) predates
-   the account routes. Without the new image the account tools answer 404.
+5. **Rebuild the stub image.** The pinned stub image (`mortgageUnderwriting`
+   and `wren` in `profiles/azure/common.yaml`) predates the account routes.
+   Without the new image the account tools answer 404.
    ```bash
    make images
    ```
-   then re-pin the tags it prints.
+   `make images` writes `.images.env`, and `make demos` then runs every image
+   from that build instead of the profile's pins. There is nothing to re-pin
+   by hand. `rm .images.env` goes back to the pins. (To pin instead, set those
+   two keys in `profiles/azure/common.yaml`.)
 6. **The token key.** The Personal Agent seals its sign-in tokens under Secret
    `personal-agent-token-key`, made by the keys script alongside the identity
    keys. On a cluster that already has `personal-agent-identity`, running it
@@ -292,8 +298,11 @@ The live run is deferred.
    Restart `deploy/personal-agent` afterwards. `--force` replaces both keys and
    orphans every stored sign-in.
 7. **[needs #4443] Turn sign-in on.** Set `poppy.auth.enabled: true` in
-   `profiles/azure/larkmere-mutual.yaml` and `wrenmoor-energy.yaml` (with the
-   gateway, scopes and `poppy.account` values above), then `make demos`.
+   `profiles/azure/larkmere-mutual.yaml` and `wrenmoor-energy.yaml`, together
+   with `poppy.auth.gateway.enabled: true`, its `host` and `upstream` (step 1
+   and 2) and the `poppy.account` values (`tokenURL`, `clientID`,
+   `clientSecretRef`, `encryption`; steps 3 and 4). The `scopes` and
+   `scopeHints` are already in the profiles. Then `make demos`.
    This also switches each Company Agent from the signed-out pack to its
    `-signin` pack, which carries the account tools. Both packs ship, and
    `poppy.auth.enabled` chooses.
@@ -373,9 +382,9 @@ upstream, quoting the contradiction. Never loosen a gate to make it pass.
   (Larkmere) or `outages` (Wrenmoor). Check the scope in the Workspace
   Company's `auth.scopes`, and what Ellen's consent granted (a response may
   grant a subset, and the row then stays "needs sign-in").
-- **`no account for this customer`.** The token's verified email is not one
-  the stub holds. Ellen's test user at the Auth0 tenant must have
-  `ellen.whitcomb@example.com`.
+- **`404 no account for this customer`.** The token is valid and its email
+  is verified, but the stub holds no member with it. Ellen's test user at the
+  Auth0 tenant must have `ellen.whitcomb@example.com`.
 - **`sign_in` answers 400 with no known scopes.** The Company's discovery
   document or resource metadata listed no scopes, so personal-agent had none to
   ask for. Check `poppy.auth.scopes` and the Workspace's `auth` on the
