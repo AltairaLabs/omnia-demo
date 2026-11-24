@@ -53,16 +53,31 @@ type Company struct {
 	Identifier string
 	Issuer     string
 	Agents     []AgentEntry
+	// SignInDisabled is poppy.json auth.disabled (PAP §3.2): the company
+	// offers no sign-in, whatever its agents' access says.
+	SignInDisabled bool
+	// Scopes is poppy.json auth.scopes: scope name to description.
+	Scopes map[string]string
+	// ScopesSupported is the protected resource metadata's scopes_supported.
+	ScopesSupported []string
 }
 
 // AgentEntry is one poppy protocol entry. Access is "session" or "signed_in".
-type AgentEntry struct{ Endpoint, Description, Access string }
+//
+// Resource is the RFC 9728 resource of the endpoint's own metadata, or "" when
+// it has none or names a different resource (RFC 9728 §3.3). A token must not
+// be sent to an endpoint with a resource of its own.
+type AgentEntry struct{ Endpoint, Description, Access, Resource string }
 
 type poppyDoc struct {
 	Organization struct {
 		Name   string `json:"name"`
 		Domain string `json:"domain"`
 	} `json:"organization"`
+	Auth struct {
+		Disabled bool              `json:"disabled"`
+		Scopes   map[string]string `json:"scopes"`
+	} `json:"auth"`
 	Agent struct {
 		Protocols []struct {
 			Type        string `json:"type"`
@@ -87,7 +102,7 @@ func Discover(ctx context.Context, hc *http.Client, domain string) (*Company, er
 	if doc.Organization.Domain != domain {
 		return nil, fmt.Errorf("organization.domain %q does not match %q", doc.Organization.Domain, domain)
 	}
-	c := &Company{Name: doc.Organization.Name, Domain: domain}
+	c := &Company{Name: doc.Organization.Name, Domain: domain, SignInDisabled: doc.Auth.Disabled, Scopes: doc.Auth.Scopes}
 	for _, p := range doc.Agent.Protocols {
 		if p.Type != "poppy" {
 			continue
@@ -102,11 +117,19 @@ func Discover(ctx context.Context, hc *http.Client, domain string) (*Company, er
 		}
 		c.Agents = append(c.Agents, AgentEntry{Endpoint: p.Endpoint, Description: p.Description, Access: access})
 	}
-	issuer, err := fetchIssuer(ctx, hc, domain)
+	issuer, scopes, err := fetchIssuer(ctx, hc, domain)
 	if err != nil {
 		return nil, err
 	}
 	c.Issuer = issuer
+	c.ScopesSupported = scopes
+	if issuer != "" {
+		for i := range c.Agents {
+			if c.Agents[i].Resource, err = EndpointResource(ctx, hc, c.Agents[i].Endpoint); err != nil {
+				return nil, err
+			}
+		}
+	}
 	c.Identifier = issuer
 	if issuer == "" {
 		c.Identifier = "https://" + domain
@@ -146,35 +169,73 @@ func fetchPoppy(ctx context.Context, hc *http.Client, domain string, out *poppyD
 	return nil
 }
 
-// fetchIssuer returns "" for 404 (no issuer). Any other non-200 is an error,
-// with no fallback, and redirects are not followed.
-func fetchIssuer(ctx context.Context, hc *http.Client, domain string) (string, error) {
+// noRedirect returns a copy of hc that does not follow redirects.
+func noRedirect(hc *http.Client) *http.Client {
 	client := *hc
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+domain+prmPath, nil)
+	return &client
+}
+
+type prmDoc struct {
+	Resource             string   `json:"resource"`
+	AuthorizationServers []string `json:"authorization_servers"`
+	ScopesSupported      []string `json:"scopes_supported"`
+}
+
+// getPRM fetches protected resource metadata at path on host. found is false
+// for 404. Redirects are not followed.
+func getPRM(ctx context.Context, hc *http.Client, host, path string) (doc prmDoc, found bool, err error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://"+host+path, nil)
 	if err != nil {
-		return "", err
+		return doc, false, err
 	}
-	resp, err := client.Do(req)
+	resp, err := noRedirect(hc).Do(req)
 	if err != nil {
-		return "", unreachable(prmPath, err)
+		return doc, false, unreachable(path, err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusNotFound:
-		return "", nil
+		return doc, false, nil
 	case http.StatusOK:
 	default:
-		return "", statusError(prmPath, resp.StatusCode)
+		return doc, false, statusError(path, resp.StatusCode)
 	}
-	var prm struct {
-		AuthorizationServers []string `json:"authorization_servers"`
+	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBodySize)).Decode(&doc); err != nil {
+		return doc, false, fmt.Errorf("decoding %s: %w", path, err)
 	}
-	if err := json.NewDecoder(io.LimitReader(resp.Body, maxBodySize)).Decode(&prm); err != nil {
-		return "", fmt.Errorf("decoding %s: %w", prmPath, err)
+	return doc, true, nil
+}
+
+// fetchIssuer returns "" for 404 (no issuer). Any other non-200 is an error,
+// with no fallback, and redirects are not followed. The metadata's resource
+// must be https://<domain>, else it describes some other resource.
+func fetchIssuer(ctx context.Context, hc *http.Client, domain string) (string, []string, error) {
+	prm, found, err := getPRM(ctx, hc, domain, prmPath)
+	if err != nil || !found {
+		return "", nil, err
+	}
+	if prm.Resource != "https://"+domain {
+		return "", nil, fmt.Errorf("%s resource %q is not https://%s", prmPath, prm.Resource, domain)
 	}
 	if len(prm.AuthorizationServers) == 0 || prm.AuthorizationServers[0] == "" {
-		return "", fmt.Errorf("%s has no authorization_servers", prmPath)
+		return "", nil, fmt.Errorf("%s has no authorization_servers", prmPath)
 	}
-	return prm.AuthorizationServers[0], nil
+	return prm.AuthorizationServers[0], prm.ScopesSupported, nil
+}
+
+// EndpointResource returns the RFC 9728 resource the endpoint's own metadata
+// (https://<host>/.well-known/oauth-protected-resource<path>) declares, or ""
+// when it answers 404 or its resource is not the endpoint URL (§3.3). Any
+// other non-200 is an error. Redirects are not followed.
+func EndpointResource(ctx context.Context, hc *http.Client, endpoint string) (string, error) {
+	u, err := url.Parse(endpoint)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("endpoint %q is not a URL", endpoint)
+	}
+	prm, found, err := getPRM(ctx, hc, u.Host, prmPath+u.Path)
+	if err != nil || !found || prm.Resource != endpoint {
+		return "", err
+	}
+	return prm.Resource, nil
 }
