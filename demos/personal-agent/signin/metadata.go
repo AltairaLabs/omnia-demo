@@ -1,7 +1,8 @@
 // Package signin is the Personal Agent's side of PAP Direct Sign-In (PAP
 // 1.0 §4.2, https://personalagentprotocol.org/docs/1.0/spec), written from
 // the spec: checking a Company's issuer metadata (§3.2) before anything is
-// sent to it, using only the standard library.
+// sent to it, and keeping the tokens a sign-in grants sealed per Company and
+// User (tokens.go).
 package signin
 
 import (
