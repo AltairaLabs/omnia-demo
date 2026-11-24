@@ -15,6 +15,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -24,6 +25,8 @@ import (
 
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/conversation"
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/identity"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin/signintest"
 )
 
 // testIdentity generates the two identity keys in-process and loads them.
@@ -70,6 +73,16 @@ type company struct {
 	// closedAlready makes /close answer 409 conversation_closed, as for a
 	// conversation the Company closed first.
 	closedAlready bool
+	// issuer, when set, is named in the protected resource metadata, so
+	// the Company offers sign-in there.
+	issuer string
+	// requireToken makes /events answer 401 with no Bearer challenge
+	// error, as for a conversation that needs the User's account, to a
+	// request without an access token.
+	requireToken bool
+	// authz is the Authorization header of every request, "METHOD path
+	// header".
+	authz []string
 }
 
 func newCompany(t *testing.T, name string) *company {
@@ -78,6 +91,8 @@ func newCompany(t *testing.T, name string) *company {
 	c.srv = httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		c.mu.Lock()
 		c.paths = append(c.paths, r.Method+" "+r.URL.Path)
+		c.authz = append(c.authz, r.Method+" "+r.URL.Path+" "+r.Header.Get("Authorization"))
+		issuer, requireToken := c.issuer, c.requireToken
 		c.mu.Unlock()
 		switch {
 		case r.URL.Path == "/.well-known/poppy.json":
@@ -88,7 +103,13 @@ func newCompany(t *testing.T, name string) *company {
 				}}},
 			})
 		case r.URL.Path == "/.well-known/oauth-protected-resource":
-			http.NotFound(w, r)
+			if issuer == "" {
+				http.NotFound(w, r)
+				return
+			}
+			writeJSONTest(w, 200, map[string]any{
+				"resource": "https://" + c.domain, "authorization_servers": []string{issuer},
+			})
 		case r.Method == http.MethodPost:
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
@@ -109,6 +130,10 @@ func newCompany(t *testing.T, name string) *company {
 			}
 			writeJSONTest(w, http.StatusCreated, map[string]string{"conversation_id": id})
 		case strings.HasSuffix(r.URL.Path, "/events"):
+			if requireToken && r.Header.Get("Authorization") == "" {
+				writeJSONTest(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
+				return
+			}
 			id := strings.Split(strings.TrimPrefix(r.URL.Path, "/poppy/"), "/")[0]
 			c.mu.Lock()
 			evs := c.stream[id]
@@ -134,6 +159,12 @@ func (c *company) setStream(conv string, evs ...map[string]any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.stream[conv] = evs
+}
+
+func (c *company) authorizations() []string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]string(nil), c.authz...)
 }
 
 func (c *company) requests() []string {
@@ -167,6 +198,9 @@ type harness struct {
 	http  *httptest.Server
 	store *conversation.MemoryStore
 	id    *identity.Identity
+	// flow and iss are set by newSignInHarness.
+	flow *signin.Flow
+	iss  *signintest.Issuer
 }
 
 func newHarness(t *testing.T, hc *http.Client, known ...string) *harness {
@@ -178,11 +212,38 @@ func newHarness(t *testing.T, hc *http.Client, known ...string) *harness {
 
 func newHarnessWith(t *testing.T, hc *http.Client, id *identity.Identity, st *conversation.MemoryStore, known ...string) *harness {
 	t.Helper()
-	ctx, cancel := context.WithCancel(context.Background())
-	s := newServer(ctx, config{
-		Identity: id, Store: st, HTTP: hc, KnownCompanies: known,
-		ReaderBackoff: 10 * time.Millisecond,
+	return newHarnessConfig(t, config{Identity: id, Store: st, HTTP: hc, KnownCompanies: known})
+}
+
+// newSignInHarness is a harness whose agent can sign in at co, a known
+// Company whose issuer is a signintest.Issuer offering "claims" and
+// "claims:read".
+func newSignInHarness(t *testing.T, co *company) *harness {
+	t.Helper()
+	id := testIdentity(t)
+	iss := signintest.NewIssuer(t, id, co.domain)
+	iss.SetScopesSupported("claims", "claims:read")
+	co.mu.Lock()
+	co.issuer = iss.URL
+	co.mu.Unlock()
+	// Every httptest TLS server has the same certificate, so the Company's
+	// client trusts the issuer too.
+	flow := signin.NewFlow(co.srv.Client(), id, signin.NewMemoryTokenStore())
+	h := newHarnessConfig(t, config{
+		Identity: id, Store: conversation.NewMemoryStore(id, time.Now), HTTP: co.srv.Client(),
+		KnownCompanies: []string{co.domain}, SignIn: flow,
 	})
+	h.flow, h.iss = flow, iss
+	return h
+}
+
+func newHarnessConfig(t *testing.T, cfg config) *harness {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg.ReaderBackoff = 10 * time.Millisecond
+	st := cfg.Store.(*conversation.MemoryStore)
+	id := cfg.Identity
+	s := newServer(ctx, cfg)
 	ts := httptest.NewServer(s.handler())
 	t.Cleanup(func() {
 		cancel()
@@ -399,38 +460,50 @@ func TestIdentityDocsServedWithoutRedirect(t *testing.T) {
 
 func TestToolsNeverExposeUserIDOrKeys(t *testing.T) {
 	co := newCompany(t, "Wrenmoor Energy")
-	co.setStream("cnv_1", msgEvent("e1", "There is an outage at HX7."))
-	h := newHarness(t, co.srv.Client(), co.domain)
+	co.setStream("cnv_1", msgEvent("e1", "There is an outage at HX7."), authEvent("e2", "claims"))
+	h := newSignInHarness(t, co)
 	ups := h.updates(t)
 
 	var bodies []string
 	add := func(_ int, _ map[string]any, raw string) { bodies = append(bodies, raw) }
 	add(h.call(t, "/tools/find_company", map[string]string{"domain": co.domain}))
 	add(h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "outage?"}))
-	u := waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e1" })
-	b, _ := json.Marshal(u)
-	bodies = append(bodies, string(b))
+	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e2" })
+	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
+	}
+	bodies = append(bodies, raw)
+	_, _, page := h.callback(t, h.iss.Approve(body["authorization_url"].(string)))
+	bodies = append(bodies, page)
+	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["status"] == "signed_in" })
 	add(h.call(t, "/tools/send_message", map[string]string{"conversation_id": "cnv_1", "text": "thanks"}))
 	add(h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"}))
 	add(h.call(t, "/api/direct", map[string]string{"conversation_id": "cnv_1", "text": "It's Ellen."}))
 	add(h.call(t, "/tools/close_conversation", map[string]string{"conversation_id": "cnv_1"}))
-	for _, path := range []string{"/agent.json", "/jwks.json"} {
-		resp, err := http.Get(h.http.URL + path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		raw, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		bodies = append(bodies, string(raw))
+	for _, path := range []string{"/agent.json", "/jwks.json", "/api/conversations"} {
+		_, _, raw := h.get(t, path)
+		bodies = append(bodies, raw)
 	}
+	bodies = append(bodies, drain(ups)...)
 
-	userID, err := h.store.UserID("https://" + co.domain)
+	userID, err := h.store.UserID(h.iss.URL)
 	if err != nil {
 		t.Fatal(err)
 	}
+	tok := h.tokens(t)
+	if tok == nil {
+		t.Fatal("no tokens stored after the sign-in")
+	}
+	if !contains(co.authorizations(), "POST /poppy/cnv_1/messages Bearer "+tok.Access) {
+		t.Errorf("send_message after the sign-in carried no access token: %v", co.authorizations())
+	}
+	secrets := append([]string{userID, tok.Access, tok.Refresh}, h.exchangeSecrets()...)
 	for _, body := range bodies {
-		if strings.Contains(body, userID) {
-			t.Errorf("a response exposes the User ID: %s", body)
+		for _, sec := range secrets {
+			if strings.Contains(body, sec) {
+				t.Errorf("a response or update exposes a User ID, token, code or verifier %q: %s", sec, body)
+			}
 		}
 		if strings.Contains(body, "eyJ") {
 			t.Errorf("a response holds what looks like a JWT: %s", body)
@@ -920,5 +993,366 @@ func TestReadConversationWaitAnswersAtOnceWhenAlreadyReplied(t *testing.T) {
 	}
 	if msgs, _ := r.body["messages"].([]any); len(msgs) != 1 {
 		t.Errorf("read_conversation = %s, want the reply", r.raw)
+	}
+}
+
+func authEvent(id, scope string) map[string]any {
+	return map[string]any{
+		"id": id, "type": "authorization", "created_at": "2026-11-23T10:01:00Z",
+		"error": "insufficient_scope", "scope": scope,
+	}
+}
+
+// get fetches path and returns the status, headers and body.
+func (h *harness) get(t *testing.T, path string) (int, http.Header, string) {
+	t.Helper()
+	resp, err := http.Get(h.http.URL + path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, resp.Header, string(raw)
+}
+
+// callback opens the sign-in callback with the redirect's query q, as
+// Ellen's browser does after the Company's sign-in page.
+func (h *harness) callback(t *testing.T, q url.Values) (int, http.Header, string) {
+	t.Helper()
+	return h.get(t, "/signin/callback?"+q.Encode())
+}
+
+// tokens is what the agent holds for Ellen at the harness's issuer.
+func (h *harness) tokens(t *testing.T) *signin.Tokens {
+	t.Helper()
+	userID, err := h.store.UserID(h.iss.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, err := h.flow.Tokens.Get(h.iss.URL, userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tok
+}
+
+// exchangeSecrets are the codes, verifiers and refresh tokens the agent sent
+// the issuer's token endpoint.
+func (h *harness) exchangeSecrets() []string {
+	var out []string
+	for _, r := range h.iss.Requests() {
+		for _, k := range []string{"code", "code_verifier", "refresh_token"} {
+			if v := r.Form.Get(k); v != "" {
+				out = append(out, v)
+			}
+		}
+	}
+	return out
+}
+
+// drain returns the updates that arrive within 200ms, as JSON.
+func drain(ch <-chan map[string]any) []string {
+	var out []string
+	for {
+		select {
+		case u := <-ch:
+			b, _ := json.Marshal(u)
+			out = append(out, string(b))
+		case <-time.After(200 * time.Millisecond):
+			return out
+		}
+	}
+}
+
+func isSignIn(status string) func(map[string]any) bool {
+	return func(u map[string]any) bool {
+		ev, _ := u["event"].(map[string]any)
+		return ev["type"] == "signin" && ev["status"] == status
+	}
+}
+
+func signInOf(t *testing.T, body map[string]any, raw string) map[string]any {
+	t.Helper()
+	si, ok := body["sign_in"].(map[string]any)
+	if !ok {
+		t.Fatalf("read_conversation has no sign_in: %s", raw)
+	}
+	return si
+}
+
+func TestAuthorizationEventNeedsSignIn(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.setStream("cnv_1", msgEvent("e1", "I can look at your claim once you sign in."), authEvent("e2", "claims"))
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e2" })
+	status, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	if status != 200 {
+		t.Fatalf("read_conversation = %d %s", status, raw)
+	}
+	si := signInOf(t, body, raw)
+	if si["needed"] != true || si["scopes"] != "claims" || si["status"] != "needed" {
+		t.Errorf("sign_in = %v, want needed, scopes claims, status needed", si)
+	}
+
+	// A conversation with no authorization event, not stopped, needs none.
+	plain := conversation.Conversation{ID: "cnv_p", Company: co.domain, Name: "Larkmere Mutual"}
+	if err := h.store.SaveConversation(plain); err != nil {
+		t.Fatal(err)
+	}
+	if _, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_p"}); body["sign_in"] != nil {
+		t.Errorf("read_conversation = %s, want no sign_in", raw)
+	}
+
+	// A waiting read wakes when one arrives.
+	if err := h.store.SetWorking("cnv_p", true); err != nil {
+		t.Fatal(err)
+	}
+	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_p", "wait_seconds": 15})
+	subscribed(t, &h.srv.hub, 2)
+	h.arrive(t, plain, authEvent("p1", "claims:read"))
+	select {
+	case r := <-res:
+		si, _ := r.body["sign_in"].(map[string]any)
+		if r.status != 200 || si["needed"] != true || si["scopes"] != "claims:read" {
+			t.Errorf("read_conversation = %d %s, want sign_in needed for claims:read", r.status, r.raw)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("read_conversation did not return when sign-in became needed")
+	}
+}
+
+func TestSignInToolReturnsURLNeverToken(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.setStream("cnv_1", authEvent("e1", "claims"))
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	// A first sign-in, so there are tokens, a code and a verifier the next
+	// answer must not hold.
+	_, first, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status, _, page := h.callback(t, h.iss.Approve(first["authorization_url"].(string))); status != 200 {
+		t.Fatalf("first sign-in: callback = %d %s (sign_in %s)", status, page, raw)
+	}
+	tok := h.tokens(t)
+	if tok == nil {
+		t.Fatal("no tokens after the first sign-in")
+	}
+
+	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims:read"})
+	if status != 200 {
+		t.Fatalf("sign_in = %d %s", status, raw)
+	}
+	authURL, _ := body["authorization_url"].(string)
+	if !strings.HasPrefix(authURL, h.iss.URL+"/authorize?") {
+		t.Errorf("authorization_url = %q, want the issuer's authorization endpoint", authURL)
+	}
+	note, _ := body["note"].(string)
+	if body["status"] != "pending" || body["company"] != "Larkmere Mutual" || body["scopes"] != "claims claims:read" ||
+		!strings.Contains(note, "Sign in to Larkmere Mutual") {
+		t.Errorf("sign_in = %s, want pending at Larkmere Mutual for claims and claims:read, with the note", raw)
+	}
+	for _, sec := range append([]string{tok.Access, tok.Refresh}, h.exchangeSecrets()...) {
+		if strings.Contains(raw, sec) {
+			t.Errorf("sign_in's answer holds a token, code or verifier %q: %s", sec, raw)
+		}
+	}
+	u := waitFor(t, ups, func(u map[string]any) bool {
+		ev, _ := u["event"].(map[string]any)
+		return ev["type"] == "signin" && ev["status"] == "pending" && ev["authorization_url"] == authURL
+	})
+	if ev := u["event"].(map[string]any); u["conversation_id"] != "cnv_1" || ev["scope"] != "claims claims:read" {
+		t.Errorf("update = %v", u)
+	}
+	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	if si := signInOf(t, body, raw); si["status"] != "pending" {
+		t.Errorf("sign_in = %v, want pending", si)
+	}
+
+	// An assistant with no sign-in set up says so.
+	plain := newHarness(t, co.srv.Client(), co.domain)
+	status, body, _ = plain.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	if status != http.StatusBadRequest || body["error"] != "sign-in isn't set up on this assistant" {
+		t.Errorf("sign_in without a Flow = %d %v", status, body)
+	}
+}
+
+func TestCallbackSignsInAndResumesStoppedReader(t *testing.T) {
+	co := newCompany(t, "Wrenmoor Energy")
+	co.requireToken = true
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my outage?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	u := waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["type"] == "stopped" })
+	if ev := u["event"].(map[string]any); !strings.HasPrefix(ev["reason"].(string), conversation.CodeSignInRequired) {
+		t.Fatalf("stopped = %v, want sign_in_required", ev)
+	}
+	_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	if si := signInOf(t, body, raw); si["needed"] != true || si["status"] != "needed" {
+		t.Errorf("sign_in = %v, want needed", si)
+	}
+
+	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	authURL, _ := body["authorization_url"].(string)
+	if authURL == "" {
+		t.Fatalf("sign_in = %s", raw)
+	}
+	q := h.iss.Approve(authURL)
+	status, hdr, page := h.callback(t, q)
+	if status != 200 || !strings.Contains(page, "Signed in to Wrenmoor Energy. You can close this tab and go back to your assistant.") {
+		t.Fatalf("callback = %d %s", status, page)
+	}
+	checkPageHeaders(t, hdr)
+	tok := h.tokens(t)
+	if tok == nil {
+		t.Fatal("no tokens after the callback")
+	}
+	for _, sec := range append([]string{tok.Access, tok.Refresh, q.Get("state")}, h.exchangeSecrets()...) {
+		if strings.Contains(page, sec) {
+			t.Errorf("the callback page holds a token, code, state or verifier %q: %s", sec, page)
+		}
+	}
+	waitFor(t, ups, isSignIn("signed_in"))
+
+	// The Reader runs again, signed in.
+	deadline := time.Now().Add(5 * time.Second)
+	for !contains(co.authorizations(), "GET /poppy/cnv_1/events Bearer "+tok.Access) {
+		if time.Now().After(deadline) {
+			t.Fatalf("the Reader did not read again with the access token: %v", co.authorizations())
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	if body["stopped"] != nil {
+		t.Errorf("read_conversation = %s, want no longer stopped", raw)
+	}
+	if si := signInOf(t, body, raw); si["needed"] != false || si["status"] != "signed_in" {
+		t.Errorf("sign_in = %v, want signed in and not needed", si)
+	}
+}
+
+func checkPageHeaders(t *testing.T, hdr http.Header) {
+	t.Helper()
+	if ct := hdr.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Errorf("Content-Type = %q, want text/html", ct)
+	}
+	if cc := hdr.Get("Cache-Control"); cc != "no-store" {
+		t.Errorf("Cache-Control = %q, want no-store", cc)
+	}
+	if csp := hdr.Get("Content-Security-Policy"); csp != "default-src 'none'; style-src 'unsafe-inline'" {
+		t.Errorf("Content-Security-Policy = %q", csp)
+	}
+}
+
+func TestCallbackDeclineKeepsConversationOpen(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.setStream("cnv_1", authEvent("e1", "claims"))
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e1" })
+	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	authURL, _ := body["authorization_url"].(string)
+	if authURL == "" {
+		t.Fatalf("sign_in = %s", raw)
+	}
+	status, hdr, page := h.callback(t, h.iss.Decline(authURL))
+	if status != 200 || !strings.Contains(page, "You didn&#39;t sign in to Larkmere Mutual.") {
+		t.Fatalf("callback = %d %s", status, page)
+	}
+	checkPageHeaders(t, hdr)
+	waitFor(t, ups, isSignIn("declined"))
+	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	if body["closed"] != false || body["stopped"] != nil {
+		t.Errorf("read_conversation = %s, want open", raw)
+	}
+	if si := signInOf(t, body, raw); si["needed"] != true || si["status"] != "declined" || si["scopes"] != "claims" {
+		t.Errorf("sign_in = %v, want still needed, declined", si)
+	}
+	if h.tokens(t) != nil {
+		t.Error("tokens stored after a decline")
+	}
+	for _, r := range co.requests() {
+		if strings.HasSuffix(r, "/close") {
+			t.Errorf("the conversation was closed: %s", r)
+		}
+	}
+}
+
+func TestCallbackUnknownStateIsPlainRefusal(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.setStream("cnv_1", authEvent("e1", "claims"))
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["id"] == "e1" })
+
+	q := url.Values{"state": {"state-nobody-started"}, "code": {"code-from-nowhere"}, "iss": {h.iss.URL}}
+	status, hdr, page := h.callback(t, q)
+	if status != http.StatusBadRequest || !strings.Contains(page, "expired or has already been used") {
+		t.Errorf("callback = %d %s, want 400 and the reason", status, page)
+	}
+	checkPageHeaders(t, hdr)
+	for _, v := range []string{"state-nobody-started", "code-from-nowhere"} {
+		if strings.Contains(page, v) {
+			t.Errorf("the page echoes %q: %s", v, page)
+		}
+	}
+	for _, u := range drain(ups) {
+		if strings.Contains(u, `"signin"`) {
+			t.Errorf("an update was published: %s", u)
+		}
+	}
+	if n := len(h.iss.Requests()); n != 0 {
+		t.Errorf("the issuer saw %d requests, want none", n)
+	}
+
+	// A redirect from another issuer is refused too, and the sign-in failed.
+	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	authURL, _ := body["authorization_url"].(string)
+	if authURL == "" {
+		t.Fatalf("sign_in = %s", raw)
+	}
+	q = h.iss.Approve(authURL)
+	q.Set("iss", "https://elsewhere.example")
+	if status, _, page := h.callback(t, q); status != http.StatusBadRequest || !strings.Contains(page, "refused") {
+		t.Errorf("callback from another issuer = %d %s", status, page)
+	}
+	waitFor(t, ups, isSignIn("failed"))
+	if h.tokens(t) != nil {
+		t.Error("tokens stored after a refused redirect")
+	}
+}
+
+// With Redis, sign-in tokens are sealed, so the key is required; without, they
+// stay in memory.
+func TestTokenStoreNeedsKeyWithRedis(t *testing.T) {
+	if _, err := tokenStore("redis://127.0.0.1:1", ""); err == nil || !strings.Contains(err.Error(), "--token-key-file") {
+		t.Errorf("tokenStore with Redis and no key = %v, want an error naming --token-key-file", err)
+	}
+	key := filepath.Join(t.TempDir(), "token.key")
+	if err := os.WriteFile(key, []byte("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if ts, err := tokenStore("redis://127.0.0.1:1", key); err != nil {
+		t.Errorf("tokenStore with Redis and a key = %v", err)
+	} else if _, ok := ts.(*signin.RedisTokenStore); !ok {
+		t.Errorf("tokenStore = %T, want a RedisTokenStore", ts)
+	}
+	if ts, err := tokenStore("", ""); err != nil {
+		t.Errorf("tokenStore without Redis = %v", err)
+	} else if _, ok := ts.(*signin.MemoryTokenStore); !ok {
+		t.Errorf("tokenStore = %T, want a MemoryTokenStore", ts)
 	}
 }

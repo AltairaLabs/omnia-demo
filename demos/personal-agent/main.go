@@ -25,6 +25,14 @@
 //   - This tool service, not the model, holds the keys and the User IDs.
 //     The model sees conversation IDs, Company names and messages; no tool
 //     answer carries a User ID, a key or a Session JWT.
+//   - The sign-in redirect lands on a public callback that cannot tell who
+//     completed it (PAP §4.2, §10.8). A real Personal Agent would receive
+//     it in its own app, signed in as the User who began the sign-in, or
+//     on the device that opened the link. Here a forwarded link completes
+//     the sign-in for Ellen, so the Company's consent page (prompt=consent)
+//     is the only guard; nothing here works around it.
+//   - Sign-in tokens are sealed in Redis under a key from a cluster Secret
+//     (--token-key-file), not an HSM or a vendor's key service.
 //
 // Written from the spec. Nothing is copied from Omnia's own test Personal
 // Agent, which is under a commercial licence (this repository is public).
@@ -45,6 +53,7 @@ import (
 
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/conversation"
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/identity"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin"
 )
 
 func main() {
@@ -54,6 +63,7 @@ func main() {
 	addr := flag.String("addr", ":8080", "listen address")
 	testIdentityDir := flag.String("test-identity-dir", "", "if set, serve this directory's files at /poppy-test/ (the PAP validator's test identity)")
 	known := flag.String("known-companies", "", "comma-separated domains Ellen has accounts at")
+	tokenKeyFile := flag.String("token-key-file", "", "file holding the key sign-in tokens are sealed under in Redis: one line of standard base64, 32 bytes; required with --redis-url")
 	flag.Parse()
 
 	id, err := identity.Load(*identityDir, *baseURL)
@@ -71,6 +81,10 @@ func main() {
 		log.Print("no --redis-url: User IDs and conversations are kept in memory and lost on restart")
 		st = conversation.NewMemoryStore(id, time.Now)
 	}
+	tokens, err := tokenStore(*redisURL, *tokenKeyFile)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	var companies []string
 	for _, d := range strings.Split(*known, ",") {
@@ -85,6 +99,7 @@ func main() {
 	s := newServer(ctx, config{
 		Identity: id, Store: st, HTTP: companyClient(),
 		KnownCompanies: companies, TestIdentityDir: *testIdentityDir,
+		SignIn: signin.NewFlow(issuerClient(), id, tokens),
 	})
 	s.resume()
 
@@ -109,11 +124,26 @@ func main() {
 	s.wait()
 }
 
-// companyClient reaches the Companies. It has no overall timeout, because
-// event streams stay open for minutes; ResponseHeaderTimeout covers a read
-// held up to its 30s wait (§8.5).
-func companyClient() *http.Client {
-	return &http.Client{Transport: &http.Transport{
+// tokenStore is where sign-in tokens are kept: sealed in Redis under the
+// key in keyFile, which is then required, or in memory without Redis, lost
+// on restart.
+func tokenStore(redisURL, keyFile string) (signin.TokenStore, error) {
+	if redisURL == "" {
+		log.Print("no --redis-url: sign-in tokens are kept in memory and lost on restart")
+		return signin.NewMemoryTokenStore(), nil
+	}
+	if keyFile == "" {
+		return nil, errors.New("--token-key-file is required with --redis-url: sign-in tokens are sealed under it")
+	}
+	key, err := signin.LoadKey(keyFile)
+	if err != nil {
+		return nil, err
+	}
+	return signin.NewRedisTokenStore(redisURL, key)
+}
+
+func transport() *http.Transport {
+	return &http.Transport{
 		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           (&net.Dialer{Timeout: 10 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
 		ForceAttemptHTTP2:     true,
@@ -121,5 +151,20 @@ func companyClient() *http.Client {
 		ResponseHeaderTimeout: 60 * time.Second,
 		IdleConnTimeout:       90 * time.Second,
 		MaxIdleConns:          20,
-	}}
+	}
+}
+
+// companyClient reaches the Companies. It has no overall timeout, because
+// event streams stay open for minutes; ResponseHeaderTimeout covers a read
+// held up to its 30s wait (§8.5).
+func companyClient() *http.Client {
+	return &http.Client{Transport: transport()}
+}
+
+// issuerClient reaches the Companies' issuers: metadata, token exchange,
+// refresh and revocation. Each is one short request, so a hung issuer is
+// cut off after 30s (a refresh, which holds up that User's requests, after
+// the Flow's own 15s).
+func issuerClient() *http.Client {
+	return &http.Client{Transport: transport(), Timeout: 30 * time.Second}
 }

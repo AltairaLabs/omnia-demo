@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html/template"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +20,7 @@ import (
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/conversation"
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/discovery"
 	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/identity"
+	"github.com/AltairaLabs/omnia-demo/demos/personal-agent/signin"
 )
 
 const (
@@ -30,6 +33,10 @@ const (
 	// maxReadWait is the longest read_conversation waits for a change. The
 	// ToolRegistry's timeout for it must stay above this.
 	maxReadWait = 20 * time.Second
+	// signInPendingFor is how long a begun sign-in reads as pending: as long
+	// as the Flow keeps its state (10 minutes). After that its redirect is
+	// refused anyway.
+	signInPendingFor = 10 * time.Minute
 )
 
 // config is what the server is built from; main fills it from flags.
@@ -47,6 +54,10 @@ type config struct {
 	// ReaderBackoff is each Reader's base reconnect wait; 0 is the Reader's
 	// own default.
 	ReaderBackoff time.Duration
+	// SignIn runs Direct Sign-In (PAP §4.2) and keeps the tokens it grants
+	// fresh. nil means this agent never signs in: every request is signed
+	// out and sign_in says sign-in isn't set up.
+	SignIn *signin.Flow
 }
 
 // server is the Personal Agent's HTTP surface: its public identity
@@ -60,11 +71,17 @@ type server struct {
 	testDir string
 	backoff time.Duration
 	hub     hub
+	signIn  *signin.Flow // nil when sign-in isn't set up
 
 	mu      sync.Mutex
 	allowed map[string]bool   // domains start_conversation may use
 	names   map[string]string // Company name by domain
+	ids     map[string]string // Company identifier (§3.2) by domain
 	readers map[string]bool   // conversations with a running Reader
+	// again marks a conversation whose stopped Reader is to run once more
+	// as soon as it has left, because a sign-in completed meanwhile.
+	again   map[string]bool
+	signins map[string]signInState // the latest sign-in begun, by domain
 	wg      sync.WaitGroup
 
 	directMu sync.Mutex // one Direct Conversation per parent
@@ -78,9 +95,17 @@ func newServer(ctx context.Context, cfg config) *server {
 		client:  conversation.NewClient(cfg.HTTP, cfg.Store),
 		testDir: cfg.TestIdentityDir,
 		backoff: cfg.ReaderBackoff,
+		signIn:  cfg.SignIn,
 		allowed: map[string]bool{},
 		names:   map[string]string{},
+		ids:     map[string]string{},
 		readers: map[string]bool{},
+		again:   map[string]bool{},
+		signins: map[string]signInState{},
+	}
+	if cfg.SignIn != nil {
+		// Only when set: a nil *Flow in the interface would not be nil.
+		s.client.Tokens = cfg.SignIn
 	}
 	for _, d := range cfg.KnownCompanies {
 		if d, ok := normalizeDomain(d); ok {
@@ -95,6 +120,7 @@ func newServer(ctx context.Context, cfg config) *server {
 		if err == nil {
 			s.mu.Lock()
 			s.names[co.Domain] = co.Name
+			s.ids[co.Domain] = co.Identifier
 			s.mu.Unlock()
 		}
 		return co, err
@@ -117,6 +143,10 @@ func (s *server) handler() http.Handler {
 	mux.HandleFunc("POST /tools/send_message", s.tool("send_message", s.sendMessage))
 	mux.HandleFunc("POST /tools/read_conversation", s.tool("read_conversation", s.readConversation))
 	mux.HandleFunc("POST /tools/close_conversation", s.tool("close_conversation", s.closeConversation))
+	mux.HandleFunc("POST /tools/sign_in", s.tool("sign_in", s.signInTool))
+	// Public: where the Company's sign-in page sends Ellen's browser back
+	// (PAP §4.2). It answers a page that names the Company and nothing else.
+	mux.HandleFunc("GET /signin/callback", s.signInCallback)
 	// The page. Not tools: only Ellen takes a conversation over.
 	mux.HandleFunc("POST /api/direct", s.tool("direct", s.direct))
 	mux.HandleFunc("GET /api/updates", s.updates)
@@ -163,10 +193,27 @@ func (s *server) resume() {
 // ends, unless one already runs. Its lifetime is the server's, not the
 // request's that started it.
 func (s *server) follow(conv conversation.Conversation) {
+	s.start(conv, false)
+}
+
+// refollow follows conv again after its Reader stopped: at once, or, if the
+// stopped Reader has not quite left yet, as soon as it has.
+func (s *server) refollow(conv conversation.Conversation) {
+	s.start(conv, true)
+}
+
+func (s *server) start(conv conversation.Conversation, again bool) {
 	s.mu.Lock()
-	if s.readers[conv.ID] || s.ctx.Err() != nil {
-		// Already followed, or the server is shutting down: a Reader
-		// started now would outlive wait.
+	if s.ctx.Err() != nil {
+		// The server is shutting down: a Reader started now would outlive
+		// wait.
+		s.mu.Unlock()
+		return
+	}
+	if s.readers[conv.ID] {
+		if again {
+			s.again[conv.ID] = true
+		}
 		s.mu.Unlock()
 		return
 	}
@@ -175,13 +222,22 @@ func (s *server) follow(conv conversation.Conversation) {
 	s.mu.Unlock()
 	go func() {
 		defer s.wg.Done()
-		defer func() {
+		for {
+			r := &conversation.Reader{Client: s.client, Backoff: s.backoff}
+			r.Run(s.ctx, conv, s.publish)
+			// Leave before saying why, so whoever acts on it (a sign-in that
+			// resumes the conversation) can start a new Reader.
 			s.mu.Lock()
-			delete(s.readers, conv.ID)
+			rerun := s.again[conv.ID] && s.ctx.Err() == nil
+			delete(s.again, conv.ID)
+			if !rerun {
+				delete(s.readers, conv.ID)
+			}
 			s.mu.Unlock()
-		}()
-		r := &conversation.Reader{Client: s.client, Backoff: s.backoff}
-		r.Run(s.ctx, conv, s.publish)
+			if !rerun {
+				break
+			}
+		}
 		if reason, _ := s.store.Stopped(conv.ID); reason != "" {
 			log.Printf("reader stopped: conversation=%s reason=%s", conv.ID, reason)
 			b, _ := json.Marshal(map[string]string{"type": "stopped", "reason": reason})
@@ -296,6 +352,8 @@ type toolRequest struct {
 	// WaitSeconds is how long read_conversation may wait for a change,
 	// 0 to 20.
 	WaitSeconds int `json:"wait_seconds"`
+	// Scopes are the scopes sign_in asks for, space-separated.
+	Scopes string `json:"scopes"`
 }
 
 // toolError is a refusal or failure the model can read and act on.
@@ -524,6 +582,19 @@ type readOut struct {
 	// Stopped is why the conversation is no longer followed, such as a
 	// Company asking for sign-in.
 	Stopped string `json:"stopped,omitempty"`
+	// SignIn is set while the Company wants Ellen signed in, or a sign-in
+	// with it has begun or ended.
+	SignIn *signInOut `json:"sign_in,omitempty"`
+}
+
+// signInOut is a conversation's sign-in state as the model sees it. Needed
+// is whether the Company wants Ellen signed in for Scopes (space-separated,
+// "" when it didn't say). Status is needed, pending (a sign-in begun and not
+// completed), signed_in or declined.
+type signInOut struct {
+	Needed bool   `json:"needed"`
+	Scopes string `json:"scopes"`
+	Status string `json:"status"`
 }
 
 // readConversation answers from the Store alone: what the conversation's
@@ -585,7 +656,15 @@ func changed(before, now readOut) bool {
 	return companyMessages(now) > companyMessages(before) ||
 		(before.Working && !now.Working) ||
 		now.Handoff != before.Handoff ||
-		now.Closed || now.Stopped != ""
+		now.Closed || now.Stopped != "" ||
+		!sameSignIn(before.SignIn, now.SignIn)
+}
+
+func sameSignIn(a, b *signInOut) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
 }
 
 // replied reports whether the company has already answered: its message is
@@ -632,6 +711,7 @@ func (s *server) read(c conversation.Conversation) (readOut, *toolError) {
 			out.Messages = append(out.Messages, messageOut{Role: e.Role, Author: e.AuthorType, Text: e.Text})
 		}
 	}
+	out.SignIn = s.signInOf(c, events, stopped)
 	return out, nil
 }
 
@@ -824,5 +904,294 @@ func (h *hub) publish(b []byte) {
 				log.Printf("updates: a page is not keeping up; %d updates dropped so far", h.dropped)
 			}
 		}
+	}
+}
+
+// signInState is the latest sign-in begun with a Company: pending from
+// sign_in until its redirect comes back, then signed_in or declined. A
+// sign-in that failed leaves none. It is kept in memory only, like the
+// Flow's pending sign-ins; after a restart the token store alone says
+// whether Ellen is signed in.
+type signInState struct {
+	status string
+	at     time.Time
+}
+
+// signInStatus is the domain's latest sign-in status, "" for none or for a
+// pending one whose redirect can no longer come back.
+func (s *server) signInStatus(domain string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	st := s.signins[domain]
+	if st.status == "pending" && time.Since(st.at) > signInPendingFor {
+		return ""
+	}
+	return st.status
+}
+
+func (s *server) setSignInStatus(domain, status string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if status == "" {
+		delete(s.signins, domain)
+		return
+	}
+	s.signins[domain] = signInState{status: status, at: time.Now()}
+}
+
+// signInOf is a conversation's sign-in state. Sign-in is needed when the
+// Company's latest authorization event (§8.11) names scopes Ellen's tokens
+// for it don't hold, or when its Reader stopped on a 401 asking for sign-in
+// (§5.4). nil when sign-in isn't needed and none has begun.
+func (s *server) signInOf(c conversation.Conversation, events []conversation.Event, stopped string) *signInOut {
+	var scopes []string
+	asked := false
+	for i := len(events) - 1; i >= 0; i-- {
+		if events[i].Type != "authorization" {
+			continue
+		}
+		var a struct {
+			Scope string `json:"scope"`
+		}
+		_ = json.Unmarshal(events[i].Raw, &a)
+		scopes, asked = strings.Fields(a.Scope), true
+		break
+	}
+	needed := strings.HasPrefix(stopped, conversation.CodeSignInRequired) || (asked && !s.holds(c.Company, scopes))
+	st := s.signInStatus(c.Company)
+	if !needed && st == "" {
+		return nil
+	}
+	status := st
+	switch {
+	case st == "pending":
+	case needed && st != "declined":
+		// Not yet signed in, or signed in without what is needed now.
+		status = "needed"
+	}
+	return &signInOut{Needed: needed, Scopes: strings.Join(scopes, " "), Status: status}
+}
+
+// holds reports whether Ellen's stored tokens for the Company at domain hold
+// every scope in scopes. With no Flow, or a Company not discovered since
+// this process started, there are none.
+func (s *server) holds(domain string, scopes []string) bool {
+	if s.signIn == nil || s.signIn.Tokens == nil {
+		return false
+	}
+	s.mu.Lock()
+	identifier := s.ids[domain]
+	s.mu.Unlock()
+	if identifier == "" {
+		return false
+	}
+	userID, err := s.store.UserID(identifier)
+	if err != nil {
+		return false
+	}
+	t, err := s.signIn.Tokens.Get(identifier, userID)
+	if err != nil || t == nil {
+		return false
+	}
+	for _, sc := range scopes {
+		if !slices.Contains(t.Scopes, sc) {
+			return false
+		}
+	}
+	return true
+}
+
+// publishDomain sends raw to the page on every open conversation with the
+// Company at domain.
+func (s *server) publishDomain(domain string, raw json.RawMessage) {
+	convs, err := s.store.Conversations()
+	if err != nil {
+		log.Printf("publish: %v", err)
+		return
+	}
+	for _, c := range convs {
+		if c.Company == domain && !s.isClosed(c) {
+			s.publishRaw(c, raw)
+		}
+	}
+}
+
+// signInTool begins a Direct Sign-In (PAP §4.2) at a Company for scopes.
+// It answers the authorization URL, which the page shows Ellen as a button;
+// she signs in on the Company's own page, and the redirect comes back to
+// /signin/callback. Nothing it answers or publishes holds a token, code or
+// verifier: the URL carries only the state and the code challenge.
+func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolError) {
+	if s.signIn == nil {
+		return nil, fail(http.StatusBadRequest, "sign-in isn't set up on this assistant")
+	}
+	domain, ok := normalizeDomain(req.Domain)
+	if !ok {
+		return nil, fail(http.StatusBadRequest, "%q is not a domain name", req.Domain)
+	}
+	scopes := strings.Fields(req.Scopes)
+	if len(scopes) == 0 {
+		return nil, fail(http.StatusBadRequest, "scopes is empty; pass the scopes read_conversation's sign_in.scopes names, space-separated")
+	}
+	s.mu.Lock()
+	allowed := s.allowed[domain]
+	s.mu.Unlock()
+	if !allowed {
+		return nil, fail(http.StatusBadRequest, "%s is not a company Ellen has an account at, nor one found with find_company", domain)
+	}
+	ctx, cancel := context.WithTimeout(ctx, companyTimeout)
+	defer cancel()
+	co, err := s.client.Discover(ctx, domain)
+	if err != nil {
+		log.Printf("sign_in: domain=%s: %v", domain, err)
+		if errors.Is(err, discovery.ErrUnreachable) {
+			return nil, fail(http.StatusBadGateway, "%s", unreachableReason(domain))
+		}
+		return nil, fail(http.StatusBadGateway, "no Poppy agent at %s", domain)
+	}
+	s.client.Remember(co)
+	if co.Issuer == "" || co.SignInDisabled {
+		return nil, fail(http.StatusBadRequest, "%s offers no sign-in", co.Name)
+	}
+	userID, err := s.store.UserID(co.Identifier)
+	if err != nil {
+		return nil, fail(http.StatusInternalServerError, "reading the User ID: %v", err)
+	}
+	authURL, err := s.signIn.Begin(ctx, co, userID, scopes)
+	if err != nil {
+		log.Printf("sign_in: domain=%s: %v", domain, err)
+		return nil, fail(http.StatusBadGateway, "couldn't start a sign-in at %s: %s", co.Name, strings.TrimPrefix(err.Error(), "signin: "))
+	}
+	// The scopes asked for: those given, plus any Ellen already granted.
+	asked := ""
+	if u, err := url.Parse(authURL); err == nil {
+		asked = u.Query().Get("scope")
+	}
+	s.setSignInStatus(domain, "pending")
+	b, _ := json.Marshal(map[string]string{
+		"type": "signin", "status": "pending", "scope": asked, "authorization_url": authURL,
+	})
+	s.publishDomain(domain, b)
+	return map[string]string{
+		"company":           co.Name,
+		"scopes":            asked,
+		"authorization_url": authURL,
+		"status":            "pending",
+		"note":              fmt.Sprintf("A 'Sign in to %s' button is on Ellen's screen; she signs in on %s's own page.", co.Name, co.Name),
+	}, nil
+}
+
+// signInCallback is where the Company's sign-in page sends Ellen's browser
+// back (PAP §4.2). It completes the sign-in the state names and answers a
+// small page saying how it went. The page holds no token, code or state.
+//
+// It is public, and cannot tell who opened it: a sign-in link opened on
+// another device, or forwarded, completes for whoever began it (§4.2,
+// §10.8). The Company's consent page (prompt=consent) is what guards that.
+func (s *server) signInCallback(w http.ResponseWriter, r *http.Request) {
+	if s.signIn == nil {
+		writeSignInPage(w, http.StatusNotFound, "Sign-in isn't set up", "This assistant doesn't sign in to companies.")
+		return
+	}
+	// The exchange outlives a browser that gives up waiting: the state is
+	// used up either way.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), companyTimeout)
+	defer cancel()
+	res, err := s.signIn.Complete(ctx, r.URL.Query())
+	name := res.Name
+	if name == "" {
+		name = res.Domain
+	}
+	switch {
+	case errors.Is(err, signin.ErrUnknownState):
+		log.Printf("signin callback: %v", err)
+		writeSignInPage(w, http.StatusBadRequest, "Sign-in not completed",
+			"This sign-in link has expired or has already been used. Ask your assistant to start the sign-in again.")
+	case errors.Is(err, signin.ErrIssuerMismatch):
+		log.Printf("signin callback: domain=%s: %v", res.Domain, err)
+		s.finishSignIn(res, "failed")
+		writeSignInPage(w, http.StatusBadRequest, "Sign-in not completed",
+			fmt.Sprintf("This sign-in didn't come back from %s's own sign-in page, so your assistant refused it. Ask your assistant to start the sign-in again.", name))
+	case err != nil:
+		log.Printf("signin callback: domain=%s: %v", res.Domain, err)
+		s.finishSignIn(res, "failed")
+		writeSignInPage(w, http.StatusBadGateway, "Sign-in not completed",
+			fmt.Sprintf("%s didn't complete the sign-in. Ask your assistant to try again.", name))
+	case res.Declined:
+		s.finishSignIn(res, "declined")
+		writeSignInPage(w, http.StatusOK, "Not signed in",
+			fmt.Sprintf("You didn't sign in to %s. You can close this tab and go back to your assistant.", name))
+	default:
+		s.finishSignIn(res, "signed_in")
+		writeSignInPage(w, http.StatusOK, "Signed in",
+			fmt.Sprintf("Signed in to %s. You can close this tab and go back to your assistant.", name))
+	}
+}
+
+// finishSignIn records how a sign-in at res.Domain ended and tells the page,
+// on each open conversation with that Company. Signed in, it first resumes
+// each conversation whose Reader stopped asking for sign-in, so a read woken
+// by the update finds it followed again.
+func (s *server) finishSignIn(res signin.Result, status string) {
+	if res.Domain == "" {
+		return
+	}
+	if status == "failed" {
+		s.setSignInStatus(res.Domain, "")
+	} else {
+		s.setSignInStatus(res.Domain, status)
+	}
+	if status == "signed_in" {
+		convs, err := s.store.Conversations()
+		if err != nil {
+			log.Printf("signin: resuming conversations: %v", err)
+		}
+		for _, c := range convs {
+			if c.Company != res.Domain || s.isClosed(c) {
+				continue
+			}
+			reason, err := s.store.Stopped(c.ID)
+			if err != nil || !strings.HasPrefix(reason, conversation.CodeSignInRequired) {
+				continue
+			}
+			if err := s.store.SetStopped(c.ID, ""); err != nil {
+				log.Printf("signin: resuming conversation=%s: %v", c.ID, err)
+				continue
+			}
+			log.Printf("signin: resuming conversation=%s company=%s", c.ID, c.Company)
+			s.refollow(c)
+		}
+	}
+	b, _ := json.Marshal(map[string]string{"type": "signin", "status": status, "scope": strings.Join(res.Granted, " ")})
+	s.publishDomain(res.Domain, b)
+}
+
+var signInPage = template.Must(template.New("signin").Parse(`<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}}</title>
+<style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:4rem auto;padding:0 1rem;line-height:1.5}</style>
+</head>
+<body>
+<h1>{{.Title}}</h1>
+<p>{{.Text}}</p>
+</body>
+</html>
+`))
+
+// writeSignInPage answers the callback's page: no caching, no scripts, no
+// referrer (the URL held a code), and its text escaped by html/template.
+func writeSignInPage(w http.ResponseWriter, status int, title, text string) {
+	h := w.Header()
+	h.Set("Content-Type", "text/html; charset=utf-8")
+	h.Set("Cache-Control", "no-store")
+	h.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")
+	h.Set("Referrer-Policy", "no-referrer")
+	h.Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(status)
+	if err := signInPage.Execute(w, struct{ Title, Text string }{title, text}); err != nil {
+		log.Printf("signin page: %v", err)
 	}
 }
