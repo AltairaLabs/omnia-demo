@@ -426,8 +426,15 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 		bearer := bearerError(resp.Header)
 		cerr := readError(resp)
 		switch {
-		case resp.StatusCode == http.StatusUnauthorized && sent && bearer == "invalid_token" && !refreshed:
+		case resp.StatusCode == http.StatusUnauthorized && sent != "" && bearer == "invalid_token" && !refreshed:
 			refreshed = true
+			// Another request may have refreshed already: then resend with
+			// its token rather than refresh again.
+			if cur, err := c.Tokens.AccessToken(ctx, co, userID); err == nil && cur != sent {
+				attempt--
+				wait = 0
+				continue
+			}
 			if _, err := c.Tokens.Refresh(ctx, co, userID); err != nil {
 				// Not an *Error: the issuer failing is no reason to stop
 				// following a conversation, so a Reader tries again later.
@@ -462,26 +469,26 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 
 // send sends one request, signed now. It asks Tokens for the User's
 // current access token at every send, so a retry carries a refreshed one,
-// and reports whether it sent one.
-func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method, u string, body []byte, hdr http.Header) (*http.Response, bool, error) {
+// and returns the token it sent, "" for none.
+func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method, u string, body []byte, hdr http.Header) (*http.Response, string, error) {
 	var token string
 	if c.Tokens != nil && mayCarryToken(co, u) {
 		t, err := c.Tokens.AccessToken(ctx, co, userID)
 		if err != nil {
-			return nil, false, err
+			return nil, "", err
 		}
 		token = t
 	}
 	d, err := c.Store.Delegation(userID)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	jwt, err := d.SignSession(identity.SessionClaims{
 		Aud: co.Identifier, Sub: userID, Sid: c.sid(userID, false), Method: method, URL: u,
 		AccessToken: token,
 	}, c.Now())
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	var rd io.Reader
 	if body != nil {
@@ -489,7 +496,7 @@ func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method
 	}
 	req, err := http.NewRequestWithContext(ctx, method, u, rd)
 	if err != nil {
-		return nil, false, err
+		return nil, "", err
 	}
 	for k, v := range hdr {
 		req.Header[k] = v
@@ -506,23 +513,27 @@ func (c *Client) send(ctx context.Context, co *discovery.Company, userID, method
 		req.Header.Set("Accept", "application/json")
 	}
 	resp, err := c.HTTP.Do(req)
-	return resp, token != "", err
+	return resp, token, err
 }
 
 // mayCarryToken reports whether a request to u may carry co's default
 // access token (§4.5): u is one of co's discovered conversation endpoints,
-// or under one, and that endpoint's metadata names no resource of its own.
+// or under one, and no endpoint it is under names a resource of its own.
 // Such an endpoint takes only tokens issued for it, which this agent does
 // not request, so it is used signed out.
 func mayCarryToken(co *discovery.Company, u string) bool {
+	matched := false
 	for _, a := range co.Agents {
 		ep := strings.TrimSuffix(a.Endpoint, "/")
 		if u != ep && !strings.HasPrefix(u, ep+"/") && !strings.HasPrefix(u, ep+"?") {
 			continue
 		}
-		return a.Resource == "" || a.Resource == "https://"+co.Domain
+		if a.Resource != "" && a.Resource != "https://"+co.Domain {
+			return false
+		}
+		matched = true
 	}
-	return false
+	return matched
 }
 
 // bearerError is the error parameter of a Bearer challenge in

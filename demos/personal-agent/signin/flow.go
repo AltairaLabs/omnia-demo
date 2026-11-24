@@ -38,11 +38,19 @@ const (
 	// redirect back; a new one past it drops that User's oldest.
 	maxPendingPerUser = 8
 	// revokeTimeout bounds a best-effort revocation.
-	revokeTimeout    = 5 * time.Second
+	revokeTimeout = 5 * time.Second
+	// refreshTimeout bounds a refresh, which holds the lock for its Company
+	// and User, so a hung issuer can't block their requests for long.
+	refreshTimeout   = 15 * time.Second
 	maxTokenResponse = 1 << 20 // 1 MiB
 
 	assertionType = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 )
+
+// errRefused marks a refresh the issuer refused for good: a 4xx with or
+// without an OAuth error code (but not 429), or a 200 whose response fails
+// the checks. Only network errors, 429 and 5xx are worth trying again.
+var errRefused = errors.New("signin: the issuer refused the refresh")
 
 var (
 	// ErrUnknownState is a redirect whose state this Flow did not start, has
@@ -426,9 +434,14 @@ func (f *Flow) lock(identifier, userID string) *sync.Mutex {
 
 // AccessToken is the access token to send to co for userID: the stored one,
 // refreshed first when it expires within a minute (§4.4), or "" when there
-// is none. If the refresh fails for any reason but invalid_grant, an
-// unexpired token is still answered; an expired one is an error. On
-// invalid_grant the tokens are deleted and it answers "" (§5.5).
+// is none. If the refresh fails, an unexpired token is still answered.
+// Otherwise:
+//   - invalid_grant deletes the tokens and answers "" (§5.5);
+//   - any other refusal (unauthorized_client, invalid_client, a bad
+//     response...) deletes them too and answers "": the agent continues
+//     signed out (§4.1, §5.5), so the Company's 401 asks for sign-in
+//     instead of a loop of retries;
+//   - a network error, 429 or 5xx is an error, worth trying again.
 func (f *Flow) AccessToken(ctx context.Context, co *discovery.Company, userID string) (string, error) {
 	return f.access(ctx, co, userID, false)
 }
@@ -436,7 +449,8 @@ func (f *Flow) AccessToken(ctx context.Context, co *discovery.Company, userID st
 // Refresh refreshes userID's tokens at co after the Company refused the
 // access token (invalid_token), and answers the new access token, or ""
 // when there are no tokens or the refresh answered invalid_grant, which
-// deletes them (§5.5). Any other failure is an error.
+// deletes them (§5.5), or any other refusal, which deletes them too and
+// continues signed out (§4.1). A network error, 429 or 5xx is an error.
 func (f *Flow) Refresh(ctx context.Context, co *discovery.Company, userID string) (string, error) {
 	return f.access(ctx, co, userID, true)
 }
@@ -457,11 +471,23 @@ func (f *Flow) access(ctx context.Context, co *discovery.Company, userID string,
 		return t.Access, nil
 	}
 	access, err := f.refresh(ctx, co, userID, t)
-	if err != nil && !force && now.Before(t.Expiry) {
+	switch {
+	case err == nil:
+		return access, nil
+	case !force && now.Before(t.Expiry):
 		log.Printf("signin: refreshing at %s failed; the current token has not expired, so it is used", co.Domain)
 		return t.Access, nil
+	case errors.Is(err, errRefused):
+		// The refresh token can't be used, so the tokens are dropped and the
+		// agent continues signed out, as after invalid_grant (§5.5). Keeping
+		// them would resend an access token the Company has refused.
+		if derr := f.Tokens.Delete(co.Identifier, userID); derr != nil {
+			return "", derr
+		}
+		log.Printf("%v; continuing signed out at %s", err, co.Domain)
+		return "", nil
 	}
-	return access, err
+	return "", err
 }
 
 // refresh sends the refresh token with grant_type=refresh_token and no scope
@@ -473,6 +499,8 @@ func (f *Flow) refresh(ctx context.Context, co *discovery.Company, userID string
 	if co.Issuer == "" {
 		return "", fmt.Errorf("signin: %s has no issuer to refresh at", co.Name)
 	}
+	ctx, cancel := context.WithTimeout(ctx, refreshTimeout)
+	defer cancel()
 	md, err := FetchMetadata(ctx, f.HTTP, co.Issuer, co.Domain)
 	if err != nil {
 		return "", err
@@ -491,6 +519,9 @@ func (f *Flow) refresh(ctx context.Context, co *discovery.Company, userID string
 		log.Printf("signin: %s refused the refresh with invalid_grant; signed out there", co.Domain)
 		return "", nil
 	}
+	if errors.As(err, &te) && te.status >= 400 && te.status < 500 && te.status != http.StatusTooManyRequests {
+		return "", fmt.Errorf("%w: %w", errRefused, err)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -502,7 +533,7 @@ func (f *Flow) refresh(ctx context.Context, co *discovery.Company, userID string
 		if tr.RefreshToken != t.Refresh {
 			f.revoke(ctx, co.Issuer, md.RevocationEndpoint, co.Domain, tr.RefreshToken)
 		}
-		return "", fmt.Errorf("signin: %s's refresh response: %w", co.Name, err)
+		return "", fmt.Errorf("%w: %s's refresh response: %w", errRefused, co.Name, err)
 	}
 	next := Tokens{Access: tr.AccessToken, Refresh: t.Refresh, Scopes: t.Scopes, Expiry: f.now().Add(expiresIn(tr))}
 	if tr.RefreshToken != "" {

@@ -615,15 +615,15 @@ func TestRefreshRefusesExtraScopeAndRevokesItsRefreshToken(t *testing.T) {
 	fx := newFlowFixture(t)
 	fx.putTokens(t, "a0", "r0", -time.Second)
 	fx.iss.Next(http.StatusOK, tokenBody("a1", "r1", map[string]any{"scope": "policies:read claims:read"}))
-	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "" || err == nil {
-		t.Errorf("AccessToken = %q, %v; want a refusal", got, err)
+	if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "" || err != nil {
+		t.Errorf("AccessToken = %q, %v; want empty: refused, so signed out", got, err)
 	}
 	revs := fx.requestsTo("/revoke")
 	if len(revs) != 1 || revs[0].Form.Get("token") != "r1" || revs[0].Form.Get("token_type_hint") != "refresh_token" || revs[0].Claims == nil {
 		t.Errorf("revocations = %+v, want r1 revoked with an assertion", revs)
 	}
-	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok == nil || tok.Access != "a0" {
-		t.Errorf("stored %v, want it unchanged", tok)
+	if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok != nil {
+		t.Errorf("stored %v, want the tokens dropped", tok)
 	}
 }
 
@@ -732,6 +732,51 @@ func TestRefreshNeverLogsSecrets(t *testing.T) {
 	for _, s := range []string{"access-secret", "refresh-secret"} {
 		if strings.Contains(out, s) {
 			t.Errorf("a secret reached the log or an error:\n%s", out)
+		}
+	}
+}
+
+// A refresh the issuer refuses for good, other than invalid_grant, goes
+// signed out instead of failing (§4.1, §5.5); only network errors, 429 and
+// 5xx are errors worth trying again.
+func TestRefreshRefusalContinuesSignedOut(t *testing.T) {
+	for _, c := range []struct {
+		name   string
+		status int
+		body   map[string]any
+	}{
+		{"unauthorized_client", http.StatusBadRequest, map[string]any{"error": "unauthorized_client"}},
+		{"invalid_client", http.StatusUnauthorized, map[string]any{"error": "invalid_client"}},
+		{"invalid_request", http.StatusBadRequest, map[string]any{"error": "invalid_request"}},
+		{"4xx with no code", http.StatusForbidden, map[string]any{}},
+		{"DPoP response", http.StatusOK, tokenBody("a1", "r1", map[string]any{"token_type": "DPoP"})},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			fx := newFlowFixture(t)
+			fx.putTokens(t, "a0", "r0", -time.Second)
+			fx.iss.Next(c.status, c.body)
+			if got, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); got != "" || err != nil {
+				t.Errorf("AccessToken with an expired token = %q, %v; want empty", got, err)
+			}
+			if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok != nil {
+				t.Errorf("tokens still stored after a refused refresh: %v", tok)
+			}
+			fx.putTokens(t, "a0", "r0", time.Hour)
+			fx.iss.Next(c.status, c.body)
+			if got, err := fx.flow.Refresh(context.Background(), fx.co, ellen); got != "" || err != nil {
+				t.Errorf("Refresh = %q, %v; want empty", got, err)
+			}
+			if tok, _ := fx.store.Get(fx.co.Identifier, ellen); tok != nil {
+				t.Errorf("tokens still stored after a refused refresh: %v", tok)
+			}
+		})
+	}
+	for _, status := range []int{http.StatusTooManyRequests, http.StatusBadGateway} {
+		fx := newFlowFixture(t)
+		fx.putTokens(t, "a0", "r0", -time.Second)
+		fx.iss.Next(status, map[string]any{"error": "temporarily_unavailable"})
+		if _, err := fx.flow.AccessToken(context.Background(), fx.co, ellen); err == nil {
+			t.Errorf("status %d: AccessToken answered no error; want one, to try again", status)
 		}
 	}
 }

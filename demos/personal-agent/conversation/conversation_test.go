@@ -1085,3 +1085,112 @@ func TestTokenWithheldFromEndpointWithOwnResource(t *testing.T) {
 		}
 	}
 }
+
+func TestRefreshRefusedStopsSignedOut(t *testing.T) {
+	for _, c := range []struct {
+		name      string
+		expiresIn time.Duration
+		challenge string
+	}{
+		{"expired token", -time.Second, `Bearer realm="larkmere"`},
+		{"after invalid_token", time.Hour, `Bearer error="invalid_token"`},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+				w.Header().Set("WWW-Authenticate", c.challenge)
+				w.WriteHeader(http.StatusUnauthorized)
+			})
+			s := newSignedInClient(t, f)
+			s.c.Remember(f.co)
+			s.put(t, f.co, "t1", "r1", c.expiresIn)
+			s.iss.Next(http.StatusBadRequest, map[string]any{"error": "unauthorized_client"})
+			conv := Conversation{ID: "cnv_1", Company: f.co.Domain, Endpoint: f.co.Agents[0].Endpoint}
+			if err := s.st.SaveConversation(conv); err != nil {
+				t.Fatal(err)
+			}
+			runReader(t, s.c, conv)
+			if reason, _ := s.st.Stopped("cnv_1"); reason != "sign_in_required (HTTP 401)" {
+				t.Errorf("Stopped = %q, want sign_in_required (HTTP 401)", reason)
+			}
+			if n := len(s.iss.Requests()); n != 1 {
+				t.Errorf("issuer saw %d requests, want 1", n)
+			}
+			if n := len(f.requests()); n > 2 {
+				t.Errorf("Company saw %d requests, want at most 2", n)
+			}
+			if last := f.requests()[len(f.requests())-1]; last.Authorization != "" {
+				t.Errorf("the last request carried %q, want it signed out", last.Authorization)
+			}
+		})
+	}
+}
+
+// rotatingTokens answers t1 to the first AccessToken and t2 after, as if
+// another request refreshed in between, and counts Refresh calls.
+type rotatingTokens struct {
+	mu        sync.Mutex
+	calls     int
+	refreshes int
+}
+
+func (r *rotatingTokens) AccessToken(context.Context, *discovery.Company, string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.calls++
+	if r.calls == 1 {
+		return "t1", nil
+	}
+	return "t2", nil
+}
+
+func (r *rotatingTokens) Refresh(context.Context, *discovery.Company, string) (string, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.refreshes++
+	return "t3", nil
+}
+
+func TestInvalidTokenAfterAnotherRefreshResendsWithoutRefreshing(t *testing.T) {
+	f := newFakeCompany(t, func(w http.ResponseWriter, r *http.Request, n int) {
+		if n == 1 {
+			w.Header().Set("WWW-Authenticate", `Bearer error="invalid_token"`)
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		created(w, r, n)
+	})
+	c, _ := newTestClient(t, f)
+	ts := &rotatingTokens{}
+	c.Tokens = ts
+	if _, err := c.Start(context.Background(), f.co, f.co.Agents[0], "hello"); err != nil {
+		t.Fatal(err)
+	}
+	reqs := f.requests()
+	if len(reqs) != 2 || reqs[1].Authorization != "Bearer t2" {
+		t.Errorf("%d requests, the second with %q; want 2, the second with t2", len(reqs), reqs[len(reqs)-1].Authorization)
+	}
+	if ts.refreshes != 0 {
+		t.Errorf("Refresh called %d times, want 0: another request already refreshed", ts.refreshes)
+	}
+}
+
+func TestMayCarryTokenWithheldWhenAnyMatchHasOwnResource(t *testing.T) {
+	co := &discovery.Company{Domain: "larkmere.example", Agents: []discovery.AgentEntry{
+		{Endpoint: "https://larkmere.example/poppy"},
+		{Endpoint: "https://larkmere.example/poppy/claims", Resource: "https://larkmere.example/poppy/claims"},
+		{Endpoint: "https://larkmere.example/home", Resource: "https://larkmere.example"},
+	}}
+	for u, want := range map[string]bool{
+		"https://larkmere.example/poppy":                    true,
+		"https://larkmere.example/poppy/cnv_1/messages":     true,
+		"https://larkmere.example/poppy/claims":             false,
+		"https://larkmere.example/poppy/claims/cnv_1/close": false,
+		"https://larkmere.example/home/cnv_1":               true,
+		"https://larkmere.example/other":                    false,
+		"https://evil.example/poppy":                        false,
+	} {
+		if got := mayCarryToken(co, u); got != want {
+			t.Errorf("mayCarryToken(%s) = %v, want %v", u, got, want)
+		}
+	}
+}
