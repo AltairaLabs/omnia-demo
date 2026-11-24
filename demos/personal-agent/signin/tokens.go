@@ -10,8 +10,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,9 +41,62 @@ type TokenStore interface {
 	Delete(identifier, userID string) error
 }
 
+// secret is how String, GoString and LogValue show a token: never its
+// value, only whether there is one.
+func secret(s string) string {
+	if s == "" {
+		return "absent"
+	}
+	return "[redacted]"
+}
+
+// String shows the scopes and expiry, never a token, so %v and %+v can't
+// log one.
+func (t Tokens) String() string {
+	return fmt.Sprintf("{Access:%s Refresh:%s Scopes:%v Expiry:%s}",
+		secret(t.Access), secret(t.Refresh), t.Scopes, t.Expiry.Format(time.RFC3339))
+}
+
+// GoString is String for %#v.
+func (t Tokens) GoString() string {
+	return fmt.Sprintf("signin.Tokens{Access:%q, Refresh:%q, Scopes:%#v, Expiry:%q}",
+		secret(t.Access), secret(t.Refresh), t.Scopes, t.Expiry.Format(time.RFC3339))
+}
+
+// LogValue is what log/slog records: the scopes and expiry, never a token.
+func (t Tokens) LogValue() slog.Value {
+	return slog.GroupValue(
+		slog.String("access", secret(t.Access)),
+		slog.String("refresh", secret(t.Refresh)),
+		slog.Any("scopes", t.Scopes),
+		slog.Time("expiry", t.Expiry),
+	)
+}
+
 func cloneTokens(t Tokens) Tokens {
 	t.Scopes = slices.Clone(t.Scopes)
 	return t
+}
+
+// normalise is what Put stores: a copy whose Expiry is UTC with no
+// monotonic reading, so both stores give back the same value.
+func normalise(t Tokens) Tokens {
+	t = cloneTokens(t)
+	t.Expiry = t.Expiry.UTC().Round(0)
+	return t
+}
+
+// checkPair refuses a pair that would make the Redis key or the sealing
+// additional data ambiguous: a newline in the identifier or a "|" in the
+// User ID.
+func checkPair(identifier, userID string) error {
+	if strings.Contains(identifier, "\n") {
+		return errors.New("signin: company identifier contains a newline")
+	}
+	if strings.Contains(userID, "|") {
+		return errors.New(`signin: user ID contains "|"`)
+	}
+	return nil
 }
 
 // MemoryTokenStore is a TokenStore held in memory, unsealed, for tests.
@@ -56,6 +111,9 @@ func NewMemoryTokenStore() *MemoryTokenStore {
 }
 
 func (s *MemoryTokenStore) Get(identifier, userID string) (*Tokens, error) {
+	if err := checkPair(identifier, userID); err != nil {
+		return nil, err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	t, ok := s.m[[2]string{identifier, userID}]
@@ -67,13 +125,19 @@ func (s *MemoryTokenStore) Get(identifier, userID string) (*Tokens, error) {
 }
 
 func (s *MemoryTokenStore) Put(identifier, userID string, t Tokens) error {
+	if err := checkPair(identifier, userID); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.m[[2]string{identifier, userID}] = cloneTokens(t)
+	s.m[[2]string{identifier, userID}] = normalise(t)
 	return nil
 }
 
 func (s *MemoryTokenStore) Delete(identifier, userID string) error {
+	if err := checkPair(identifier, userID); err != nil {
+		return err
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.m, [2]string{identifier, userID})
@@ -116,6 +180,9 @@ func tokenAD(identifier, userID string) []byte {
 }
 
 func (s *RedisTokenStore) Get(identifier, userID string) (*Tokens, error) {
+	if err := checkPair(identifier, userID); err != nil {
+		return nil, err
+	}
 	raw, err := s.rdb.Get(context.Background(), tokenKey(identifier, userID)).Bytes()
 	if errors.Is(err, redis.Nil) {
 		return nil, nil
@@ -136,7 +203,10 @@ func (s *RedisTokenStore) Get(identifier, userID string) (*Tokens, error) {
 }
 
 func (s *RedisTokenStore) Put(identifier, userID string, t Tokens) error {
-	plain, err := json.Marshal(t)
+	if err := checkPair(identifier, userID); err != nil {
+		return err
+	}
+	plain, err := json.Marshal(normalise(t))
 	if err != nil {
 		return errors.New("signin: tokens can't be encoded")
 	}
@@ -151,6 +221,9 @@ func (s *RedisTokenStore) Put(identifier, userID string, t Tokens) error {
 }
 
 func (s *RedisTokenStore) Delete(identifier, userID string) error {
+	if err := checkPair(identifier, userID); err != nil {
+		return err
+	}
 	if err := s.rdb.Del(context.Background(), tokenKey(identifier, userID)).Err(); err != nil {
 		return fmt.Errorf("signin: %w", err)
 	}
