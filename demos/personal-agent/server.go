@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
@@ -82,7 +83,13 @@ type server struct {
 	// as soon as it has left, because a sign-in completed meanwhile.
 	again   map[string]bool
 	signins map[string]signInState // the latest sign-in begun, by domain
-	wg      sync.WaitGroup
+	// asked is the scopes the latest sign-in asked for, by domain.
+	asked map[string][]string
+	// signedIn counts completed sign-ins by domain. A Reader that stops
+	// asking for sign-in after the count moved since it began raced a
+	// sign-in, and runs again.
+	signedIn map[string]int
+	wg       sync.WaitGroup
 
 	directMu sync.Mutex // one Direct Conversation per parent
 }
@@ -102,6 +109,9 @@ func newServer(ctx context.Context, cfg config) *server {
 		readers: map[string]bool{},
 		again:   map[string]bool{},
 		signins: map[string]signInState{},
+		asked:   map[string][]string{},
+
+		signedIn: map[string]int{},
 	}
 	if cfg.SignIn != nil {
 		// Only when set: a nil *Flow in the interface would not be nil.
@@ -223,12 +233,21 @@ func (s *server) start(conv conversation.Conversation, again bool) {
 	go func() {
 		defer s.wg.Done()
 		for {
+			s.mu.Lock()
+			gen := s.signedIn[conv.Company]
+			s.mu.Unlock()
 			r := &conversation.Reader{Client: s.client, Backoff: s.backoff}
 			r.Run(s.ctx, conv, s.publish)
+			reason, _ := s.store.Stopped(conv.ID)
+			// A Reader whose request went out signed out before a sign-in
+			// completed, and that stopped asking for sign-in after the
+			// callback looked for stopped conversations, runs again.
+			raced := strings.HasPrefix(reason, conversation.CodeSignInRequired)
 			// Leave before saying why, so whoever acts on it (a sign-in that
 			// resumes the conversation) can start a new Reader.
 			s.mu.Lock()
-			rerun := s.again[conv.ID] && s.ctx.Err() == nil
+			raced = raced && s.signedIn[conv.Company] != gen
+			rerun := (s.again[conv.ID] || raced) && s.ctx.Err() == nil
 			delete(s.again, conv.ID)
 			if !rerun {
 				delete(s.readers, conv.ID)
@@ -236,6 +255,12 @@ func (s *server) start(conv conversation.Conversation, again bool) {
 			s.mu.Unlock()
 			if !rerun {
 				break
+			}
+			if raced {
+				log.Printf("signin: resuming conversation=%s company=%s, stopped as a sign-in completed", conv.ID, conv.Company)
+				if err := s.store.SetStopped(conv.ID, ""); err != nil {
+					log.Printf("signin: resuming conversation=%s: %v", conv.ID, err)
+				}
 			}
 		}
 		if reason, _ := s.store.Stopped(conv.ID); reason != "" {
@@ -940,24 +965,38 @@ func (s *server) setSignInStatus(domain, status string) {
 }
 
 // signInOf is a conversation's sign-in state. Sign-in is needed when the
-// Company's latest authorization event (§8.11) names scopes Ellen's tokens
-// for it don't hold, or when its Reader stopped on a 401 asking for sign-in
-// (§5.4). nil when sign-in isn't needed and none has begun.
+// authorization events (§8.11) of the latest turn, those since the latest
+// role "user" message, name scopes Ellen's tokens for the Company don't all
+// hold, or when its Reader stopped on a 401 asking for sign-in (§5.4).
+// Scopes is the union of those events' scopes and the 401 challenge's. An
+// event whose scope is "" names none, so for it holds is vacuously true once
+// Ellen holds any tokens at the Company: signed in, it needs no more. Signed
+// out, it needs sign-in, with Scopes "" (sign_in then falls back).
+// nil when sign-in isn't needed and none has begun.
 func (s *server) signInOf(c conversation.Conversation, events []conversation.Event, stopped string) *signInOut {
 	var scopes []string
 	asked := false
 	for i := len(events) - 1; i >= 0; i-- {
-		if events[i].Type != "authorization" {
+		e := events[i]
+		if e.Type == "message" && e.Role == "user" {
+			break
+		}
+		if e.Type != "authorization" {
 			continue
 		}
 		var a struct {
 			Scope string `json:"scope"`
 		}
-		_ = json.Unmarshal(events[i].Raw, &a)
-		scopes, asked = strings.Fields(a.Scope), true
-		break
+		_ = json.Unmarshal(e.Raw, &a)
+		scopes, asked = append(scopes, strings.Fields(a.Scope)...), true
 	}
-	needed := strings.HasPrefix(stopped, conversation.CodeSignInRequired) || (asked && !s.holds(c.Company, scopes))
+	stoppedForSignIn := strings.HasPrefix(stopped, conversation.CodeSignInRequired)
+	if stoppedForSignIn {
+		scopes = append(scopes, conversation.StopScopes(stopped)...)
+	}
+	slices.Sort(scopes)
+	scopes = slices.Compact(scopes)
+	needed := stoppedForSignIn || (asked && !s.holds(c.Company, scopes))
 	st := s.signInStatus(c.Company)
 	if !needed && st == "" {
 		return nil
@@ -1002,18 +1041,38 @@ func (s *server) holds(domain string, scopes []string) bool {
 }
 
 // publishDomain sends raw to the page on every open conversation with the
-// Company at domain.
-func (s *server) publishDomain(domain string, raw json.RawMessage) {
+// Company at domain, and answers how many there were.
+func (s *server) publishDomain(domain string, raw json.RawMessage) int {
 	convs, err := s.store.Conversations()
 	if err != nil {
 		log.Printf("publish: %v", err)
-		return
+		return 0
 	}
+	n := 0
 	for _, c := range convs {
 		if c.Company == domain && !s.isClosed(c) {
 			s.publishRaw(c, raw)
+			n++
 		}
 	}
+	return n
+}
+
+// fallbackScopes are the scopes sign_in asks for when it was given none:
+// those Ellen holds at the Company, else those she last asked for there,
+// else those the Company describes in poppy.json auth.scopes. nil when
+// none is known.
+func (s *server) fallbackScopes(co *discovery.Company, userID string) []string {
+	if t, err := s.signIn.Tokens.Get(co.Identifier, userID); err == nil && t != nil && len(t.Scopes) > 0 {
+		return slices.Clone(t.Scopes)
+	}
+	s.mu.Lock()
+	asked := slices.Clone(s.asked[co.Domain])
+	s.mu.Unlock()
+	if len(asked) > 0 {
+		return asked
+	}
+	return slices.Sorted(maps.Keys(co.Scopes))
 }
 
 // signInTool begins a Direct Sign-In (PAP §4.2) at a Company for scopes.
@@ -1030,9 +1089,6 @@ func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolErr
 		return nil, fail(http.StatusBadRequest, "%q is not a domain name", req.Domain)
 	}
 	scopes := strings.Fields(req.Scopes)
-	if len(scopes) == 0 {
-		return nil, fail(http.StatusBadRequest, "scopes is empty; pass the scopes read_conversation's sign_in.scopes names, space-separated")
-	}
 	s.mu.Lock()
 	allowed := s.allowed[domain]
 	s.mu.Unlock()
@@ -1057,6 +1113,12 @@ func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolErr
 	if err != nil {
 		return nil, fail(http.StatusInternalServerError, "reading the User ID: %v", err)
 	}
+	if len(scopes) == 0 {
+		// A 401 or an authorization event that named no scope.
+		if scopes = s.fallbackScopes(co, userID); len(scopes) == 0 {
+			return nil, fail(http.StatusBadRequest, "%s named no scopes to sign in for, and none is known; pass scopes, space-separated", co.Name)
+		}
+	}
 	authURL, err := s.signIn.Begin(ctx, co, userID, scopes)
 	if err != nil {
 		log.Printf("sign_in: domain=%s: %v", domain, err)
@@ -1068,16 +1130,22 @@ func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolErr
 		asked = u.Query().Get("scope")
 	}
 	s.setSignInStatus(domain, "pending")
+	s.mu.Lock()
+	s.asked[domain] = strings.Fields(asked)
+	s.mu.Unlock()
 	b, _ := json.Marshal(map[string]string{
 		"type": "signin", "status": "pending", "scope": asked, "authorization_url": authURL,
 	})
-	s.publishDomain(domain, b)
+	note := fmt.Sprintf("A 'Sign in to %s' button is on Ellen's screen; she signs in on %s's own page.", co.Name, co.Name)
+	if s.publishDomain(domain, b) == 0 {
+		note = fmt.Sprintf("No conversation with %s is open on Ellen's screen, so no sign-in button is showing; she can open authorization_url to sign in on %s's own page.", co.Name, co.Name)
+	}
 	return map[string]string{
 		"company":           co.Name,
 		"scopes":            asked,
 		"authorization_url": authURL,
 		"status":            "pending",
-		"note":              fmt.Sprintf("A 'Sign in to %s' button is on Ellen's screen; she signs in on %s's own page.", co.Name, co.Name),
+		"note":              note,
 	}, nil
 }
 
@@ -1142,6 +1210,9 @@ func (s *server) finishSignIn(res signin.Result, status string) {
 		s.setSignInStatus(res.Domain, status)
 	}
 	if status == "signed_in" {
+		s.mu.Lock()
+		s.signedIn[res.Domain]++
+		s.mu.Unlock()
 		convs, err := s.store.Conversations()
 		if err != nil {
 			log.Printf("signin: resuming conversations: %v", err)

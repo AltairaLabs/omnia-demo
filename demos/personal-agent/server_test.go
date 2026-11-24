@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -83,6 +84,12 @@ type company struct {
 	// authz is the Authorization header of every request, "METHOD path
 	// header".
 	authz []string
+	// challenge, when set, is the WWW-Authenticate of requireToken's 401.
+	challenge string
+	// gate, when set, holds requireToken's 401 until it is closed.
+	gate chan struct{}
+	// authScopes is poppy.json auth.scopes.
+	authScopes map[string]string
 }
 
 func newCompany(t *testing.T, name string) *company {
@@ -92,12 +99,13 @@ func newCompany(t *testing.T, name string) *company {
 		c.mu.Lock()
 		c.paths = append(c.paths, r.Method+" "+r.URL.Path)
 		c.authz = append(c.authz, r.Method+" "+r.URL.Path+" "+r.Header.Get("Authorization"))
-		issuer, requireToken := c.issuer, c.requireToken
+		issuer, requireToken, challenge, gate, authScopes := c.issuer, c.requireToken, c.challenge, c.gate, c.authScopes
 		c.mu.Unlock()
 		switch {
 		case r.URL.Path == "/.well-known/poppy.json":
 			writeJSONTest(w, 200, map[string]any{
 				"organization": map[string]any{"name": name, "domain": c.domain},
+				"auth":         map[string]any{"scopes": authScopes},
 				"agent": map[string]any{"protocols": []any{map[string]any{
 					"type": "poppy", "endpoint": c.srv.URL + "/poppy", "description": "Power cuts", "access": "session",
 				}}},
@@ -131,6 +139,12 @@ func newCompany(t *testing.T, name string) *company {
 			writeJSONTest(w, http.StatusCreated, map[string]string{"conversation_id": id})
 		case strings.HasSuffix(r.URL.Path, "/events"):
 			if requireToken && r.Header.Get("Authorization") == "" {
+				if gate != nil {
+					<-gate
+				}
+				if challenge != "" {
+					w.Header().Set("WWW-Authenticate", challenge)
+				}
 				writeJSONTest(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 				return
 			}
@@ -505,7 +519,7 @@ func TestToolsNeverExposeUserIDOrKeys(t *testing.T) {
 				t.Errorf("a response or update exposes a User ID, token, code or verifier %q: %s", sec, body)
 			}
 		}
-		if strings.Contains(body, "eyJ") {
+		if jwtShape.MatchString(body) {
 			t.Errorf("a response holds what looks like a JWT: %s", body)
 		}
 		var doc any
@@ -515,6 +529,11 @@ func TestToolsNeverExposeUserIDOrKeys(t *testing.T) {
 		}
 	}
 }
+
+// jwtShape matches a compact JWS: a base64url JSON header ("eyJ"), a dot, a
+// payload and a dot. A bare "eyJ" can turn up in random base64url, such as
+// an authorization URL's state.
+var jwtShape = regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.`)
 
 // privateMembers walks a JSON document for private JWK members (RFC 7518
 // §6.2.2, §6.3.2) in any object that has a kty.
@@ -1182,59 +1201,178 @@ func TestSignInToolReturnsURLNeverToken(t *testing.T) {
 	}
 }
 
+// A Reader stopped by a 401 asking for sign-in runs again, signed in, once
+// the sign-in completes. The 401's Bearer challenge may name the scopes
+// needed (PAP §7), or none: then sign_in falls back to the scopes the
+// Company describes in poppy.json.
 func TestCallbackSignsInAndResumesStoppedReader(t *testing.T) {
-	co := newCompany(t, "Wrenmoor Energy")
-	co.requireToken = true
-	h := newSignInHarness(t, co)
-	ups := h.updates(t)
-	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my outage?"}); status != 200 {
-		t.Fatalf("start = %d %s", status, raw)
-	}
-	u := waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["type"] == "stopped" })
-	if ev := u["event"].(map[string]any); !strings.HasPrefix(ev["reason"].(string), conversation.CodeSignInRequired) {
-		t.Fatalf("stopped = %v, want sign_in_required", ev)
-	}
-	_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
-	if si := signInOf(t, body, raw); si["needed"] != true || si["status"] != "needed" {
-		t.Errorf("sign_in = %v, want needed", si)
-	}
+	for _, tc := range []struct {
+		name, challenge, scopes, asked string
+	}{
+		{"challenge names a scope", `Bearer scope="claims:read"`, "claims:read", "claims:read"},
+		{"challenge names none", "", "", "claims"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			co := newCompany(t, "Wrenmoor Energy")
+			co.requireToken, co.challenge = true, tc.challenge
+			co.authScopes = map[string]string{"claims": "See your claims"}
+			h := newSignInHarness(t, co)
+			ups := h.updates(t)
+			if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my outage?"}); status != 200 {
+				t.Fatalf("start = %d %s", status, raw)
+			}
+			u := waitFor(t, ups, func(u map[string]any) bool { ev, _ := u["event"].(map[string]any); return ev["type"] == "stopped" })
+			if ev := u["event"].(map[string]any); !strings.HasPrefix(ev["reason"].(string), conversation.CodeSignInRequired) {
+				t.Fatalf("stopped = %v, want sign_in_required", ev)
+			}
+			_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+			si := signInOf(t, body, raw)
+			if si["needed"] != true || si["status"] != "needed" || si["scopes"] != tc.scopes {
+				t.Errorf("sign_in = %v, want needed for %q", si, tc.scopes)
+			}
 
-	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
-	authURL, _ := body["authorization_url"].(string)
-	if authURL == "" {
-		t.Fatalf("sign_in = %s", raw)
+			// The assistant passes on sign_in.scopes as it reads them.
+			_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": si["scopes"].(string)})
+			authURL, _ := body["authorization_url"].(string)
+			if authURL == "" || body["scopes"] != tc.asked {
+				t.Fatalf("sign_in = %s, want a sign-in for %q", raw, tc.asked)
+			}
+			q := h.iss.Approve(authURL)
+			status, hdr, page := h.callback(t, q)
+			if status != 200 || !strings.Contains(page, "Signed in to Wrenmoor Energy. You can close this tab and go back to your assistant.") {
+				t.Fatalf("callback = %d %s", status, page)
+			}
+			checkPageHeaders(t, hdr)
+			tok := h.tokens(t)
+			if tok == nil {
+				t.Fatal("no tokens after the callback")
+			}
+			for _, sec := range append([]string{tok.Access, tok.Refresh, q.Get("state")}, h.exchangeSecrets()...) {
+				if strings.Contains(page, sec) {
+					t.Errorf("the callback page holds a token, code, state or verifier %q: %s", sec, page)
+				}
+			}
+			waitFor(t, ups, isSignIn("signed_in"))
+			h.waitSignedInRead(t, co, tok, "cnv_1")
+		})
 	}
-	q := h.iss.Approve(authURL)
-	status, hdr, page := h.callback(t, q)
-	if status != 200 || !strings.Contains(page, "Signed in to Wrenmoor Energy. You can close this tab and go back to your assistant.") {
-		t.Fatalf("callback = %d %s", status, page)
-	}
-	checkPageHeaders(t, hdr)
-	tok := h.tokens(t)
-	if tok == nil {
-		t.Fatal("no tokens after the callback")
-	}
-	for _, sec := range append([]string{tok.Access, tok.Refresh, q.Get("state")}, h.exchangeSecrets()...) {
-		if strings.Contains(page, sec) {
-			t.Errorf("the callback page holds a token, code, state or verifier %q: %s", sec, page)
-		}
-	}
-	waitFor(t, ups, isSignIn("signed_in"))
+}
 
-	// The Reader runs again, signed in.
+// waitSignedInRead waits for the conversation's Reader to read again with
+// the access token, and checks the conversation no longer reads as stopped.
+func (h *harness) waitSignedInRead(t *testing.T, co *company, tok *signin.Tokens, convID string) {
+	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
-	for !contains(co.authorizations(), "GET /poppy/cnv_1/events Bearer "+tok.Access) {
+	for !contains(co.authorizations(), "GET /poppy/"+convID+"/events Bearer "+tok.Access) {
 		if time.Now().After(deadline) {
 			t.Fatalf("the Reader did not read again with the access token: %v", co.authorizations())
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	_, body, raw = h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_1"})
+	_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": convID})
 	if body["stopped"] != nil {
 		t.Errorf("read_conversation = %s, want no longer stopped", raw)
 	}
 	if si := signInOf(t, body, raw); si["needed"] != false || si["status"] != "signed_in" {
 		t.Errorf("sign_in = %v, want signed in and not needed", si)
+	}
+}
+
+// A Reader whose signed-out request is answered 401 only after a sign-in
+// completed (so the callback found nothing stopped) runs again, signed in.
+func TestSignInRacingA401ResumesReader(t *testing.T) {
+	co := newCompany(t, "Wrenmoor Energy")
+	co.requireToken, co.gate = true, make(chan struct{})
+	co.authScopes = map[string]string{"claims": "See your claims"}
+	h := newSignInHarness(t, co)
+	ups := h.updates(t)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my outage?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	// The Reader's first read is out, signed out, and held at the Company.
+	deadline := time.Now().Add(5 * time.Second)
+	for !contains(co.authorizations(), "GET /poppy/cnv_1/events ") {
+		if time.Now().After(deadline) {
+			t.Fatalf("the Reader never read: %v", co.requests())
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+	_, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims"})
+	authURL, _ := body["authorization_url"].(string)
+	if authURL == "" {
+		t.Fatalf("sign_in = %s", raw)
+	}
+	if status, _, page := h.callback(t, h.iss.Approve(authURL)); status != 200 {
+		t.Fatalf("callback = %d %s", status, page)
+	}
+	waitFor(t, ups, isSignIn("signed_in"))
+	close(co.gate) // now the held read is refused, after the sign-in
+	tok := h.tokens(t)
+	if tok == nil {
+		t.Fatal("no tokens after the callback")
+	}
+	h.waitSignedInRead(t, co, tok, "cnv_1")
+}
+
+// The scopes needed are the union of the authorization events of the latest
+// turn: those since the latest role "user" message.
+func TestAuthorizationEventsOfTheTurnAreUnited(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	h := newSignInHarness(t, co)
+	conv := conversation.Conversation{ID: "cnv_t", Company: co.domain, Name: "Larkmere Mutual"}
+	if err := h.store.SaveConversation(conv); err != nil {
+		t.Fatal(err)
+	}
+	user := func(id, text string) map[string]any {
+		m := msgEvent(id, text)
+		m["message"].(map[string]any)["role"] = "user"
+		return m
+	}
+	h.arrive(t, conv, user("u1", "my policy?"))
+	h.arrive(t, conv, authEvent("a1", "policies:read"))
+	h.arrive(t, conv, user("u2", "and my claim?"))
+	h.arrive(t, conv, authEvent("a2", "claims"))
+	h.arrive(t, conv, authEvent("a3", "claims:read claims"))
+	h.arrive(t, conv, msgEvent("c1", "Please sign in so I can see your claim."))
+	_, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_t"})
+	if si := signInOf(t, body, raw); si["needed"] != true || si["scopes"] != "claims claims:read" {
+		t.Errorf("sign_in = %v, want needed for claims and claims:read only", si)
+	}
+	// A new turn with no authorization event needs none.
+	h.arrive(t, conv, user("u3", "thanks"))
+	if _, body, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_t"}); body["sign_in"] != nil {
+		t.Errorf("read_conversation = %s, want no sign_in after a turn that asked for none", raw)
+	}
+}
+
+// sign_in given no scopes asks for those Ellen holds at the Company, else
+// those she last asked for there, else those its poppy.json describes; with
+// none known it says so.
+func TestSignInFallbackScopes(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	h := newSignInHarness(t, co)
+	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain})
+	if status != http.StatusBadRequest || !strings.Contains(raw, "none is known") {
+		t.Errorf("sign_in with no scopes known = %d %s, want 400", status, raw)
+	}
+	// With no conversation open, the note says no button is showing.
+	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims:read"})
+	if note, _ := body["note"].(string); !strings.Contains(note, "No conversation with Larkmere Mutual is open") {
+		t.Errorf("sign_in with no conversation = %s, want a note that no button is showing", raw)
+	}
+	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain})
+	if body["scopes"] != "claims:read" {
+		t.Errorf("sign_in = %s, want the scopes last asked for", raw)
+	}
+	if status, _, page := h.callback(t, h.iss.Approve(body["authorization_url"].(string))); status != 200 {
+		t.Fatalf("callback = %d %s", status, page)
+	}
+	co.mu.Lock()
+	co.authScopes = map[string]string{"claims": "See your claims"}
+	co.mu.Unlock()
+	_, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain})
+	if body["scopes"] != "claims:read" {
+		t.Errorf("sign_in = %s, want the scopes Ellen holds", raw)
 	}
 }
 

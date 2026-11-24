@@ -1194,3 +1194,22 @@ func TestMayCarryTokenWithheldWhenAnyMatchHasOwnResource(t *testing.T) {
 		}
 	}
 }
+
+// A sign_in_required stop reason carries the scopes the 401's Bearer
+// challenge named, and StopScopes reads them back.
+func TestStopReasonKeepsChallengeScope(t *testing.T) {
+	h := http.Header{"Www-Authenticate": {`Bearer realm="x", scope="claims  claims:read"`}}
+	e := &Error{Status: http.StatusUnauthorized, Code: CodeSignInRequired, Scope: strings.Join(strings.Fields(bearerParam(h, bearerScopeParam)), " ")}
+	reason := strings.TrimPrefix(e.Error(), "conversation: ")
+	if got := strings.Join(StopScopes(reason), " "); got != "claims claims:read" {
+		t.Errorf("StopScopes(%q) = %q", reason, got)
+	}
+	for _, r := range []string{"sign_in_required (HTTP 401)", `conversation_not_found (HTTP 404) scope="x"`, ""} {
+		if got := StopScopes(r); got != nil {
+			t.Errorf("StopScopes(%q) = %v, want none", r, got)
+		}
+	}
+	if got := bearerParam(http.Header{"Www-Authenticate": {"Bearer scope=claims"}}, bearerScopeParam); got != "claims" {
+		t.Errorf("unquoted scope = %q", got)
+	}
+}

@@ -54,15 +54,22 @@ var (
 )
 
 // Error is a Company's error response (§5.3, §8.13). Code is empty when the
-// body had none; the caller then goes by Status.
+// body had none; the caller then goes by Status. Scope is set on a
+// CodeSignInRequired error whose Bearer challenge named the scopes needed
+// (RFC 6750 §3, PAP §7).
 type Error struct {
 	Status         int
 	Code           string
 	Description    string
 	ConversationID string
+	Scope          string
 }
 
 func (e *Error) Error() string {
+	if e.Code == CodeSignInRequired && e.Scope != "" {
+		// StopScopes reads the scope back from a Reader's stop reason.
+		return fmt.Sprintf("conversation: %s (HTTP %d) scope=%q", e.Code, e.Status, e.Scope)
+	}
 	if e.Code == "" {
 		return fmt.Sprintf("conversation: HTTP %d", e.Status)
 	}
@@ -70,6 +77,24 @@ func (e *Error) Error() string {
 		return fmt.Sprintf("conversation: %s (HTTP %d): %s", e.Code, e.Status, e.Description)
 	}
 	return fmt.Sprintf("conversation: %s (HTTP %d)", e.Code, e.Status)
+}
+
+// StopScopes is the scopes a Reader's stop reason (Store.Stopped) names: those
+// of the sign_in_required challenge that stopped it, or nil when it named
+// none or the reason is another.
+func StopScopes(reason string) []string {
+	if !strings.HasPrefix(reason, CodeSignInRequired) {
+		return nil
+	}
+	_, q, ok := strings.Cut(reason, " scope=")
+	if !ok {
+		return nil
+	}
+	scope, err := strconv.Unquote(q)
+	if err != nil {
+		return nil
+	}
+	return strings.Fields(scope)
 }
 
 // IsCode reports whether err is a Company error with the given code.
@@ -445,8 +470,9 @@ func (c *Client) do(ctx context.Context, co *discovery.Company, method, u string
 			continue
 		case resp.StatusCode == http.StatusUnauthorized:
 			// The Company's description is dropped: the reason a Reader
-			// records is the same for every sign-in it needs.
-			return nil, &Error{Status: http.StatusUnauthorized, Code: CodeSignInRequired}
+			// records is the same for every sign-in it needs, but for the
+			// scopes the challenge names.
+			return nil, &Error{Status: http.StatusUnauthorized, Code: CodeSignInRequired, Scope: strings.Join(strings.Fields(bearerParam(resp.Header, bearerScopeParam)), " ")}
 		case cerr.Code == "session_ended" && !rotated:
 			rotated = true
 			c.sid(userID, true)
@@ -539,21 +565,30 @@ func mayCarryToken(co *discovery.Company, u string) bool {
 // bearerError is the error parameter of a Bearer challenge in
 // WWW-Authenticate (RFC 6750 §3), or "" when there is none.
 func bearerError(h http.Header) string {
+	return bearerParam(h, bearerErrorParam)
+}
+
+// bearerParam is the parameter param matches in a Bearer challenge in
+// WWW-Authenticate, or "" when there is none.
+func bearerParam(h http.Header, param *regexp.Regexp) string {
 	for _, v := range h.Values("WWW-Authenticate") {
 		scheme, params, _ := strings.Cut(strings.TrimSpace(v), " ")
 		if !strings.EqualFold(scheme, "Bearer") {
 			continue
 		}
-		if m := bearerErrorParam.FindStringSubmatch(params); m != nil {
+		if m := param.FindStringSubmatch(params); m != nil {
 			return m[1] + m[2]
 		}
 	}
 	return ""
 }
 
-// bearerErrorParam matches error="..." or error=token among a challenge's
-// parameters.
-var bearerErrorParam = regexp.MustCompile(`(?:^|[\s,])error\s*=\s*(?:"([^"]*)"|([^\s,"]+))`)
+// bearerErrorParam and bearerScopeParam match error= and scope=, quoted or
+// a token, among a challenge's parameters.
+var (
+	bearerErrorParam = regexp.MustCompile(`(?:^|[\s,])error\s*=\s*(?:"([^"]*)"|([^\s,"]+))`)
+	bearerScopeParam = regexp.MustCompile(`(?:^|[\s,])scope\s*=\s*(?:"([^"]*)"|([^\s,"]+))`)
+)
 
 func readError(resp *http.Response) *Error {
 	defer resp.Body.Close()
