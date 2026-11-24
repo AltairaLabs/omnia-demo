@@ -156,11 +156,15 @@ func newServerWith(acct accountConfig) http.Handler {
 	newWrenmoor(time.Now).register(mux)
 	// Wren, Wrenmoor Energy's customer assistant: Amira's account, and the
 	// consent and receipt routes the customer portal uses (wren.go).
-	newWren(time.Now).register(mux)
+	wr := acct.wren
+	if wr == nil {
+		wr = newWren(time.Now)
+	}
+	wr.register(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	acct.register(mux)
+	acct.register(mux, wr)
 	return mux
 }
 

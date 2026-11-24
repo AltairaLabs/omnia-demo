@@ -56,10 +56,12 @@ func seedWrenCustomer() wrenCustomer {
 // wrenEllen is Ellen Whitcomb, whose Larkmere card is in identitydata.go, as a
 // Wrenmoor customer in the storm's district (HX7).
 //
-// STAND-IN: the stub holds her as data only. Bill, usage and tariff tools still
-// serve Amira alone, and userOf gives Ellen's email no account, so those tools
+// STAND-IN: the stub holds her as data. The account tools (compensation.go,
+// served with --account-api wrenmoor) now serve her, by the verified email of
+// the exchanged token. The older bill, usage and tariff tools still serve
+// Amira alone, and userOf gives Ellen's email no account, so those tools
 // answer her "no account for this customer". A real account system would
-// serve both. Only the public outage lookup (outages.go) concerns her.
+// serve both through one account lookup.
 var wrenEllen = wrenCustomer{
 	AccountID: "40021302",
 	Name:      "Ellen Whitcomb",
@@ -68,6 +70,14 @@ var wrenEllen = wrenCustomer{
 	Tariff:    "moor-steady",
 	MeterType: "Smart, half-hourly",
 	Heating:   "Gas central heating",
+}
+
+// wrenAccounts are the customers the account tools serve, by lowercase email,
+// the verified `email` claim of the exchanged token (obo.go). Amira's is the
+// only account the older Wren tools serve; this map does not change that.
+var wrenAccounts = map[string]wrenCustomer{
+	wrenEmail:                    seedWrenCustomer(),
+	"ellen.whitcomb@example.com": wrenEllen,
 }
 
 type billLine struct {

@@ -528,6 +528,7 @@ func TestAccountHolders(t *testing.T) {
 		{"larkmere", ellenEmail, true},
 		{"larkmere", "amira.saleem@example.com", false},
 		{"wrenmoor", "amira.saleem@example.com", true},
+		{"wrenmoor", ellenEmail, true},
 		{"wrenmoor", "nobody@example.com", false},
 	} {
 		known, err := accountHolders(tc.api)

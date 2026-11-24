@@ -72,16 +72,20 @@ const (
 type accountConfig struct {
 	api      string // "", accountAPILarkmere or accountAPIWrenmoor
 	verifier *oboVerifier
+	// wren is the Wrenmoor state the account routes read, shared with the
+	// older Wren routes so both report the same outage. Nil means a fresh one
+	// on the wall clock.
+	wren *wren
 }
 
 // register adds the account routes of the Company acct.api names. Every one
 // is wrapped in acct.verifier.guard.
-func (acct accountConfig) register(mux *http.ServeMux) {
+func (acct accountConfig) register(mux *http.ServeMux, w *wren) {
 	switch acct.api {
 	case accountAPILarkmere:
 		newHomeClaims(time.Now).register(mux, acct.verifier)
 	case accountAPIWrenmoor:
-		// No account routes yet.
+		registerWrenAccount(mux, acct.verifier, w)
 	}
 }
 
@@ -95,7 +99,10 @@ func accountHolders(api string) (func(email string) bool, error) {
 			return ok
 		}, nil
 	case accountAPIWrenmoor:
-		return func(email string) bool { return strings.EqualFold(email, wrenEmail) }, nil
+		return func(email string) bool {
+			_, ok := wrenAccounts[strings.ToLower(strings.TrimSpace(email))]
+			return ok
+		}, nil
 	default:
 		return nil, fmt.Errorf("account api %q: want %q or %q", api, accountAPILarkmere, accountAPIWrenmoor)
 	}

@@ -184,7 +184,16 @@ Add a row when you add a stand-in.
     estimated at the top of the hour about three hours ahead, the cut
     started 18h20m before that), held still for a take and moved on once
     the estimate is under an hour away. Ellen Whitcomb is held as a Wrenmoor
-    customer in HX7 but the account tools still serve Amira only.
+    customer in HX7. The older bill, usage and tariff tools still serve Amira
+    only.
+  - **Wrenmoor's outage and compensation belong to the signed-in customer**
+    (`compensation.go`, served with `--account-api wrenmoor`). The customer is
+    the verified `email` of the exchanged token (Amira or Ellen), never a
+    header; their outage is the HX7 feed's, from their postcode. The
+    compensation rule is Wrenmoor's own fictional standard (£95 at 12 hours,
+    then £45 per further full 12 hours, paid automatically within 28 days).
+    `owed` is a statement: nothing is paid or credited, and the outage never
+    ends, so it is always owed the £95 tier (hours off stay between 15 and 18).
 - **Real system:** the customer's own systems of record.
 - **Downstream:**
   - **State is in memory.** A restart resets every claim, case and consent,
