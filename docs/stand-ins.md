@@ -216,6 +216,15 @@ Add a row when you add a stand-in.
     way.
   - **It routes referrals by peril**, as a claims system does: the agent gives
     a reason, never a team.
+  - **Home claims belong to the signed-in member** (`homeclaims.go`, served
+    with `--account-api larkmere`). The member is the verified `email` of the
+    exchanged token, never a header. `homeclaimsdata.go` holds two home
+    policies (Ellen, Gwen) by email; a real insurer would link claims to a
+    policyholder record. A claim is visible and writable only to the member who
+    opened it, and another member's claim answers 404, as an unknown one does.
+    Unlike the claims-triage maps these take a mutex. They are separate from
+    the claims-triage claims, and no excess or £500 limit is enforced (the
+    ToolPolicy's job, milestone 3). State is in memory.
 
 ## Models
 

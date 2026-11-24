@@ -78,8 +78,10 @@ type accountConfig struct {
 // is wrapped in acct.verifier.guard.
 func (acct accountConfig) register(mux *http.ServeMux) {
 	switch acct.api {
-	case accountAPILarkmere, accountAPIWrenmoor:
-		// No account routes yet for either Company.
+	case accountAPILarkmere:
+		newHomeClaims(time.Now).register(mux, acct.verifier)
+	case accountAPIWrenmoor:
+		// No account routes yet.
 	}
 }
 
