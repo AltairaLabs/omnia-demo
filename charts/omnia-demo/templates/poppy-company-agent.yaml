@@ -46,8 +46,13 @@ spec:
 ---
 # pack.json is COMPILED, not authored here. The source of truth is the
 # PromptArena project at demos/claims-triage/poppy (larkmere-claims-desk) or
-# demos/wren/poppy (wrenmoor-outages). Regenerate with:
-#   hack/build-packs.sh {{ $name }}
+# demos/wren/poppy (wrenmoor-outages). Two packs: signed out
+# (config.arena.yaml) and, with Company sign-in, {{ $name }}-signin
+# (config.signin.arena.yaml), which adds the account tools. Signed out,
+# nothing serves those tools, and an unclaimed pack tool answers "no handler
+# registered" instead of the agent saying to sign in. Regenerate with:
+#   hack/build-packs.sh {{ $name }}{{ if .Values.poppy.auth.enabled }}-signin{{ end }}
+{{- $pack := printf "files/arena/%s%s-pack.json" $name (ternary "-signin" "" (eq .Values.poppy.auth.enabled true)) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -57,7 +62,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 data:
   pack.json: |
-{{ .Files.Get (printf "files/arena/%s-pack.json" $name) | indent 4 }}
+{{ required (printf "%s is missing: hack/build-packs.sh" $pack) (.Files.Get $pack) | indent 4 }}
 ---
 # The tenant's Company Agent under the Personal Agent Protocol (PAP 1.0,
 # "Poppy"). A Personal Agent finds it through the Company's

@@ -1,0 +1,39 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. The
+# per-tool half of RFC 0013, action_scope (including the pii data class), is
+# declared on each tool in tools/*.tool.yaml: this block has no data-class
+# field.
+
+intended_purpose: >-
+  Tell Larkmere Mutual's members, or someone acting for them, what home cover
+  usually includes for storm and flood damage and what to do first, and, once
+  the member has signed in, report a home claim on their policy, add the
+  damaged items to it and say where it stands.
+
+foreseeable_misuse:
+  - Asking it to report or read a named member's claim without that member signed in
+  - Treating its general description of cover as a promise that a claim will be paid
+  - Relying on it in an emergency, which needs the emergency services
+
+# acts_with_oversight: signed in, it reports a claim and adds items on its own,
+# as the member asked; a claims handler reviews every claim before anything is
+# settled. Signed out it only explains.
+autonomy_level: acts_with_oversight
+
+# A role, not a person.
+accountable_owner: Larkmere Mutual Claims Operations
+
+operator_role: eu-aiact:AIDeployer
+
+risk_classification: eu-aiact:RiskLevelLimited
+
+intended_deployment_contexts:
+  - Larkmere Mutual's Company Agent, reached by Personal Agents under the Personal Agent Protocol
+
+approved_environments:
+  - demo
+
+# True: it talks to the public, directly or through someone acting for them.
+requires_ai_disclosure: true

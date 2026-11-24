@@ -42,7 +42,8 @@ if [[ $# -gt 0 ]]; then
 else
   demos=(mortgage-underwriting pii-chat card-line claims-triage sharepoint-adapter
     incident-agent data-analyst field-service wren research
-    larkmere-claims-desk wrenmoor-outages assistant)
+    larkmere-claims-desk larkmere-claims-desk-signin
+    wrenmoor-outages wrenmoor-outages-signin assistant)
 fi
 
 # A pack's Arena project is demos/<demo>/arena, except for the Poppy Company
@@ -50,10 +51,30 @@ fi
 # assistant, which lives beside the personal-agent service its tools call.
 arena_dir() {
   case "$1" in
-    larkmere-claims-desk) echo "${ROOT}/demos/claims-triage/poppy" ;;
-    wrenmoor-outages) echo "${ROOT}/demos/wren/poppy" ;;
+    larkmere-claims-desk | larkmere-claims-desk-signin) echo "${ROOT}/demos/claims-triage/poppy" ;;
+    wrenmoor-outages | wrenmoor-outages-signin) echo "${ROOT}/demos/wren/poppy" ;;
     assistant) echo "${ROOT}/demos/personal-agent/arena" ;;
     *) echo "${ROOT}/demos/$1/arena" ;;
+  esac
+}
+
+# Each Company Agent ships two packs from one Arena project: the signed-out
+# pack (config.arena.yaml) and, for Company sign-in, <demo>-signin
+# (config.signin.arena.yaml, governance-declarations.signin.yaml) with the
+# account tools. The chart picks one by poppy.auth.enabled. Both carry the
+# agent's own pack id. Their tools share one tools/ directory, so a Company
+# Agent's action_scopes are read from the tools its config lists, not from
+# every file there: a scope for a tool the pack lacks is an error below.
+variant() {
+  case "$1" in
+    *-signin) echo ".signin" ;;
+    *) echo "" ;;
+  esac
+}
+tools_from_config() {
+  case "$1" in
+    larkmere-claims-desk* | wrenmoor-outages*) return 0 ;;
+    *) return 1 ;;
   esac
 }
 
@@ -62,14 +83,16 @@ trap 'rm -rf "${TMP}"' EXIT
 
 for demo in "${demos[@]}"; do
   arena="$(arena_dir "${demo}")"
+  v="$(variant "${demo}")"
+  config="${arena}/config${v}.arena.yaml"
   compiled="${TMP}/${demo}.compiled.json"
   out="${OUT}/${demo}-pack.json"
 
   echo "==> ${demo}: compiling"
   "${PACKC}" compile \
-    --config "${arena}/config.arena.yaml" \
+    --config "${config}" \
     --output "${compiled}" \
-    --id "${demo}"
+    --id "${demo%-signin}"
   # Validated BEFORE the merge: packc's schema closes Tool to
   # name/description/parameters, so it rejects action_scope. Omnia's own
   # promptpack schema defines it ($defs.Tool.action_scope, RFC 0013) and reads
@@ -77,8 +100,8 @@ for demo in "${demos[@]}"; do
   "${PACKC}" validate "${compiled}"
 
   governance='null'
-  if [[ -f "${arena}/governance-declarations.yaml" ]]; then
-    governance="$(yq -o json -I0 '.' "${arena}/governance-declarations.yaml")"
+  if [[ -f "${arena}/governance-declarations${v}.yaml" ]]; then
+    governance="$(yq -o json -I0 '.' "${arena}/governance-declarations${v}.yaml")"
   fi
 
   asserted='null'
@@ -105,9 +128,16 @@ for demo in "${demos[@]}"; do
   fi
 
   scopes='{}'
-  shopt -s nullglob
-  tool_files=("${arena}"/tools/*.tool.yaml)
-  shopt -u nullglob
+  tool_files=()
+  if tools_from_config "${demo}"; then
+    while IFS= read -r f; do
+      [[ -n "${f}" ]] && tool_files+=("${arena}/${f}")
+    done < <(yq -r '.spec.tools[]?.file' "${config}")
+  else
+    shopt -s nullglob
+    tool_files=("${arena}"/tools/*.tool.yaml)
+    shopt -u nullglob
+  fi
   if [[ ${#tool_files[@]} -gt 0 ]]; then
     scopes="$(yq -o json -I0 '{"name": .spec.name, "scope": .spec.action_scope}' "${tool_files[@]}" \
       | jq -s -c 'map(select(.scope != null) | {(.name): .scope}) | add // {}')"

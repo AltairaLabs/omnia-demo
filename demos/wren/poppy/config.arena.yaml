@@ -4,6 +4,10 @@
 # agent a customer's Personal Agent talks to over the Personal Agent Protocol
 # (the AgentRuntime's poppy facade, charts/omnia-demo/templates/poppy-company-agent.yaml).
 #
+# The SIGNED-OUT pack, shipped unless Company sign-in is on. With
+# poppy.auth.enabled the chart ships config.signin.arena.yaml's pack instead,
+# which adds the customer's own outage and compensation.
+#
 # A separate agent from Wren, not a facade on it: Wren works on the signed-in
 # customer's account and needs the portal for its consent card, and a poppy
 # facade needs Redis context, which Wren does not have.
@@ -25,18 +29,12 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # One public read, the outage feed by postcode, and two reads of the
-  # signed-in customer's own account (my_outage, compensation_status). The
-  # account reads are bound only with Company sign-in (poppy.auth.enabled,
-  # charts/omnia-demo/templates/poppy-account-tools.yaml) and carry the
-  # customer's exchanged token: signed out, the call is refused and the
-  # customer is asked to sign in. Not get_weather: the stub serves it only for
+  # One public read: the outage feed by postcode. Nothing here reads or
+  # changes a customer's account. Not get_weather: the stub serves it only for
   # the signed-in customer, and with no identity it falls back to Amira's
   # account, which would leak one customer into another's conversation.
   tools:
     - file: tools/outage-status.tool.yaml
-    - file: tools/my-outage.tool.yaml
-    - file: tools/compensation-status.tool.yaml
 
   defaults:
     temperature: 0.2

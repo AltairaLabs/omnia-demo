@@ -3,23 +3,19 @@
 #
 # ASSERTED, not evidence: typed by a human and verified by nothing. The
 # per-tool half of RFC 0013, action_scope, is declared on each tool in
-# tools/*.tool.yaml, including the pii data class of the account reads: this
-# block has no data-class field.
+# tools/*.tool.yaml.
 
 intended_purpose: >-
   Tell Wrenmoor Energy's customers, or someone acting for them, whether the
-  power is off at a postcode, when it should be restored and why, and, once
-  the customer has signed in, the power cut on their own supply and the
-  compensation they are owed for it.
+  power is off at a postcode, when it should be restored and why, and that
+  compensation is claimed through the customer's own account.
 
 foreseeable_misuse:
   - Asking about a named customer's account, outage or compensation without that customer signed in
   - Treating an estimated restoration time as a promise
   - Relying on it in an emergency, which needs the emergency services
 
-# suggests: it reads public outage data and, signed in, the customer's own
-# outage and compensation. It changes nothing; compensation is paid
-# automatically and it only reports it.
+# suggests: it reads public outage data and changes nothing.
 autonomy_level: suggests
 
 # A role, not a person.

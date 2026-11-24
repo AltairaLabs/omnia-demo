@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# The SIGNED-IN variant of wrenmoor-outages, Wrenmoor Energy's Company Agent.
+# The chart ships it only when Company sign-in is on (poppy.auth.enabled,
+# charts/omnia-demo/templates/poppy-company-agent.yaml); otherwise it ships
+# config.arena.yaml's pack, whose one tool is the public outage_status.
+#
+# Two packs, not one: with sign-in off nothing serves the account tools, and
+# Omnia keeps an unclaimed pack tool local, so the model would be offered
+# my_outage and get "no handler registered" back, perhaps before it tried
+# outage_status.
+#
+# The chart ships a COMPILED pack
+# (charts/omnia-demo/files/arena/wrenmoor-outages-signin-pack.json) with
+# governance-declarations.signin.yaml and each tool's action_scope merged in.
+#
+# Regenerate with: hack/build-packs.sh wrenmoor-outages-signin
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: wrenmoor-outages
+spec:
+  prompt_configs:
+    - id: outages
+      file: prompts/wrenmoor-outages.signin.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # One public read, the outage feed by postcode, and two reads of the
+  # signed-in customer's own account (my_outage, compensation_status). The
+  # account reads are served by the account ToolRegistry
+  # (charts/omnia-demo/templates/poppy-account-tools.yaml) and carry the
+  # customer's exchanged token: a customer who has not signed in gets no
+  # token, the call is refused and the customer is asked to sign in. Not get_weather: the stub serves it only for
+  # the signed-in customer, and with no identity it falls back to Amira's
+  # account, which would leak one customer into another's conversation.
+  tools:
+    - file: tools/outage-status.tool.yaml
+    - file: tools/my-outage.tool.yaml
+    - file: tools/compensation-status.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]
