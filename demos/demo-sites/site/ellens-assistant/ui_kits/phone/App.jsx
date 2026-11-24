@@ -63,6 +63,27 @@ function httpsURL(u) {
   }
 }
 
+// snapshotSignIns reads a snapshot's sign-in statuses against seen (company
+// -> the latest status told). The first snapshot only seeds seen, for
+// companies the stream hasn't already told of. A later one answers the
+// [company, status] pairs that ended (signed_in or declined) and differ from
+// seen, for the caller to tell as if their updates had arrived.
+function snapshotSignIns(list, seen, initial) {
+  const out = [];
+  for (const c of list || []) {
+    const st = c.sign_in && c.sign_in.status;
+    if (!st || !c.company) continue;
+    const company = String(c.company);
+    if (initial) {
+      if (!(company in seen)) seen[company] = st;
+    } else if ((st === "signed_in" || st === "declined") && seen[company] !== st &&
+               !out.some(([co]) => co === company)) {
+      out.push([company, st]);
+    }
+  }
+  return out;
+}
+
 // Sign-in lines the page sends the assistant for Ellen.
 const signedInLine = (company) => "I've signed in to " + company + ".";
 const declinedLine = (company) => "I didn't sign in to " + company + ".";
@@ -71,7 +92,7 @@ const declinedLine = (company) => "I didn't sign in to " + company + ".";
 // Conversations: what the strip knows, by conversation id.
 //
 //   { id, company, parent, working, handoff, closed, stopped, needsYou,
-//     signin: null | { needed, status, url },
+//     signin: null | { needed, status, url, asked },
 //     messages: [{ role, author, text }], seen: { eventId: true } }
 //
 // role is "user" for the person's side (the assistant, or Ellen herself in a
@@ -80,6 +101,7 @@ const declinedLine = (company) => "I didn't sign in to " + company + ".";
 // signin.status is needed, pending, signed_in, failed or declined. url is
 // the authorization URL while pending, and only from an update: the snapshot
 // does not carry it, so after a reload the assistant starts the sign-in again.
+// asked is the scopes the pending sign-in asked for, from the same update.
 
 function fromSnapshot(c) {
   const si = c.sign_in;
@@ -87,7 +109,7 @@ function fromSnapshot(c) {
     id: c.conversation_id, company: c.company, parent: c.parent_conversation_id || "",
     working: !!c.working, handoff: c.handoff || "none", closed: !!c.closed, stopped: c.stopped || "",
     needsYou: false, messages: (c.messages || []).map((m) => ({ role: m.role, author: m.author, text: m.text })),
-    signin: si ? { needed: !!si.needed, status: si.status || "", url: "" } : null,
+    signin: si ? { needed: !!si.needed, status: si.status || "", url: "", asked: [] } : null,
     seen: {}, snapshot: true,
   };
 }
@@ -152,12 +174,25 @@ function apply(convs, u, replay) {
       break;
     }
     case "signin": {
-      const status = String(ev.status || "");
-      const s = c.signin || { needed: false };
-      c.signin = { needed: status === "signed_in" ? false : s.needed, status, url: status === "pending" ? httpsURL(ev.authorization_url) : "" };
-      if (status === "signed_in" || status === "declined") c.needsYou = false;
-      // Signed in, personal-agent follows a conversation stopped for it again.
-      if (status === "signed_in" && stoppedForSignIn(c)) c.stopped = "";
+      let status = String(ev.status || "");
+      const s = c.signin || { needed: false, asked: [] };
+      const scopes = String(ev.scope || "").split(/\s+/).filter(Boolean);
+      let needed = s.needed;
+      let asked = s.asked || [];
+      if (status === "pending") asked = scopes;
+      if (status === "signed_in") {
+        // The company may grant fewer scopes than were asked (PAP §4.7). A
+        // grant naming no scope is exactly what was asked. Short of what was
+        // asked, the row still needs sign-in, as personal-agent's snapshot
+        // says.
+        needed = scopes.length > 0 && !asked.every((x) => scopes.includes(x));
+        if (needed) status = "needed";
+      }
+      c.signin = { needed, status, url: status === "pending" ? httpsURL(ev.authorization_url) : "", asked };
+      if (ev.status === "signed_in" || status === "declined") c.needsYou = false;
+      // Signed in (even short of a scope), personal-agent follows a
+      // conversation stopped for it again.
+      if (ev.status === "signed_in" && stoppedForSignIn(c)) c.stopped = "";
       break;
     }
     case "stopped":
@@ -187,6 +222,11 @@ function state(c) {
 }
 
 function lastLine(c) {
+  // A sign-in begun before a reload: its button's URL was in an update the
+  // snapshot does not repeat.
+  if (c.signin && c.signin.status === "pending" && !httpsURL(c.signin.url)) {
+    return "Ask your assistant to start the sign-in again.";
+  }
   if (c.stopped && stoppedForSignIn(c)) {
     return c.signin && c.signin.status === "declined"
       ? "You didn't sign in to " + c.company
@@ -220,18 +260,22 @@ function rows(convs, order) {
 // ---------------------------------------------------------------------------
 
 // useConversations follows the strip. onSignIn(company, status) hears every
-// "signin" update as it arrives on the stream (never from a snapshot), once
-// per conversation it was published on.
-function useConversations(onSignIn) {
+// "signin" update as it arrives on the stream, once per conversation it was
+// published on. onSnapshot(list, initial) hears each snapshot loaded, initial
+// for the first, so what changed while the stream was down can be told.
+function useConversations(onSignIn, onSnapshot) {
   const [convs, setConvs] = useState({});
   const [order, setOrder] = useState([]);
   const signInRef = useRef(onSignIn);
   signInRef.current = onSignIn;
+  const snapshotRef = useRef(onSnapshot);
+  snapshotRef.current = onSnapshot;
 
   useEffect(() => {
     let buffer = null; // updates that arrive while a snapshot is loading
     let gen = 0; // the latest load wins
     let closed = false;
+    let first = true; // no snapshot applied yet
     const remember = (id) => setOrder((o) => (o.includes(id) ? o : [...o, id]));
 
     const load = async () => {
@@ -242,6 +286,8 @@ function useConversations(onSignIn) {
         if (!res.ok) throw new Error(String(res.status));
         const list = await res.json();
         if (closed || mine !== gen) return;
+        snapshotRef.current(list, first);
+        first = false;
         const next = {};
         for (const c of list) next[c.conversation_id] = fromSnapshot(c);
         const pending = buffer;
@@ -426,7 +472,13 @@ function App() {
     if (status === "signed_in") say(signedInLine(company));
     else if (status === "declined") say(declinedLine(company));
   };
-  const { convs, order } = useConversations(onSignIn);
+  // A snapshot seeds the statuses: what had already ended before the page
+  // loaded is not said again. After a reconnect, a sign-in that ended while
+  // the stream was down is said, once, as if its update had arrived.
+  const onSnapshot = (list, initial) => {
+    for (const [company, st] of snapshotSignIns(list, signInsRef.current, initial)) onSignIn(company, st);
+  };
+  const { convs, order } = useConversations(onSignIn, onSnapshot);
   const [thread, setThread] = useState([
     { from: "it", text: "Hi Ellen. Tell me what you need and I'll get in touch with the companies you deal with. I'll tell you what each one says, and I'll ask you before agreeing to anything." },
   ]);
