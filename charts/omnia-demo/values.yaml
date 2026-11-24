@@ -1019,6 +1019,11 @@ personalAgent:
   # -- The Secret holding es256.pem and ps384.pem (PKCS#8), made by
   # hack/personal-agent-keys.sh. Never made by the chart.
   identitySecret: personal-agent-identity
+  # -- The Secret holding token.key (32 random bytes, standard base64), the key
+  # sign-in tokens are sealed under in Redis (--token-key-file). Made by
+  # hack/personal-agent-keys.sh; the chart never makes it, for the same reason
+  # as identitySecret: a new key would orphan every stored sign-in.
+  tokenKeySecret: personal-agent-token-key
   # -- Serve the PAP validator's test identity at /poppy-test/ from Secret
   # testIdentitySecret, and route it. Only while running the validator. That
   # Secret must hold ONLY the public test documents (agent.json, jwks.json):

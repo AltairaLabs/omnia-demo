@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Make the identity keys of Ellen's assistant, the demo's Personal Agent, and
-# store them in Secret personal-agent-identity, which the personal-agent
-# Deployment mounts (charts/omnia-demo/templates/personal-agent.yaml).
+# Make the keys of Ellen's assistant, the demo's Personal Agent, and store them
+# in two Secrets the personal-agent Deployment mounts
+# (charts/omnia-demo/templates/personal-agent.yaml): personal-agent-identity
+# (its identity keys) and personal-agent-token-key (the key its sign-in tokens
+# are sealed under in Redis).
 #
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh           once
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh --force   new keys
@@ -14,12 +16,15 @@ set -euo pipefail
 # Two keys, PKCS#8 PEM, as demos/personal-agent/identity.Load reads them:
 #   es256.pem   ECDSA P-256 (ES256)
 #   ps384.pem   RSA 3072 (PS384)
+# And token.key: 32 random bytes, one line of standard base64 (openssl rand
+# -base64 32), as --token-key-file reads it.
 #
 # STAND-IN (docs/stand-ins.md, "Personal Agent"): a real Personal Agent keeps
 # its keys in an HSM or KMS. Here they are a cluster Secret.
 #
 # Idempotent: an existing Secret is left alone unless --force. --force
-# replaces only the keys: the agent's client_id is unchanged, and the
+# replaces the keys of both Secrets (a new token key leaves every stored
+# sign-in unreadable, so Ellen signs in again; the identity change is below): the agent's client_id is unchanged, and the
 # Companies' facades refetch jwks.json when they meet an unknown key id. Its
 # conversations and User IDs are in Redis (pa:*), not here, so they stay; to
 # clear them, use the Reset in demos/personal-agent/RUNBOOK.md. Restart the
@@ -29,17 +34,19 @@ set -euo pipefail
 # shared by every terminal on the machine and can change under you.
 #
 # Env: CONTEXT (required), NAMESPACE (default ellens-assistant),
-#      SECRET (default personal-agent-identity).
+#      SECRET (default personal-agent-identity),
+#      TOKEN_SECRET (default personal-agent-token-key).
 
 CONTEXT="${CONTEXT:-}"
 NAMESPACE="${NAMESPACE:-ellens-assistant}"
 SECRET="${SECRET:-personal-agent-identity}"
+TOKEN_SECRET="${TOKEN_SECRET:-personal-agent-token-key}"
 
 force=false
 for arg in "$@"; do
   case "${arg}" in
     --force) force=true ;;
-    -h|--help) sed -n '4,32p' "$0"; exit 0 ;;
+    -h|--help) sed -n '4,38p' "$0"; exit 0 ;;
     *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
   esac
 done
@@ -65,8 +72,9 @@ fi
 # --ignore-not-found: NotFound is an empty answer, and any other error (RBAC,
 # a timeout) fails the script under set -e instead of reading as "absent".
 existing="$(kc -n "${NAMESPACE}" get secret "${SECRET}" --ignore-not-found -o name)"
-if [[ -n "${existing}" && "${force}" != true ]]; then
-  echo "secret ${NAMESPACE}/${SECRET} already exists on ${CONTEXT}; leaving it (--force replaces the keys)"
+existing_token="$(kc -n "${NAMESPACE}" get secret "${TOKEN_SECRET}" --ignore-not-found -o name)"
+if [[ -n "${existing}" && -n "${existing_token}" && "${force}" != true ]]; then
+  echo "secrets ${NAMESPACE}/${SECRET} and ${NAMESPACE}/${TOKEN_SECRET} already exist on ${CONTEXT}; leaving them (--force replaces the keys)"
   exit 0
 fi
 
@@ -77,6 +85,7 @@ chmod 700 "${TMP}"
 # genpkey writes PKCS#8 ("BEGIN PRIVATE KEY") for both.
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out "${TMP}/es256.pem" 2>/dev/null
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${TMP}/ps384.pem" 2>/dev/null
+openssl rand -base64 32 > "${TMP}/token.key"
 
 # Rendered client-side, then created or replaced. Never `kubectl apply`:
 # client-side apply copies the whole object, private keys included, into the
@@ -84,21 +93,34 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "${TMP}/ps384.
 # fails if the Secret appeared since the check, so existing keys are never
 # replaced without --force.
 render() {
-  kc -n "${NAMESPACE}" create secret generic "${SECRET}" \
-    --from-file=es256.pem="${TMP}/es256.pem" \
-    --from-file=ps384.pem="${TMP}/ps384.pem" \
+  local name="$1"; shift
+  kc -n "${NAMESPACE}" create secret generic "${name}" "$@" \
     --dry-run=client -o yaml \
     | kc -n "${NAMESPACE}" label --local -f - app.kubernetes.io/part-of=omnia-demo -o yaml
 }
 
-if [[ -n "${existing}" ]]; then
-  echo "==> replacing ${NAMESPACE}/${SECRET} on ${CONTEXT} (--force)"
-  render | kc -n "${NAMESPACE}" replace -f - >/dev/null
-else
-  render | kc -n "${NAMESPACE}" create -f - >/dev/null
-fi
+# put NAME EXISTING FILE=PATH...: create the Secret, or replace it (--force only).
+put() {
+  local name="$1" have="$2"; shift 2
+  local args=()
+  local f
+  for f in "$@"; do args+=("--from-file=${f}"); done
+  if [[ -n "${have}" ]]; then
+    if [[ "${force}" == true ]]; then
+      echo "==> replacing ${NAMESPACE}/${name} on ${CONTEXT} (--force)"
+      render "${name}" "${args[@]}" | kc -n "${NAMESPACE}" replace -f - >/dev/null
+    else
+      echo "==> ${NAMESPACE}/${name} exists; leaving it (--force replaces)"
+    fi
+  else
+    render "${name}" "${args[@]}" | kc -n "${NAMESPACE}" create -f - >/dev/null
+    echo "==> created ${NAMESPACE}/${name} on ${CONTEXT}"
+  fi
+}
 
-echo "==> ${NAMESPACE}/${SECRET} on ${CONTEXT}: es256.pem, ps384.pem"
-if [[ -n "${existing}" ]]; then
+put "${SECRET}" "${existing}" es256.pem="${TMP}/es256.pem" ps384.pem="${TMP}/ps384.pem"
+put "${TOKEN_SECRET}" "${existing_token}" token.key="${TMP}/token.key"
+
+if [[ -n "${existing}" || -n "${existing_token}" ]] && [[ "${force}" == true ]]; then
   echo "    restart it: kubectl --context ${CONTEXT} -n ${NAMESPACE} rollout restart deploy/personal-agent"
 fi

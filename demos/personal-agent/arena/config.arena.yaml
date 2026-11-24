@@ -31,14 +31,15 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # The five tools on the personal-agent service. Starting, sending and
-  # closing speak to a Company for Ellen; finding and reading do not.
+  # The six tools on the personal-agent service. Starting, sending, closing and
+  # signing in speak to a Company for Ellen; finding and reading do not.
   tools:
     - file: tools/find-company.tool.yaml
     - file: tools/start-conversation.tool.yaml
     - file: tools/send-message.tool.yaml
     - file: tools/read-conversation.tool.yaml
     - file: tools/close-conversation.tool.yaml
+    - file: tools/sign-in.tool.yaml
 
   defaults:
     temperature: 0.2

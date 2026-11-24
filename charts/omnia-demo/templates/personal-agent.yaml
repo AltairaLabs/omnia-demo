@@ -67,6 +67,8 @@ spec:
             {{- with $pa.redisURL }}
             - --redis-url
             - {{ . | quote }}
+            - --token-key-file
+            - /var/run/personal-agent/token/token.key
             {{- end }}
             {{- if $pa.testIdentity }}
             - --test-identity-dir
@@ -83,6 +85,11 @@ spec:
             - name: identity
               mountPath: /var/run/personal-agent/identity
               readOnly: true
+            {{- if $pa.redisURL }}
+            - name: token-key
+              mountPath: /var/run/personal-agent/token
+              readOnly: true
+            {{- end }}
             {{- if $pa.testIdentity }}
             - name: test-identity
               mountPath: /var/run/personal-agent/test-identity
@@ -108,6 +115,15 @@ spec:
           secret:
             secretName: {{ $pa.identitySecret }}
             defaultMode: 0440
+        # token.key, from hack/personal-agent-keys.sh. Mounted whenever tokens
+        # are kept in Redis (the flag is required with --redis-url). Never made
+        # by the chart either.
+        {{- if $pa.redisURL }}
+        - name: token-key
+          secret:
+            secretName: {{ $pa.tokenKeySecret }}
+            defaultMode: 0440
+        {{- end }}
         {{- if $pa.testIdentity }}
         - name: test-identity
           secret:
@@ -130,10 +146,17 @@ spec:
       port: 8080
       targetPort: http
 ---
-# The agent's public identity on its own host. ONLY the two PAP documents
-# (and the validator's test identity while testIdentity is on), as Exact
-# matches: the same listener serves the assistant's tools (/tools/*) and the
-# page's routes (/api/*), and neither may be reachable from the internet.
+# The agent's public identity on its own host. ONLY the two PAP documents,
+# the sign-in callback (and the validator's test identity while testIdentity is
+# on), as Exact matches: the same listener serves the assistant's tools
+# (/tools/*) and the page's routes (/api/*), and neither may be reachable from
+# the internet.
+#
+# /signin/callback is the one route added for sign-in, and it is public because
+# Ellen's browser is redirected to it by a Company's sign-in page (PAP §4.2).
+# It holds nothing to steal: it accepts only a redirect whose state this
+# service issued, once, within 10 minutes, and whose iss matches the issuer the
+# sign-in began with, and its page shows no token, code or state.
 # Anyone who could call /tools/send_message could speak to a Company as Ellen.
 # No URLRewrite and no redirect: PAP §4.1 wants the documents answered at
 # these exact URLs.
@@ -154,6 +177,7 @@ spec:
     - matches:
         - path: { type: Exact, value: /agent.json }
         - path: { type: Exact, value: /jwks.json }
+        - path: { type: Exact, value: /signin/callback }
 {{- if $pa.testIdentity }}
         - path: { type: PathPrefix, value: /poppy-test/ }
 {{- end }}

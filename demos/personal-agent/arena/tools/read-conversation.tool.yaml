@@ -18,7 +18,10 @@ spec:
     company is still working on a reply (working), whether a person at the
     company is taking it over (handoff "pending", else "none"), whether it is
     closed, and, if the assistant can no longer follow it, why (stopped, for
-    example when the company asks for Ellen to sign in). Changes nothing.
+    example when the company asks for Ellen to sign in), and sign_in, present
+    while the company wants Ellen signed in or a sign-in with it has begun or
+    ended (needed; scopes, space-separated; status needed, pending, signed_in
+    or declined). Changes nothing.
     With wait_seconds it first waits, up to that many seconds, for something
     to change: a new reply from the company, the company no longer working,
     a person taking over, the conversation closing or stopping. It answers as
@@ -46,6 +49,12 @@ spec:
       handoff: { type: string, enum: [none, pending] }
       closed: { type: boolean }
       stopped: { type: string }
+      sign_in:
+        type: object
+        properties:
+          needed: { type: boolean }
+          scopes: { type: string }
+          status: { type: string, enum: [needed, pending, signed_in, declined] }
       messages:
         type: array
         items:
