@@ -23,9 +23,14 @@ package main
 // Wrenmoor). A real account system would hold its own link from the identity
 // provider's user to the account, made when the customer first registered,
 // and would not depend on an email matching. Downstream: a token without an
-// email claim is refused (401), so a gateway that does not map `email` locks
-// every customer out; and whoever controls an email at the upstream provider
-// is that member here.
+// email claim and email_verified true is refused (401), so a gateway that
+// does not map both locks every customer out; and whoever controls a
+// verified email at the upstream provider is that member here.
+//
+// The issuer's signing keys are cached in memory and trusted until an
+// unknown kid triggers a refetch, or the stub restarts. A key the issuer
+// withdraws (rotated out, or compromised) keeps verifying tokens here until
+// then; a real API would refresh its JWKS on a schedule as well.
 
 import (
 	"context"
@@ -102,10 +107,16 @@ type oboVerifier struct {
 	hc               *http.Client
 	now              func() time.Time
 
-	mu        sync.Mutex
+	// keysMu guards keys, so a known kid is looked up without waiting on a
+	// JWKS fetch. fetchMu serializes fetches and guards lastFetch.
+	keysMu    sync.RWMutex
 	keys      map[string]*rsa.PublicKey // by kid
-	lastFetch time.Time                 // zero until the first fetch
+	fetchMu   sync.Mutex
+	lastFetch time.Time // zero until the first fetch
 }
+
+// oboLeeway is the clock skew allowed on exp and nbf.
+const oboLeeway = 30 * time.Second
 
 func newOBOVerifier(issuer, audience string, known func(email string) bool, hc *http.Client, now func() time.Time) *oboVerifier {
 	if hc == nil {
@@ -152,6 +163,7 @@ func (v *oboVerifier) check(r *http.Request, scope string) (member string, statu
 		jwt.WithAudience(v.audience),
 		jwt.WithExpirationRequired(),
 		jwt.WithTimeFunc(v.now),
+		jwt.WithLeeway(oboLeeway),
 	)
 	if err != nil {
 		return "", http.StatusUnauthorized, errInvalidToken, err.Error()
@@ -162,7 +174,9 @@ func (v *oboVerifier) check(r *http.Request, scope string) (member string, statu
 	if !ok || email == "" {
 		return "", http.StatusUnauthorized, errInvalidToken, "no email claim"
 	}
-	if verified, present := claims.EmailVerified.(bool); claims.EmailVerified != nil && (!present || !verified) {
+	// The gateway maps email only when the upstream verified it, and says so:
+	// anything but email_verified true, including no claim, is refused.
+	if verified, ok := claims.EmailVerified.(bool); !ok || !verified {
 		return "", http.StatusUnauthorized, errInvalidToken, "email not verified"
 	}
 	if !hasScope(claims.Scope, scope) {
@@ -196,9 +210,14 @@ func (v *oboVerifier) key(ctx context.Context, t *jwt.Token) (any, error) {
 		return nil, errors.New("no kid")
 	}
 
-	v.mu.Lock()
-	defer v.mu.Unlock()
-	if k, ok := v.keys[kid]; ok {
+	if k, ok := v.cachedKey(kid); ok {
+		return k, nil
+	}
+
+	v.fetchMu.Lock()
+	defer v.fetchMu.Unlock()
+	// Another request may have fetched while this one waited.
+	if k, ok := v.cachedKey(kid); ok {
 		return k, nil
 	}
 	if !v.lastFetch.IsZero() && v.now().Sub(v.lastFetch) < jwksRefetchInterval {
@@ -209,11 +228,20 @@ func (v *oboVerifier) key(ctx context.Context, t *jwt.Token) (any, error) {
 	if err != nil {
 		return nil, err
 	}
+	v.keysMu.Lock()
 	v.keys = keys
+	v.keysMu.Unlock()
 	if k, ok := keys[kid]; ok {
 		return k, nil
 	}
 	return nil, fmt.Errorf("unknown kid %q", kid)
+}
+
+func (v *oboVerifier) cachedKey(kid string) (*rsa.PublicKey, bool) {
+	v.keysMu.RLock()
+	defer v.keysMu.RUnlock()
+	k, ok := v.keys[kid]
+	return k, ok
 }
 
 // fetchKeys reads the issuer's RFC 8414 metadata, checks it names this

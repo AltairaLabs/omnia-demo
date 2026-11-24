@@ -382,6 +382,31 @@ func TestOBORefusesTokenWithoutEmail(t *testing.T) {
 	c = f.claims(clk.now())
 	c["email_verified"] = false
 	wantRefused(t, oboCall(v, f.mint(c), nil), http.StatusUnauthorized, "invalid_token")
+
+	// Absent, or not the boolean true, is not verified either.
+	c = f.claims(clk.now())
+	delete(c, "email_verified")
+	wantRefused(t, oboCall(v, f.mint(c), nil), http.StatusUnauthorized, "invalid_token")
+
+	c = f.claims(clk.now())
+	c["email_verified"] = "true"
+	wantRefused(t, oboCall(v, f.mint(c), nil), http.StatusUnauthorized, "invalid_token")
+}
+
+// 30 seconds of clock skew are allowed on nbf (and exp); more is refused.
+func TestOBONotBeforeLeeway(t *testing.T) {
+	f, clk := newFakeIssuer(t), newTestClock()
+	v := newTestVerifier(f, clk)
+
+	c := f.claims(clk.now())
+	c["nbf"] = clk.now().Add(10 * time.Second).Unix()
+	if rec := oboCall(v, f.mint(c), nil); rec.Code != http.StatusOK {
+		t.Fatalf("nbf 10s ahead: status = %d; body %s", rec.Code, rec.Body.String())
+	}
+
+	c = f.claims(clk.now())
+	c["nbf"] = clk.now().Add(5 * time.Minute).Unix()
+	wantRefused(t, oboCall(v, f.mint(c), nil), http.StatusUnauthorized, "invalid_token")
 }
 
 func TestOBOUnknownEmailIsNoAccount(t *testing.T) {
