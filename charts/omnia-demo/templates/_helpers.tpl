@@ -99,6 +99,29 @@ Call with (dict "root" $ "file" "files/arena/<pack>.json").
 {{- end -}}
 
 {{/*
+The issuer of the Company tokens the account tools' Connection exchanges and
+the stub's on-behalf-of check accepts. With poppy.auth.gateway.enabled the
+gateway is the Company's issuer, https://<gateway.host>, so that is the
+default, and a poppy.account.subjectIssuer that names anything else fails the
+render: nothing would serve that issuer, and every exchange would be refused.
+Without the gateway: poppy.account.subjectIssuer, else poppy.auth.issuer.
+Call with the root context.
+*/}}
+{{- define "omnia-demo.subjectIssuer" -}}
+{{- $auth := .Values.poppy.auth -}}
+{{- $set := .Values.poppy.account.subjectIssuer | default "" -}}
+{{- if $auth.gateway.enabled -}}
+{{- $gw := printf "https://%s" (required "poppy.auth.gateway.host" $auth.gateway.host) -}}
+{{- if and $set (ne $set $gw) -}}
+{{- fail (printf "PoppySubjectIssuerNotGateway: poppy.account.subjectIssuer %q is not the gateway's issuer %q; with poppy.auth.gateway.enabled leave it empty (it defaults to the gateway) or set it to the gateway's issuer" $set $gw) -}}
+{{- end -}}
+{{- $gw -}}
+{{- else -}}
+{{- required "poppy.account.subjectIssuer or poppy.auth.issuer" (default $auth.issuer $set) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
 The account-route args of a stub (demos/mortgage-underwriting, main.go): the
 Company's account routes, guarded by the check of the on-behalf-of token
 (obo.go), when Company sign-in is on and this tenant is that Company. Renders
@@ -112,7 +135,7 @@ args:
   - --account-api
   - {{ .company }}
   - --obo-issuer
-  - {{ required "poppy.account.subjectIssuer or poppy.auth.issuer" (default $p.auth.issuer $p.account.subjectIssuer) | quote }}
+  - {{ include "omnia-demo.subjectIssuer" .root | quote }}
   - --obo-audience
   - {{ required "poppy.account.audience" $p.account.audience | quote }}
 {{- end }}

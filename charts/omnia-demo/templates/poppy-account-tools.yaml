@@ -38,7 +38,7 @@
 {{- if not (hasKey (.Values.poppy.auth.scopes | default dict) $c.scope) }}
 {{- fail (printf "poppy.auth.scopes must describe %q: the account tools need it" $c.scope) }}
 {{- end }}
-{{- $issuer := required "poppy.account.subjectIssuer or poppy.auth.issuer" (default .Values.poppy.auth.issuer $acct.subjectIssuer) }}
+{{- $issuer := include "omnia-demo.subjectIssuer" . }}
 {{- $enc := $acct.encryption | default dict }}
 ---
 # The account tools' credential. When a Personal Agent sends a conversation

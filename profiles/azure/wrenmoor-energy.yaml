@@ -66,12 +66,16 @@ poppy:
   # Company sign-in, and the account tools that act as the signed-in customer
   # (their own outage and the compensation they're owed). OFF: turn on once
   # Omnia #4443 is deployed on omnia-azure. The issuer is that gateway, in
-  # front of Wrenmoor's own Auth0 tenant. Then also set gateway (or keep
-  # issuer), and poppy.account.tokenURL, clientID, clientSecretRef and
-  # encryption from the gateway's registration of the exchange client and the
-  # install's Key Vault.
+  # front of Wrenmoor's own Auth0 tenant. Then also set gateway (enabled, host
+  # auth.wrenmoor.azure.altairalabs.ai, upstream): the gateway is what serves
+  # that issuer, so without it nothing does, and keeping `issuer` alone would
+  # name an issuer that does not exist. Also set poppy.account.tokenURL,
+  # clientID, clientSecretRef and encryption from the gateway's registration
+  # of the exchange client and the install's Key Vault. account.subjectIssuer
+  # stays empty: it defaults to the gateway (https://<gateway.host>).
   auth:
     enabled: false
+    # Not used once gateway.enabled: the gateway's host is the issuer.
     issuer: https://auth.wrenmoor.azure.altairalabs.ai
     scopes:
       outages: See how long your supply has been off and the compensation you're owed

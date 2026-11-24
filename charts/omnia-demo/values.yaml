@@ -994,12 +994,10 @@ poppy:
     # -- Offer sign-in: the Workspace Company's `auth`, and the account tools,
     # their Connection, ToolPolicy and public route.
     enabled: false
-    # -- The Company's OAuth issuer. Without the gateway, the Workspace's
-    # `auth.issuer`, for a provider that already does PAP natively; with
-    # gateway.enabled the Workspace omits it (the gateway is the issuer), but
-    # it is still the default for account.subjectIssuer: the issuer the
-    # Connection exchanges tokens from and the stub's --obo-issuer. Set it to
-    # the gateway's issuer URL then, or set account.subjectIssuer.
+    # -- The Company's OAuth issuer, without the gateway: the Workspace's
+    # `auth.issuer`, for a provider that already does PAP natively, and the
+    # default for account.subjectIssuer. With gateway.enabled it is not used:
+    # the gateway, https://<gateway.host>, is the issuer.
     issuer: ""
     # Omnia's Poppy issuer gateway in front of an ordinary OIDC provider (Omnia
     # #4443, proposed). The Workspace field does not exist until it ships, so
@@ -1048,7 +1046,9 @@ poppy:
     # it, and the stub accepts only tokens that carry it. Required.
     audience: ""
     # -- The issuer of the tokens the Connection exchanges and the stub
-    # accepts. Empty: auth.issuer.
+    # accepts. Empty: https://<auth.gateway.host> with auth.gateway.enabled,
+    # else auth.issuer. With the gateway on, any other value fails the render
+    # (PoppySubjectIssuerNotGateway): nothing would serve that issuer.
     subjectIssuer: ""
     # -- The KMS key exchanged tokens are sealed with, `{kmsProvider, keyID,
     # secretRef: {name}}`. Required.
