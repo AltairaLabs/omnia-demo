@@ -168,6 +168,28 @@ Add a row when you add a stand-in.
     verified user. It forwards only `/api/conversations`, `/api/updates` and
     `/api/direct` to personal-agent, never `/tools/*`, and nothing of the
     browser's cookie, Authorization or identity headers.
+  - **Sign-in tokens are sealed in the shared Redis under a key from a
+    Secret** (`personal-agent-token-key`, made once by
+    `hack/personal-agent-keys.sh`, AES-256-GCM, bound to the Company and User
+    ID they belong to). The Redis is the one above, so anyone who can read it
+    sees only sealed blobs. Anyone who can read the Secret can open them.
+    Replacing the key (`--force`) leaves every stored sign-in unreadable, and
+    Ellen signs in again. A real Personal Agent keeps its tokens in its own
+    store or an HSM.
+  - **The public `/signin/callback` cannot tell who completed a sign-in.**
+    A real Personal Agent receives the redirect inside its own app, signed in
+    as the User (PAP section 4.2, section 10.8), so it knows whose browser
+    came back. Here the page is on another host, behind the catalogue's
+    sign-in, and the callback is a public route (the one `/signin/callback`
+    Exact path on the HTTPRoute): whoever holds a valid `state` can finish
+    that sign-in. The `state` is 128 random bits, single use and valid for 10
+    minutes, and the redirect's `iss` must match. The defence left is
+    Larkmere's consent page (`prompt=consent`), which Ellen must approve.
+  - **Pending sign-ins are in memory.** The personal-agent runs as a single
+    replica, and a restart between the button and the callback loses the
+    pending `state`: Ellen signs in again. (Tokens already granted are in
+    Redis and survive.) After a page reload a pending sign-in shows "ask your
+    assistant to start the sign-in again".
 
 ## Line-of-business systems
 
@@ -194,6 +216,9 @@ Add a row when you add a stand-in.
     then £45 per further full 12 hours, paid automatically within 28 days).
     `owed` is a statement: nothing is paid or credited, and the outage never
     ends, so it is always owed the £95 tier (hours off stay between 15 and 18).
+    The figures are loosely modelled on the regulator's guaranteed standards
+    for supply interruptions; the real tiers, amounts and conditions differ,
+    so do not quote them as the regulator's.
 - **Real system:** the customer's own systems of record.
 - **Downstream:**
   - **State is in memory.** A restart resets every claim, case and consent,
@@ -231,9 +256,62 @@ Add a row when you add a stand-in.
     policies (Ellen, Gwen) by email; a real insurer would link claims to a
     policyholder record. A claim is visible and writable only to the member who
     opened it, and another member's claim answers 404, as an unknown one does.
+    There is no table of account links: the stub matches the exchanged
+    token's `email`, which the issuer gateway (Omnia #4443, as proposed) copies
+    from the upstream provider only when it is `email_verified: true`. A token
+    without both is refused with 401, and the stub never reads the email
+    header on these routes. A real insurer holds its own link from the
+    identity provider's user to the policyholder, made at registration, and
+    does not depend on an email matching; here, whoever controls a verified
+    email at the upstream provider is that member.
     Unlike the claims-triage maps these take a mutex. They are separate from
     the claims-triage claims, and no excess or £500 limit is enforced (the
     ToolPolicy's job, milestone 3). State is in memory.
+  - **The issuer's keys are cached.** The account routes (`obo.go`) trust the
+    keys they fetched from the issuer's JWKS until a token names an unknown
+    `kid` (refetched, at most once per interval) or the stub restarts. A key
+    the issuer withdraws keeps verifying tokens here until then. A real API
+    would refresh its keys on a schedule as well.
+
+### The Poppy issuer gateway and the upstream provider (`poppy.auth`, Omnia #4443)
+
+- **Fakes:** each Company's own Poppy-capable OAuth issuer. A real Company's
+  identity provider would speak PAP natively (a client-assertion client,
+  `resource`-less authorization, token exchange).
+- **Real system:** the Company's identity provider, named in the Workspace
+  Company's `auth.issuer`.
+- **What the stand-in does:** the Workspace names Omnia's issuer gateway
+  (`auth.gateway`, proposed on Omnia #4443) as the issuer, in front of an
+  ordinary OIDC tenant. The gateway does the PAP parts the tenant cannot, and
+  maps `email` and `email_verified` from the tenant into the tokens it issues.
+- **Why not Auth0 directly:** Auth0's Poppy-relevant gaps, measured on
+  2026-11-24, are that it accepts no ES256 or PS384 client assertions (the
+  algorithms PAP names for a Personal Agent) and has no `protected_resources`
+  (RFC 9728 resources a token can be bound to). So the issuer is Omnia's
+  gateway, not Auth0.
+- **Downstream:**
+  - **Nothing of this runs until #4443 ships.** With `poppy.auth.enabled`
+    false (the profiles' setting) the Workspaces name no issuer, and the
+    Company Agents run the signed-out pack. Turning it on selects the
+    `-signin` pack, which adds the account tools. Both packs ship, and
+    `poppy.auth.enabled` chooses.
+  - **One scope per Company** (Larkmere `claims`, Wrenmoor `outages`), and one
+    Auth0 tenant per Company (Larkmere's existing one, a second free tenant for
+    Wrenmoor), so the two issuers are distinct (`PoppyIssuerConflict`).
+  - **A gateway that does not map both `email` and `email_verified` locks
+    every customer out:** the stub refuses the token (401).
+
+### Ellen at the upstream identity provider
+
+- **Fakes:** Ellen's login at Larkmere and at Wrenmoor.
+- **Real system:** each Company's customer identity provider, with its own
+  accounts. Here each Company has an Auth0 tenant (one per Company) holding a
+  test user, Ellen Whitcomb, `ellen.whitcomb@example.com`, with her email
+  marked verified and a password kept by the presenter.
+- **Downstream:** anyone with that password signs in as Ellen at both
+  Companies. The stub links her to her policy or account by that verified
+  email, so a test user created with a different email is "no account for
+  this customer".
 
 ## Models
 

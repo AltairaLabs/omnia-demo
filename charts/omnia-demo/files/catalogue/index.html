@@ -472,6 +472,15 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
         </ol>
         <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/personal-agent/RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
+      <tr>
+        <td class="name"><a href="/ellens-assistant/">Signing in</a></td>
+        <td>Larkmere says reporting a claim needs Ellen to sign in. Her assistant asks her, and she approves on Larkmere's own consent page. Larkmere then reports the claim as her, and Wrenmoor, signed in the same way, tells her how long she has been off and the compensation she is owed. The assistant adds the freezer contents to the Larkmere claim. Each company acts for her only through a token it issued, scoped to its own account system.</td>
+        <td><span class="cap">Direct Sign-In</span><span class="cap">On-behalf-of tools</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>Why it is not live yet</summary><div class="run">
+        <p>Blocked on Omnia #4443, the Poppy issuer gateway, which puts a Poppy-capable issuer in front of each company's own sign-in tenant. The code is built and the sign-in is off in the profiles until it exists. The beats are in the <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/personal-agent/RUNBOOK.md">runbook</a>, under "Milestone 2: signing in".</p>
+      </div></details></td></tr>
     </tbody>
   </table>
 </section>
