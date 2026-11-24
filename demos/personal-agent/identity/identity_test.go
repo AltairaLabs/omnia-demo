@@ -415,3 +415,56 @@ func TestSignSessionRejectsMissingFields(t *testing.T) {
 		t.Error("SignSession accepted an expired delegation")
 	}
 }
+
+func TestClientAssertionClaims(t *testing.T) {
+	id := loadTestIdentity(t)
+	const issuer = "https://auth.larkmere.example/tenant"
+	now := time.Now()
+	compact, err := id.ClientAssertion(issuer, now)
+	if err != nil {
+		t.Fatalf("ClientAssertion: %v", err)
+	}
+	verify(t, compact, "ES256", &id.es256.PublicKey)
+
+	header, claims := parseUnverified(t, compact)
+	if header["alg"] != "ES256" {
+		t.Errorf("alg = %v, want ES256", header["alg"])
+	}
+	kid, err := Thumbprint(&id.es256.PublicKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if header["kid"] != kid {
+		t.Errorf("kid = %v, want the ES256 key's thumbprint %s", header["kid"], kid)
+	}
+	if aud, ok := claims["aud"].(string); !ok || aud != issuer {
+		t.Errorf("aud = %#v, want the string %q", claims["aud"], issuer)
+	}
+	if claims["iss"] != id.ClientID || claims["sub"] != id.ClientID {
+		t.Errorf("iss = %v, sub = %v, want both %s", claims["iss"], claims["sub"], id.ClientID)
+	}
+	iat, _ := claims["iat"].(float64)
+	exp, _ := claims["exp"].(float64)
+	if life := exp - iat; life <= 0 || life > 300 {
+		t.Errorf("exp - iat = %v, want in (0, 300]", life)
+	}
+	if int64(iat) != now.Unix() {
+		t.Errorf("iat = %v, want %d", iat, now.Unix())
+	}
+	jti, _ := claims["jti"].(string)
+	if raw, err := base64.RawURLEncoding.DecodeString(jti); err != nil || len(raw) < 16 {
+		t.Errorf("jti %q is not 128 random bits in base64url", jti)
+	}
+
+	again, err := id.ClientAssertion(issuer, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, c2 := parseUnverified(t, again); c2["jti"] == claims["jti"] {
+		t.Error("two client assertions share a jti")
+	}
+
+	if _, err := id.ClientAssertion("", now); err == nil {
+		t.Error("ClientAssertion accepted an empty issuer")
+	}
+}
