@@ -11,6 +11,9 @@
 {{- if and (eq $a.company "wrenmoor") (not .Values.wren.enabled) }}
 {{- fail "poppy.agent.company=wrenmoor needs wren.enabled: its tools are on the wren-account stub" }}
 {{- end }}
+{{- if and (eq $a.company "larkmere") (not .Values.claimsTriage.enabled) }}
+{{- fail "poppy.agent.company=larkmere needs claimsTriage.enabled: its account tools are on the claims-systems stub" }}
+{{- end }}
 ---
 # Where the agent's conversation context lives (spec.context.storeRef reads key
 # url). A poppy facade requires Redis: the in-memory store belongs to one
@@ -66,9 +69,10 @@ data:
 # carry the canary, its judge and Dreaming, which Poppy conversations must not
 # flow into. Keep it out of every selection.agents, rollout and eval.
 #
-# Signed out, as every conversation is until the Company has an issuer
-# (milestone 2): the facade runs each turn as the pseudonym of the Personal
-# Agent's client_id and User ID, origin poppy, which gets no user-tier memory.
+# Signed out, unless poppy.auth.enabled gives the Company an issuer: the
+# facade runs each turn as the pseudonym of the Personal Agent's client_id and
+# User ID, origin poppy, which gets no user-tier memory. Signed in, its account
+# tools act as the customer (poppy-account-tools.yaml).
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: AgentRuntime
 metadata:
@@ -81,9 +85,15 @@ spec:
   mode: agent
   promptPackRef:
     name: {{ $name }}-pack
-{{- if eq $a.company "wrenmoor" }}
+{{- if or (eq $a.company "wrenmoor") .Values.poppy.auth.enabled }}
   toolRegistryRefs:
+{{- if eq $a.company "wrenmoor" }}
     - name: {{ $name }}-tools
+{{- end }}
+{{- if .Values.poppy.auth.enabled }}
+    # The account tools, as the signed-in customer (poppy-account-tools.yaml).
+    - name: {{ $name }}-account-tools
+{{- end }}
 {{- end }}
   facades:
     # The only facade, so it is the primary, on the Service's facade port.

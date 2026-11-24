@@ -63,3 +63,22 @@ poppy:
     enabled: true
     company: wrenmoor
     description: Power cuts, restoration times and compensation for Wrenmoor Energy customers
+  # Company sign-in, and the account tools that act as the signed-in customer
+  # (their own outage and the compensation they're owed). OFF: turn on once
+  # Omnia #4443 is deployed on omnia-azure. The issuer is that gateway, in
+  # front of Wrenmoor's own Auth0 tenant. Then also set gateway (or keep
+  # issuer), and poppy.account.tokenURL, clientID, clientSecretRef and
+  # encryption from the gateway's registration of the exchange client and the
+  # install's Key Vault.
+  auth:
+    enabled: false
+    issuer: https://auth.wrenmoor.azure.altairalabs.ai
+    scopes:
+      outages: See how long your supply has been off and the compensation you're owed
+    scopeHints:
+      outages: { changes: none, personalData: true }
+    accessTokens:
+      audiences: ["https://wrenmoor.azure.altairalabs.ai"]
+  account:
+    # The account API's audience: the stub accepts only tokens for it.
+    audience: https://wrenmoor.azure.altairalabs.ai/api

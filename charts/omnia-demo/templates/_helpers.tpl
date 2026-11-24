@@ -97,3 +97,23 @@ Call with (dict "root" $ "file" "files/arena/<pack>.json").
 {{- end -}}
 {{- $pack -}}
 {{- end -}}
+
+{{/*
+The account-route args of a stub (demos/mortgage-underwriting, main.go): the
+Company's account routes, guarded by the check of the on-behalf-of token
+(obo.go), when Company sign-in is on and this tenant is that Company. Renders
+nothing otherwise. Call with (dict "root" $ "company" "larkmere"|"wrenmoor")
+inside a container, at the container's indent.
+*/}}
+{{- define "omnia-demo.accountAPIArgs" -}}
+{{- $p := .root.Values.poppy -}}
+{{- if and $p.enabled $p.agent.enabled $p.auth.enabled (eq $p.agent.company .company) }}
+args:
+  - --account-api
+  - {{ .company }}
+  - --obo-issuer
+  - {{ required "poppy.account.subjectIssuer or poppy.auth.issuer" (default $p.auth.issuer $p.account.subjectIssuer) | quote }}
+  - --obo-audience
+  - {{ required "poppy.account.audience" $p.account.audience | quote }}
+{{- end }}
+{{- end -}}

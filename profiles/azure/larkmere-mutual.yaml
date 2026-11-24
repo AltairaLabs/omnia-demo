@@ -77,3 +77,21 @@ poppy:
     enabled: true
     company: larkmere
     description: Home insurance claims and cover for Larkmere Mutual members
+  # Company sign-in, and the account tools that act as the signed-in member
+  # (report a home claim, add to it, its status). OFF: turn on once Omnia
+  # #4443 is deployed on omnia-azure. The issuer is that gateway, in front of
+  # Larkmere's own Auth0 tenant. Then also set gateway (or keep issuer), and
+  # poppy.account.tokenURL, clientID, clientSecretRef and encryption from the
+  # gateway's registration of the exchange client and the install's Key Vault.
+  auth:
+    enabled: false
+    issuer: https://auth.larkmere.azure.altairalabs.ai
+    scopes:
+      claims: Report a home insurance claim, add items to it, and see its status
+    scopeHints:
+      claims: { changes: irreversible, personalData: true }
+    accessTokens:
+      audiences: ["https://larkmere.azure.altairalabs.ai"]
+  account:
+    # The account API's audience: the stub accepts only tokens for it.
+    audience: https://larkmere.azure.altairalabs.ai/api

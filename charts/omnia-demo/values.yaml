@@ -986,6 +986,68 @@ poppy:
     # requires a Redis context store: PAP reads can reach any replica. The
     # demo's shared Redis in the omnia namespace.
     redisURL: redis://demo-redis.omnia.svc.cluster.local:6379
+  # Company sign-in (PAP §3.2, §4): the Company's OAuth issuer, the scopes it
+  # offers Personal Agents, and the Company Agent's account tools, which call
+  # the Company's API as the signed-in customer with a token exchanged for that
+  # API (poppy-account-tools.yaml). Needs poppy.agent.enabled.
+  auth:
+    # -- Offer sign-in: the Workspace Company's `auth`, and the account tools,
+    # their Connection, ToolPolicy and public route.
+    enabled: false
+    # -- The Company's OAuth issuer, for a provider that already does PAP
+    # natively. Ignored when gateway.enabled: the gateway is the issuer.
+    issuer: ""
+    # Omnia's Poppy issuer gateway in front of an ordinary OIDC provider (Omnia
+    # #4443, proposed). The Workspace field does not exist until it ships, so
+    # keep this off: the API server would refuse the Workspace.
+    gateway:
+      # -- Render `auth.gateway` instead of `auth.issuer`.
+      enabled: false
+      # -- The host the gateway is served on.
+      host: ""
+      upstream:
+        # -- The upstream OIDC provider's issuer (the Company's own tenant).
+        issuer: ""
+        # -- The gateway's client ID at the upstream provider.
+        clientID: ""
+        # -- The Secret holding that client's secret.
+        clientSecretRef: ""
+    # -- A plain-language description of each scope, keyed by scope name. Must
+    # hold the account tools' scope: `claims` (larkmere) or `outages`
+    # (wrenmoor).
+    scopes: {}
+    # -- How consequential each scope is: `{changes, personalData}` for every
+    # key of `scopes`.
+    scopeHints: {}
+    accessTokens:
+      # -- The `aud` values of the Company's own access tokens (not the API's).
+      audiences: []
+      # -- The claim naming the client a token was issued to.
+      clientIDClaim: client_id
+      # -- The claim carrying a token's scopes.
+      scopeClaim: scope
+  # The account tools' credential: a `tokenExchange` Connection that swaps the
+  # Company token a Personal Agent presents for one scoped to the Company's API
+  # (RFC 8693), and the stub's check of that token. Used when auth.enabled.
+  account:
+    # -- The issuer's token endpoint (its RFC 8414 metadata's
+    # `token_endpoint`). Required.
+    tokenURL: ""
+    # -- The exchange client's ID at the issuer. Required.
+    clientID: ""
+    # -- The Secret holding the exchange client's secret, under `clientSecret`.
+    # It must carry the label
+    # `omnia.altairalabs.ai/token-exchange-client-secret: "true"`. Required.
+    clientSecretRef: ""
+    # -- The API's audience, `https://<domain>/api`: the Connection asks for
+    # it, and the stub accepts only tokens that carry it. Required.
+    audience: ""
+    # -- The issuer of the tokens the Connection exchanges and the stub
+    # accepts. Empty: auth.issuer.
+    subjectIssuer: ""
+    # -- The KMS key exchanged tokens are sealed with, `{kmsProvider, keyID,
+    # secretRef: {name}}`. Required.
+    encryption: {}
 
 # -- Ellen's assistant: the person's side of the Poppy demo, a STAND-IN for a
 # consumer Personal Agent run by another company (docs/stand-ins.md, "Personal

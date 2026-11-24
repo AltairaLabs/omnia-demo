@@ -117,6 +117,9 @@ spec:
         - name: stub
           image: {{ include "omnia-demo.image" (dict "root" $ "image" $ct.image) }}
           imagePullPolicy: {{ $ct.image.pullPolicy }}
+          {{- /* With Company sign-in: the signed-in member's home claims, on
+                 the public host (poppy-account-tools.yaml). */}}
+          {{- with include "omnia-demo.accountAPIArgs" (dict "root" $ "company" "larkmere") | trim }}{{ . | nindent 10 }}{{- end }}
           ports:
             - name: http
               containerPort: 8080
