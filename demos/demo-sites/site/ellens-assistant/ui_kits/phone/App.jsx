@@ -23,6 +23,16 @@ import React, { useState, useEffect, useRef } from "react";
 //   TALK TO THEM YOURSELF. Ellen's own lines go to api/direct, which opens a
 //   Direct Conversation with the company (PAP §8.10) on first use. The
 //   company's replies come back on api/updates, tagged with the parent.
+//
+//   SIGN IN. When a company wants Ellen signed in, its row says so. Once the
+//   assistant starts a sign-in (its sign_in tool), personal-agent publishes
+//   {"type":"signin","status":"pending","authorization_url":...} on
+//   api/updates and the row shows a "Sign in to <Company>" button. Only
+//   Ellen's click opens it, in a new tab: she signs in on the company's own
+//   page, which redirects to personal-agent's /signin/callback (never this
+//   site). How it ended comes back as another "signin" update, and the page
+//   tells the assistant in Ellen's words. No token, code or state ever
+//   reaches this page; the URL carries only the state and code challenge.
 
 const OPENER = "The storm's flooded the kitchen and the power's off. Sort it out.";
 
@@ -42,22 +52,58 @@ function emphasis(text) {
   return String(text || "").split(/\*\*([^*]+)\*\*/g).map((part, i) => (i % 2 ? <strong key={i}>{part}</strong> : part));
 }
 
+// httpsURL is u when it is an https URL, else "": a sign-in page is only
+// ever opened over https.
+function httpsURL(u) {
+  try {
+    const x = new URL(String(u || ""));
+    return x.protocol === "https:" ? x.href : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+// Sign-in lines the page sends the assistant for Ellen.
+const signedInLine = (company) => "I've signed in to " + company + ".";
+const declinedLine = (company) => "I didn't sign in to " + company + ".";
+
 // ---------------------------------------------------------------------------
 // Conversations: what the strip knows, by conversation id.
 //
 //   { id, company, parent, working, handoff, closed, stopped, needsYou,
+//     signin: null | { needed, status, url },
 //     messages: [{ role, author, text }], seen: { eventId: true } }
 //
 // role is "user" for the person's side (the assistant, or Ellen herself in a
 // Direct Conversation: author "human") and "company" for the company's.
+//
+// signin.status is needed, pending, signed_in, failed or declined. url is
+// the authorization URL while pending, and only from an update: the snapshot
+// does not carry it, so after a reload the assistant starts the sign-in again.
 
 function fromSnapshot(c) {
+  const si = c.sign_in;
   return {
     id: c.conversation_id, company: c.company, parent: c.parent_conversation_id || "",
     working: !!c.working, handoff: c.handoff || "none", closed: !!c.closed, stopped: c.stopped || "",
     needsYou: false, messages: (c.messages || []).map((m) => ({ role: m.role, author: m.author, text: m.text })),
+    signin: si ? { needed: !!si.needed, status: si.status || "", url: "" } : null,
     seen: {}, snapshot: true,
   };
+}
+
+// stoppedForSignIn: the company refused the assistant until Ellen signs in
+// (personal-agent's reason "sign_in_required ...", PAP §5.4).
+function stoppedForSignIn(c) {
+  return c.stopped.startsWith("sign_in_required");
+}
+
+// wantsSignIn: the company wants Ellen signed in and she hasn't, or a
+// sign-in has begun and not come back.
+function wantsSignIn(c) {
+  const s = c.signin;
+  if (!s) return false;
+  return s.status === "pending" || s.status === "needed" || (s.status === "failed" && s.needed);
 }
 
 // apply folds one update into the conversations and returns the new map.
@@ -68,7 +114,7 @@ function apply(convs, u, replay) {
   const ev = u.event || {};
   const prev = convs[id] || {
     id, company: u.company, parent: u.parent_conversation_id || "", working: false, handoff: "none",
-    closed: false, stopped: "", needsYou: false, messages: [], seen: {},
+    closed: false, stopped: "", needsYou: false, signin: null, messages: [], seen: {},
   };
   if (ev.id && prev.seen[ev.id]) return convs;
   const c = { ...prev, company: u.company || prev.company, seen: ev.id ? { ...prev.seen, [ev.id]: true } : prev.seen };
@@ -78,8 +124,12 @@ function apply(convs, u, replay) {
       const msg = { role: m.role, author: (m.author && m.author.type) || "", text: m.text || "" };
       if (replay && c.snapshot && c.messages.some((x) => x.role === msg.role && x.text === msg.text)) return convs;
       c.messages = [...c.messages, msg];
-      // Anything from the person's side answers what the company asked for.
-      if (msg.role !== "company") c.needsYou = false;
+      // Anything from the person's side answers what the company asked for,
+      // a sign-in included, unless the company stopped talking until then.
+      if (msg.role !== "company") {
+        c.needsYou = false;
+        if (c.signin && c.signin.status === "needed" && !stoppedForSignIn(c)) c.signin = null;
+      }
       break;
     }
     case "working":
@@ -91,9 +141,25 @@ function apply(convs, u, replay) {
       if (typeof ev.closed === "boolean") c.closed = ev.closed;
       break;
     case "user_requested":
-    case "authorization":
       c.needsYou = true;
       break;
+    case "authorization": {
+      // The company wants Ellen signed in (§8.11). A sign-in already begun
+      // stays pending, with its button.
+      const s = c.signin || { url: "" };
+      c.needsYou = true;
+      c.signin = { ...s, needed: true, status: s.status === "pending" ? "pending" : "needed" };
+      break;
+    }
+    case "signin": {
+      const status = String(ev.status || "");
+      const s = c.signin || { needed: false };
+      c.signin = { needed: status === "signed_in" ? false : s.needed, status, url: status === "pending" ? httpsURL(ev.authorization_url) : "" };
+      if (status === "signed_in" || status === "declined") c.needsYou = false;
+      // Signed in, personal-agent follows a conversation stopped for it again.
+      if (status === "signed_in" && stoppedForSignIn(c)) c.stopped = "";
+      break;
+    }
     case "stopped":
       c.stopped = ev.reason || "stopped";
       c.working = false;
@@ -105,12 +171,14 @@ function apply(convs, u, replay) {
 }
 
 // state is a conversation's row label: working, replied, waiting for you,
-// done or stopped. "Waiting for you" is only for what really needs Ellen (the
-// company asked for her, or for her sign-in); a company having spoken last is
-// just "Replied", since the assistant may well answer it.
+// needs you to sign in, done or stopped. "Waiting for you" is only for what
+// really needs Ellen (the company asked for her); a company having spoken
+// last is just "Replied", since the assistant may well answer it.
 function state(c) {
-  if (c.stopped) return { key: "stopped", label: "Stopped" };
+  if (c.stopped && !stoppedForSignIn(c)) return { key: "stopped", label: "Stopped" };
   if (c.closed) return { key: "done", label: "Done" };
+  if (wantsSignIn(c)) return { key: "signin", label: "Needs you to sign in" };
+  if (c.stopped) return { key: "stopped", label: "Stopped" };
   if (c.needsYou) return { key: "waiting", label: "Waiting for you" };
   if (c.working) return { key: "working", label: c.handoff === "pending" ? "Passing you to a person" : "Working" };
   const last = c.messages[c.messages.length - 1];
@@ -119,6 +187,11 @@ function state(c) {
 }
 
 function lastLine(c) {
+  if (c.stopped && stoppedForSignIn(c)) {
+    return c.signin && c.signin.status === "declined"
+      ? "You didn't sign in to " + c.company
+      : "Waiting until you sign in to " + c.company;
+  }
   if (c.stopped) return c.stopped;
   const last = c.messages[c.messages.length - 1];
   if (!last) return "Starting the conversation";
@@ -146,9 +219,14 @@ function rows(convs, order) {
 
 // ---------------------------------------------------------------------------
 
-function useConversations() {
+// useConversations follows the strip. onSignIn(company, status) hears every
+// "signin" update as it arrives on the stream (never from a snapshot), once
+// per conversation it was published on.
+function useConversations(onSignIn) {
   const [convs, setConvs] = useState({});
   const [order, setOrder] = useState([]);
+  const signInRef = useRef(onSignIn);
+  signInRef.current = onSignIn;
 
   useEffect(() => {
     let buffer = null; // updates that arrive while a snapshot is loading
@@ -193,6 +271,7 @@ function useConversations() {
       let u;
       try { u = JSON.parse(ev.data); } catch (e) { return; }
       if (!u || !u.conversation_id) return;
+      if (u.event && u.event.type === "signin" && u.company) signInRef.current(String(u.company), String(u.event.status || ""));
       if (buffer) { buffer.push(u); return; }
       setConvs((cur) => apply(cur, u, false));
       remember(u.conversation_id);
@@ -294,6 +373,19 @@ function TalkYourself({ row, onClose }) {
   );
 }
 
+// SignInButton opens the company's own sign-in page in a new tab, on Ellen's
+// click only, and only over https. noopener: the company's page gets no
+// handle on this one.
+function SignInButton({ conv }) {
+  const href = httpsURL(conv.signin && conv.signin.url);
+  if (!href || conv.signin.status !== "pending") return null;
+  return (
+    <button className="ea-link ea-signin" onClick={() => { const u = httpsURL(href); if (u) window.open(u, "_blank", "noopener"); }}>
+      {"Sign in to " + conv.company}
+    </button>
+  );
+}
+
 function Strip({ list, onTake }) {
   if (list.length === 0) {
     return <div className="ea-strip-empty">No conversations yet. When your assistant contacts a company, it shows here.</div>;
@@ -305,8 +397,12 @@ function Strip({ list, onTake }) {
         const shown = r.direct && !r.direct.closed ? lastLine(r.direct) : lastLine(r.conv);
         return (
           <div className="ea-row" key={r.conv.id}>
-            <div><span className="ea-co">{r.conv.company}</span><span className={"ea-state " + s.key}>{s.label}</span></div>
+            <div>
+              <span className="ea-co">{r.conv.company}</span><span className={"ea-state " + s.key}>{s.label}</span>
+              {r.conv.signin && r.conv.signin.status === "signed_in" && <span className="ea-state signed">Signed in</span>}
+            </div>
             <div className="ea-last" title={shown}>{shown}</div>
+            <SignInButton conv={r.conv} />
             <button className="ea-link ea-take" onClick={() => onTake(r.conv.id)}
               disabled={!r.direct && !!(r.conv.closed || r.conv.stopped)}>
               {r.direct ? "Your conversation" : "Talk to them yourself"}
@@ -319,12 +415,26 @@ function Strip({ list, onTake }) {
 }
 
 function App() {
-  const { convs, order } = useConversations();
+  // The latest sign-in status per company, as the stream told it. A sign-in
+  // is published on every open conversation with the company; only its first
+  // copy is said to the assistant.
+  const signInsRef = useRef({});
+  const onSignIn = (company, status) => {
+    const was = signInsRef.current[company];
+    signInsRef.current[company] = status;
+    if (was === status) return;
+    if (status === "signed_in") say(signedInLine(company));
+    else if (status === "declined") say(declinedLine(company));
+  };
+  const { convs, order } = useConversations(onSignIn);
   const [thread, setThread] = useState([
     { from: "it", text: "Hi Ellen. Tell me what you need and I'll get in touch with the companies you deal with. I'll tell you what each one says, and I'll ask you before agreeing to anything." },
   ]);
   const [draft, setDraft] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  const busyRef = useRef(false);
+  const queueRef = useRef([]); // Ellen's sign-in lines, held while a turn runs
+  const setBusy = (b) => { busyRef.current = b; setBusyState(b); };
   const [offline, setOffline] = useState(false);
   const [open, setOpen] = useState(null); // conversation id of the sheet's row
   const sockRef = useRef(null);
@@ -363,12 +473,14 @@ function App() {
           turnRef.current = "";
           if (text) setThread((t) => [...t, { from: "it", text }]);
           setBusy(false);
+          flush();
           return;
         }
         case "error":
           turnRef.current = "";
           setBusy(false);
           setThread((t) => [...t, { from: "it", text: "Sorry, something went wrong on my side. Try again in a moment." }]);
+          flush();
           return;
         default:
       }
@@ -383,10 +495,9 @@ function App() {
     if (box) box.scrollTop = box.scrollHeight;
   }, [thread, busy]);
 
-  const ask = (q) => {
-    const text = q.trim();
-    if (!text || busy) return;
-    setDraft("");
+  // sendLine sends Ellen's line to the assistant as a turn. It reads refs
+  // only, so the socket's handlers may call it from their first render.
+  function sendLine(text) {
     setThread((t) => [...t, { from: "me", text }]);
     const sock = sockRef.current;
     if (!sock || sock.readyState !== WebSocket.OPEN) {
@@ -397,6 +508,24 @@ function App() {
     const m = { type: "message", content: text };
     if (sessionRef.current) m.session_id = sessionRef.current;
     sock.send(JSON.stringify(m));
+  }
+
+  // say sends a line for Ellen now, or after the turn that is running.
+  function say(text) {
+    if (busyRef.current) queueRef.current.push(text);
+    else sendLine(text);
+  }
+
+  function flush() {
+    const next = queueRef.current.shift();
+    if (next) sendLine(next);
+  }
+
+  const ask = (q) => {
+    const text = q.trim();
+    if (!text || busy) return;
+    setDraft("");
+    sendLine(text);
   };
 
   const list = rows(convs, order);

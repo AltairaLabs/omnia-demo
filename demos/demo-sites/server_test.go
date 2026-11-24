@@ -614,3 +614,48 @@ func TestAssistantSiteProxiesUpdates(t *testing.T) {
 		t.Fatalf("conversations with no personal agent: status %d", resp.StatusCode)
 	}
 }
+
+// The sign-in callback is the personal agent's own public route, which the
+// Company's sign-in page redirects to; sign_in is a tool the assistant agent
+// calls. Neither is the page's: through the site both are 404, and neither
+// reaches personal-agent, whatever the method or path spelling.
+func TestAssistantSiteNeverProxiesSignIn(t *testing.T) {
+	var mu sync.Mutex
+	var reached []string
+	pa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reached = append(reached, r.Method+" "+r.URL.Path)
+		mu.Unlock()
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer pa.Close()
+
+	b, err := lookupBrand("ellens-assistant", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", nil, endUserPlane{}, pa.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	for _, c := range []struct{ method, path string }{
+		{http.MethodGet, "/signin/callback?state=s&code=c&iss=https%3A%2F%2Fissuer.example"},
+		{http.MethodGet, "/api/signin/callback?state=s&code=c"},
+		{http.MethodPost, "/tools/sign_in"},
+		{http.MethodPost, "/api/tools/sign_in"},
+		{http.MethodPost, "/api/sign_in"},
+		{http.MethodGet, "/api/updates/../../signin/callback"},
+	} {
+		if code := do(t, c.method, srv.URL+c.path, nil); code != http.StatusNotFound {
+			t.Errorf("%s %s: status %d, want 404", c.method, c.path, code)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reached) != 0 {
+		t.Fatalf("sign-in routes reached personal-agent through the site: %v", reached)
+	}
+}
