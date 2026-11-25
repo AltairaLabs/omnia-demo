@@ -73,11 +73,11 @@ poppy:
   # nothing serves that issuer. account.tokenURL and account.subjectIssuer
   # stay empty: they default to the gateway.
   auth:
-    enabled: false
+    enabled: true
     # The gateway's own URL: Omnia serves the gateway on this host.
     issuer: https://auth.wrenmoor.azure.altairalabs.ai
     gateway:
-      enabled: false
+      enabled: true
       upstream:
         # The demo's one Auth0 tenant; this is its "Wrenmoor Energy Poppy gateway"
         # application (Regular Web Application).
