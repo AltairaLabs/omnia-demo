@@ -37,6 +37,16 @@ workspace:
   runtimeIdentity:
     serviceAccountAnnotations: {}
     podLabels: {}
+  # Workspace cloud identities (Omnia #4052) instead of per-agent federation:
+  # the Workspace declares the identity runtimeIdentity names (its client and
+  # tenant ids) as `name`, every agent's default, and spec.runtime drops native
+  # identity. The cloud side federates system:serviceaccount:<ns>:omnia-identity-<name>
+  # once (omnia-azure `make workspace-identity`). Covers agents made at run
+  # time, which per-agent federation cannot (Dreaming replays). Non-agent pods
+  # (eval worker, memory-api) keep native identity.
+  cloudIdentity:
+    enabled: false
+    name: foundry
   # Before beta.23: a template ServiceAccount every agent runs as (the chart can
   # create it). From beta.23 its annotations are only copied onto each agent's SA.
   runtimeServiceAccount:

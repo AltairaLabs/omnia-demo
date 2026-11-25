@@ -3,6 +3,10 @@
 workspace:
   displayName: Larkmere Mutual
   description: Mutual insurer and lender. Mortgage underwriting, claims triage and member card support.
+  # Agents authenticate as the workspace's cloud identity (Omnia #4052), so
+  # Dreaming's replay agents reach Foundry too.
+  cloudIdentity:
+    enabled: true
 
 mortgageUnderwriting:
   enabled: true
