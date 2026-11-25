@@ -101,5 +101,7 @@ poppy:
       kmsProvider: azure-keyvault
       keyID: omnia-connections
       secretRef: { name: kms-credentials }
+      # The persistent Key Vault; privacy-api reaches it keylessly (Omnia #4466).
+      vaultURL: https://kv-omnia-demo-p-gotzfbhj.vault.azure.net/
     # The account API's audience: the stub accepts only tokens for it.
     audience: https://wrenmoor.azure.altairalabs.ai/api

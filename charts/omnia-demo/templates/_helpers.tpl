@@ -175,3 +175,16 @@ args:
   - {{ required "poppy.account.audience" $p.account.audience | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Non-empty when privacy-api reaches the account tools' Key Vault key by keyless
+workload identity: sign-in on, an azure-keyvault key with its vaultURL, and the
+workspace identity's annotations to copy.
+*/}}
+{{- define "omnia-demo.privacyKMSIdentity" -}}
+{{- $p := .Values.poppy | default dict -}}
+{{- $enc := (($p.account | default dict).encryption | default dict) -}}
+{{- if and $p.enabled ($p.auth | default dict).enabled (eq ($enc.kmsProvider | default "") "azure-keyvault") $enc.vaultURL .Values.workspace.runtimeIdentity.serviceAccountAnnotations .Values.workspace.privacy -}}
+true
+{{- end -}}
+{{- end }}

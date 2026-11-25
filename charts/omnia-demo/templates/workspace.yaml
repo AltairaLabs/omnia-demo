@@ -98,9 +98,20 @@ spec:
   storage:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- $kmsID := include "omnia-demo.privacyKMSIdentity" . }}
   {{- with .Values.workspace.privacy }}
   privacy:
     {{- toYaml . | nindent 4 }}
+    {{- if $kmsID }}
+    # Keyless Key Vault for privacy-api (Omnia #4466): it seals the account
+    # tools' exchanged tokens. Its pod runs as privacy-<workspace>, with the
+    # workspace identity's annotations copied from privacy-identity; the cloud
+    # trusts that subject (omnia-azure `make workspace-identity`).
+    podOverrides:
+      serviceAccountName: privacy-identity
+      labels:
+        azure.workload.identity/use: "true"
+    {{- end }}
   {{- end }}
   {{- $md := .Values.piiChat.portal.myData }}
   {{- if and .Values.piiChat.enabled .Values.piiChat.portal.enabled $md.enabled }}
@@ -212,4 +223,28 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
+{{- end }}
+{{- if (include "omnia-demo.privacyKMSIdentity" .) }}
+---
+# The identity privacy-api takes for Key Vault (workspace.privacy.podOverrides
+# above): only its annotations are used, copied onto privacy-<workspace>.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: privacy-identity
+  namespace: {{ .Values.namespace }}
+  annotations:
+    {{- toYaml .Values.workspace.runtimeIdentity.serviceAccountAnnotations | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Where the Connection's Key Vault key lives. Workload identity supplies the
+# credential, so this holds the vault's address only, no secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.poppy.account.encryption.secretRef.name }}
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  vault-url: {{ .Values.poppy.account.encryption.vaultURL | quote }}
 {{- end }}
