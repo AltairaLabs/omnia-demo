@@ -99,11 +99,26 @@ Call with (dict "root" $ "file" "files/arena/<pack>.json").
 {{- end -}}
 
 {{/*
+The issuer gateway's own URL (Omnia's Poppy issuer gateway, from dd2e94540):
+poppy.auth.issuer, the one source of the gateway's host. Omnia serves the
+gateway on the host of auth.issuer and requires it to be `https://` and a host
+with no path, not even `/`; anything else fails the render here rather than at
+the API server. Call with the root context, only with poppy.auth.gateway.enabled.
+*/}}
+{{- define "omnia-demo.gatewayIssuer" -}}
+{{- $iss := required "poppy.auth.issuer (the gateway's URL, https://<auth host>)" .Values.poppy.auth.issuer -}}
+{{- if not (regexMatch "^https://[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$" $iss) -}}
+{{- fail (printf "poppy.auth.issuer %q: with poppy.auth.gateway.enabled it is the gateway's URL, https:// and a lowercase host with no path and no trailing slash" $iss) -}}
+{{- end -}}
+{{- $iss -}}
+{{- end -}}
+
+{{/*
 The issuer of the Company tokens the account tools' Connection exchanges and
 the stub's on-behalf-of check accepts. With poppy.auth.gateway.enabled the
-gateway is the Company's issuer, https://<gateway.host>, so that is the
-default, and a poppy.account.subjectIssuer that names anything else fails the
-render: nothing would serve that issuer, and every exchange would be refused.
+gateway is the Company's issuer, poppy.auth.issuer, so that is the default,
+and a poppy.account.subjectIssuer that names anything else fails the render:
+nothing would serve that issuer, and every exchange would be refused.
 Without the gateway: poppy.account.subjectIssuer, else poppy.auth.issuer.
 Call with the root context.
 */}}
@@ -111,13 +126,33 @@ Call with the root context.
 {{- $auth := .Values.poppy.auth -}}
 {{- $set := .Values.poppy.account.subjectIssuer | default "" -}}
 {{- if $auth.gateway.enabled -}}
-{{- $gw := printf "https://%s" (required "poppy.auth.gateway.host" $auth.gateway.host) -}}
+{{- $gw := include "omnia-demo.gatewayIssuer" . -}}
 {{- if and $set (ne $set $gw) -}}
 {{- fail (printf "PoppySubjectIssuerNotGateway: poppy.account.subjectIssuer %q is not the gateway's issuer %q; with poppy.auth.gateway.enabled leave it empty (it defaults to the gateway) or set it to the gateway's issuer" $set $gw) -}}
 {{- end -}}
 {{- $gw -}}
 {{- else -}}
 {{- required "poppy.account.subjectIssuer or poppy.auth.issuer" (default $auth.issuer $set) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+The account tools' Connection's tokenURL. With poppy.auth.gateway.enabled the
+gateway's token endpoint, <gateway issuer>/oauth/token, is the default, and a
+poppy.account.tokenURL that names anything else fails the render: the
+exchange client is registered at the gateway alone. Without the gateway:
+poppy.account.tokenURL, required. Call with the root context.
+*/}}
+{{- define "omnia-demo.accountTokenURL" -}}
+{{- $set := .Values.poppy.account.tokenURL | default "" -}}
+{{- if .Values.poppy.auth.gateway.enabled -}}
+{{- $gw := printf "%s/oauth/token" (include "omnia-demo.gatewayIssuer" .) -}}
+{{- if and $set (ne $set $gw) -}}
+{{- fail (printf "PoppyTokenURLNotGateway: poppy.account.tokenURL %q is not the gateway's token endpoint %q; with poppy.auth.gateway.enabled leave it empty (it defaults to the gateway) or set it to the gateway's token endpoint" $set $gw) -}}
+{{- end -}}
+{{- $gw -}}
+{{- else -}}
+{{- required "poppy.account.tokenURL" $set -}}
 {{- end -}}
 {{- end -}}
 

@@ -994,26 +994,35 @@ poppy:
     # -- Offer sign-in: the Workspace Company's `auth`, and the account tools,
     # their Connection, ToolPolicy and public route.
     enabled: false
-    # -- The Company's OAuth issuer, without the gateway: the Workspace's
-    # `auth.issuer`, for a provider that already does PAP natively, and the
-    # default for account.subjectIssuer. With gateway.enabled it is not used:
-    # the gateway, https://<gateway.host>, is the issuer.
+    # -- The Company's OAuth issuer: the Workspace's `auth.issuer`, and the
+    # default for account.subjectIssuer. Without the gateway, a provider that
+    # already does PAP natively. With gateway.enabled, the gateway's own URL,
+    # `https://<auth host>` with no path and no trailing slash: Omnia serves
+    # the gateway on that host, and poppy-routes.yaml routes it.
     issuer: ""
-    # Omnia's Poppy issuer gateway in front of an ordinary OIDC provider (Omnia
-    # #4443, proposed). The Workspace field does not exist until it ships, so
-    # keep this off: the API server would refuse the Workspace.
+    # Omnia's Poppy issuer gateway (Omnia dd2e94540) in front of an ordinary
+    # OIDC provider: the Workspace's `auth.gateway`. Needs management-api's
+    # session Redis; token exchange (account tools) is Enterprise.
     gateway:
-      # -- Render `auth.gateway` instead of `auth.issuer`.
+      # -- Render `auth.gateway` beside `auth.issuer`, and the issuer route.
       enabled: false
-      # -- The host the gateway is served on.
-      host: ""
       upstream:
-        # -- The upstream OIDC provider's issuer (the Company's own tenant).
+        # -- The upstream provider's OIDC issuer, exactly as its discovery
+        # document states it (Auth0's ends in `/`).
         issuer: ""
-        # -- The gateway's client ID at the upstream provider.
+        # -- The gateway's client ID at the upstream provider: a web
+        # application whose redirect URI is `<issuer>/oauth/callback`.
         clientID: ""
-        # -- The Secret holding that client's secret.
+        # -- The Secret holding that client's secret, under `clientSecret`.
         clientSecretRef: ""
+        # -- The scopes asked of the provider. Empty: Omnia's default,
+        # `openid profile email`. Must include `openid`.
+        scopes: []
+      # -- Access token lifetime, 1-60. Empty: Omnia's default, 10.
+      accessTokenLifetimeMinutes: ""
+      # -- Sign-in lifetime after its refresh token was last used, 1-90.
+      # Empty: Omnia's default, 30.
+      refreshTokenLifetimeDays: ""
     # -- A plain-language description of each scope, keyed by scope name. Must
     # hold the account tools' scope: `claims` (larkmere) or `outages`
     # (wrenmoor).
@@ -1034,20 +1043,24 @@ poppy:
   # (RFC 8693), and the stub's check of that token. Used when auth.enabled.
   account:
     # -- The issuer's token endpoint (its RFC 8414 metadata's
-    # `token_endpoint`). Required.
+    # `token_endpoint`). Empty with auth.gateway.enabled: the gateway's,
+    # `<auth.issuer>/oauth/token`, and any other value fails the render.
+    # Required without the gateway.
     tokenURL: ""
-    # -- The exchange client's ID at the issuer. Required.
+    # -- The exchange client's ID at the issuer. With auth.gateway.enabled the
+    # Workspace registers it in `auth.gateway.exchangeClients`, for `audience`.
+    # Required.
     clientID: ""
-    # -- The Secret holding the exchange client's secret, under `clientSecret`.
-    # It must carry the label
+    # -- The Secret holding the exchange client's secret, under `clientSecret`
+    # (at least 32 random bytes with the gateway). It must carry the label
     # `omnia.altairalabs.ai/token-exchange-client-secret: "true"`. Required.
     clientSecretRef: ""
     # -- The API's audience, `https://<domain>/api`: the Connection asks for
     # it, and the stub accepts only tokens that carry it. Required.
     audience: ""
     # -- The issuer of the tokens the Connection exchanges and the stub
-    # accepts. Empty: https://<auth.gateway.host> with auth.gateway.enabled,
-    # else auth.issuer. With the gateway on, any other value fails the render
+    # accepts. Empty: auth.issuer. With auth.gateway.enabled, any other value
+    # fails the render
     # (PoppySubjectIssuerNotGateway): nothing would serve that issuer.
     subjectIssuer: ""
     # -- The KMS key exchanged tokens are sealed with, `{kmsProvider, keyID,

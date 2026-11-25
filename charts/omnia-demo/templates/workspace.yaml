@@ -124,18 +124,46 @@ spec:
         # it.
         auth:
           {{- if $auth.gateway.enabled }}
-          # Omnia's Poppy issuer gateway in front of the Company's own OIDC
-          # provider, as Omnia #4443 proposes it. THIS FIELD DOES NOT EXIST
-          # until #4443 ships, and the API server refuses a Workspace that sets
-          # it: keep poppy.auth.gateway.enabled off until then. The operator
-          # sets the issuer to the gateway's URL.
+          {{- $gw := $auth.gateway }}
+          {{- $acct := .Values.poppy.account }}
+          # Omnia's Poppy issuer gateway (Omnia dd2e94540) is the Company's
+          # issuer: management-api serves it on the host of `issuer`
+          # (poppy-routes.yaml routes that host), signs the Personal Agents'
+          # tokens, and sends the customer to sign in at the upstream OIDC
+          # provider. The operator checks it like any issuer and reports
+          # PoppyIssuerGateway and PoppyIssuer.
+          issuer: {{ include "omnia-demo.gatewayIssuer" . | quote }}
           gateway:
             upstream:
-              issuer: {{ required "poppy.auth.gateway.upstream.issuer" $auth.gateway.upstream.issuer | quote }}
-              clientID: {{ required "poppy.auth.gateway.upstream.clientID" $auth.gateway.upstream.clientID | quote }}
+              issuer: {{ required "poppy.auth.gateway.upstream.issuer" $gw.upstream.issuer | quote }}
+              clientID: {{ required "poppy.auth.gateway.upstream.clientID" $gw.upstream.clientID | quote }}
+              # Key clientSecret: the upstream application's client secret.
               clientSecretRef:
-                name: {{ required "poppy.auth.gateway.upstream.clientSecretRef" $auth.gateway.upstream.clientSecretRef }}
-            host: {{ required "poppy.auth.gateway.host" $auth.gateway.host | quote }}
+                name: {{ required "poppy.auth.gateway.upstream.clientSecretRef" $gw.upstream.clientSecretRef }}
+              {{- with $gw.upstream.scopes }}
+              {{- if not (has "openid" .) }}
+              {{- fail "poppy.auth.gateway.upstream.scopes must include openid" }}
+              {{- end }}
+              scopes:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- with $gw.accessTokenLifetimeMinutes }}
+            accessTokenLifetimeMinutes: {{ . }}
+            {{- end }}
+            {{- with $gw.refreshTokenLifetimeDays }}
+            refreshTokenLifetimeDays: {{ . }}
+            {{- end }}
+            {{- if $acct.clientID }}
+            # The account tools' exchange client (poppy-account-tools.yaml):
+            # privacy-api exchanges a Personal Agent's token at the gateway for
+            # one whose aud is the Company's account API. Enterprise.
+            exchangeClients:
+              - clientID: {{ $acct.clientID | quote }}
+                clientSecretRef:
+                  name: {{ required "poppy.account.clientSecretRef" $acct.clientSecretRef }}
+                audiences:
+                  - {{ required "poppy.account.audience" $acct.audience | quote }}
+            {{- end }}
           {{- else }}
           issuer: {{ required "poppy.auth.issuer (or poppy.auth.gateway.enabled)" $auth.issuer | quote }}
           {{- end }}

@@ -23,4 +23,29 @@ spec:
       backendRefs:
         - name: omnia-management-api
           port: 8080
+{{- if and .Values.poppy.auth.enabled .Values.poppy.auth.gateway.enabled }}
+---
+# Routes the issuer gateway's host (poppy.auth.issuer) to management-api,
+# which serves the gateway's metadata and its /oauth/ endpoints (authorize,
+# callback, token, jwks.json, revoke) for a request whose Host is the issuer's
+# host. Host unchanged, no URLRewrite, beside the discovery route.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: poppy-issuer-{{ .Values.namespace }}
+  namespace: {{ .Values.poppy.omniaNamespace }}
+spec:
+  parentRefs:
+    - name: omnia-external
+      namespace: {{ .Values.poppy.gatewayNamespace }}
+  hostnames:
+    - {{ include "omnia-demo.gatewayIssuer" . | trimPrefix "https://" | quote }}
+  rules:
+    - matches:
+        - path: { type: Exact, value: /.well-known/oauth-authorization-server }
+        - path: { type: PathPrefix, value: /oauth/ }
+      backendRefs:
+        - name: omnia-management-api
+          port: 8080
+{{- end }}
 {{- end }}

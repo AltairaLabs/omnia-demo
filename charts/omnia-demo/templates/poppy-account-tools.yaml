@@ -50,8 +50,10 @@
 # a token from any other issuer is never exchanged here, and no refresh token
 # is kept (PAP gives refresh tokens to the Personal Agent only).
 #
-# The exchange client (clientID, its Secret) is registered at the issuer
-# (Omnia #4443's gateway, when it ships) for this purpose alone.
+# The exchange client (clientID, its Secret) is registered at the issuer for
+# this purpose alone. With poppy.auth.gateway.enabled that is Omnia's issuer
+# gateway: the Workspace lists the client in auth.gateway.exchangeClients
+# (workspace.yaml), and tokenURL is the gateway's <issuer>/oauth/token.
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: Connection
 metadata:
@@ -65,7 +67,7 @@ spec:
   credential:
     kind: tokenExchange
     tokenExchange:
-      tokenURL: {{ required "poppy.account.tokenURL" $acct.tokenURL | quote }}
+      tokenURL: {{ include "omnia-demo.accountTokenURL" . | quote }}
       clientID: {{ required "poppy.account.clientID" $acct.clientID | quote }}
       clientSecretRef:
         name: {{ required "poppy.account.clientSecretRef" $acct.clientSecretRef }}

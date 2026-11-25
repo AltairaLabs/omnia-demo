@@ -64,22 +64,20 @@ poppy:
     company: wrenmoor
     description: Power cuts, restoration times and compensation for Wrenmoor Energy customers
   # Company sign-in, and the account tools that act as the signed-in customer
-  # (their own outage and the compensation they're owed). OFF: turn on once
-  # Omnia #4443 is deployed on omnia-azure. The issuer is that gateway, in
-  # front of the demo's Auth0 tenant (shared with Larkmere). Then also set
-  # gateway.enabled: true (its host and upstream are below): the gateway is what serves
-  # that issuer, so without it nothing does, and keeping `issuer` alone would
-  # name an issuer that does not exist. Also set poppy.account.tokenURL,
-  # clientID, clientSecretRef and encryption from the gateway's registration
-  # of the exchange client and the install's Key Vault. account.subjectIssuer
-  # stays empty: it defaults to the gateway (https://<gateway.host>).
+  # (their own outage and the compensation they're owed). OFF until the deploy
+  # prep in demos/personal-agent/RUNBOOK.md (milestone 2) is done: the Auth0
+  # callback, the three Secrets and the issuer host's TLS. Then set
+  # auth.enabled and gateway.enabled together. The issuer is Omnia's issuer
+  # gateway (Omnia dd2e94540) on auth.wrenmoor.azure.altairalabs.ai, in front
+  # of the demo's Auth0 tenant (shared with Larkmere); without gateway.enabled
+  # nothing serves that issuer. account.tokenURL and account.subjectIssuer
+  # stay empty: they default to the gateway.
   auth:
     enabled: false
-    # Not used once gateway.enabled: the gateway's host is the issuer.
+    # The gateway's own URL: Omnia serves the gateway on this host.
     issuer: https://auth.wrenmoor.azure.altairalabs.ai
     gateway:
       enabled: false
-      host: auth.wrenmoor.azure.altairalabs.ai
       upstream:
         # The demo's one Auth0 tenant; this is its "Wrenmoor Energy Poppy gateway"
         # application (Regular Web Application).
@@ -93,5 +91,15 @@ poppy:
     accessTokens:
       audiences: ["https://wrenmoor.azure.altairalabs.ai"]
   account:
+    # The exchange client the gateway registers (auth.gateway.exchangeClients)
+    # and the Connection uses. Its Secret, wrenmoor-exchange-client, holds a
+    # random clientSecret and carries the token-exchange-client-secret label.
+    clientID: wrenmoor-account-exchange
+    clientSecretRef: wrenmoor-exchange-client
+    # Exchanged tokens are sealed under the install's Key Vault key.
+    encryption:
+      kmsProvider: azure-keyvault
+      keyID: omnia-connections
+      secretRef: { name: kms-credentials }
     # The account API's audience: the stub accepts only tokens for it.
     audience: https://wrenmoor.azure.altairalabs.ai/api
