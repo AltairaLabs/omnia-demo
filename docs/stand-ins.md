@@ -257,8 +257,9 @@ Add a row when you add a stand-in.
     policyholder record. A claim is visible and writable only to the member who
     opened it, and another member's claim answers 404, as an unknown one does.
     There is no table of account links: the stub matches the exchanged
-    token's `email`, which the issuer gateway (Omnia #4443, as proposed) copies
-    from the upstream provider only when it is `email_verified: true`. A token
+    token's `email`, which Omnia's issuer gateway puts in an exchanged token,
+    with `email_verified: true`, only when the upstream provider's ID token
+    marked the email verified. A token
     without both is refused with 401, and the stub never reads the email
     header on these routes. A real insurer holds its own link from the
     identity provider's user to the policyholder, made at registration, and
@@ -273,10 +274,10 @@ Add a row when you add a stand-in.
     the issuer withdraws keeps verifying tokens here until then. A real API
     would refresh its keys on a schedule as well.
 
-### The Companies' Auth0 tenants behind the issuer gateway (`poppy.auth`, Omnia #4443)
+### The Companies' Auth0 tenants behind the issuer gateway (`poppy.auth`)
 
-The issuer gateway is not a stand-in. It is Omnia's own component (Omnia
-#4443, proposed): the product path for a Company whose identity provider does
+The issuer gateway is not a stand-in. It is Omnia's own component (shipped in
+Omnia dd2e94540): the product path for a Company whose identity provider does
 not speak PAP, and what a real Company would run here too. The stand-ins are
 what sits behind and beside it.
 
@@ -293,20 +294,24 @@ what sits behind and beside it.
   account holder, made at registration. Whether the Workspace names that
   provider (`auth.issuer`, when it speaks PAP natively) or the gateway in
   front of it (`auth.gateway`) is the Company's choice, not a demo shortcut.
-- **What the demo does:** the Workspace names Omnia's issuer gateway
-  (`auth.gateway`) as the issuer, in front of the Auth0 tenant. The gateway
-  does the PAP parts the tenant cannot, and maps `email` and `email_verified`
-  from the tenant into the tokens it issues. The account tools' Connection and
-  the stub accept tokens only from the gateway (`https://<gateway.host>`; the
-  chart refuses a `poppy.account.subjectIssuer` that names anything else).
+- **What the demo does:** the Workspace sets `auth.gateway`, with `auth.issuer`
+  the gateway's own URL (`https://auth.<company>.azure.altairalabs.ai`), in
+  front of the Auth0 tenant. The gateway does the PAP parts the tenant cannot,
+  signs its own tokens (RS256, `at+jwt`) and puts `email` and
+  `email_verified: true` from the tenant into exchanged tokens only. The
+  account tools' Connection exchanges at the gateway (`/oauth/token`, as the
+  exchange client the Workspace registers), and it and the stub accept tokens
+  only from the gateway (the chart refuses a `poppy.account.subjectIssuer` or
+  `tokenURL` that names anything else).
 - **Why not Auth0 directly:** Auth0's Poppy-relevant gaps, measured on
   2026-11-24, are that it accepts no ES256 or PS384 client assertions (the
   algorithms PAP names for a Personal Agent) and has no `protected_resources`
   (RFC 9728 resources a token can be bound to). So the issuer is Omnia's
   gateway, not Auth0.
 - **Downstream:**
-  - **Nothing of this runs until #4443 ships.** With `poppy.auth.enabled`
-    false (the profiles' setting) the Workspaces name no issuer, and the
+  - **Off in the profiles until the deploy prep is done** (the runbook's
+    milestone 2 Setup). With `poppy.auth.enabled` false the Workspaces name
+    no issuer, and the
     Company Agents run the signed-out pack. Turning it on selects the
     `-signin` pack, which adds the account tools. Both packs ship, and
     `poppy.auth.enabled` chooses.
@@ -318,9 +323,9 @@ what sits behind and beside it.
     Ellen at both, and an Auth0 session from signing in to one carries over
     to the other.
   - **The email link means whoever controls a verified email at the tenant is
-    that customer**, and a gateway that does not map both `email` and
-    `email_verified` locks every customer out: the stub refuses the token
-    (401).
+    that customer**, and a customer whose email the tenant has not verified
+    gets no `email` in the exchanged token and is locked out: the stub refuses
+    the token (401).
 
 ### Ellen at the upstream identity provider
 

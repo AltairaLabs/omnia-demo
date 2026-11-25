@@ -8,9 +8,9 @@ reports back. Then the same conversations, seen from each company's side in
 the dashboard.
 
 This is **milestone 1, signed out**, with **milestone 2, signing in** built
-but not yet run live: it needs Omnia #4443 (the Poppy issuer gateway), which
-does not exist yet (see
-[Milestone 2: signing in](#milestone-2-signing-in)). The follow-up after a
+but not yet run live: it needs Omnia's Poppy issuer gateway (Omnia
+dd2e94540) deployed, and the deploy prep in
+[Milestone 2: signing in](#milestone-2-signing-in). The follow-up after a
 claims handler is not built (see [What isn't here yet](#what-isnt-here-yet)).
 
 ## What it shows
@@ -234,7 +234,7 @@ Milestone 1 is signed out. Not in this demo until milestone 2 is switched on:
 
 - **Sign-in:** Larkmere says reporting a claim needs Ellen to sign in, and the
   code to go through it is built, but it is off in the profiles
-  (`poppy.auth.enabled: false`) until Omnia #4443 exists.
+  (`poppy.auth.enabled: false`) until milestone 2 Setup below is done.
 - **The freezer handoff:** taking Wrenmoor's 19-hour outage to Larkmere to add
   the freezer contents. It needs sign-in at both.
 - **The follow-up after a claims handler** decides a claim over £500. It needs
@@ -243,27 +243,30 @@ Milestone 1 is signed out. Not in this demo until milestone 2 is switched on:
 ## Milestone 2: signing in
 
 Story steps 3 and 4: Ellen signs in to each Company from her assistant, and
-each Company acts for her. **Every step marked [needs #4443 + Auth0] cannot be
-done today:** the gateway (Omnia #4443, proposed) does not exist yet. Until it
-does, leave `poppy.auth.enabled: false` and run milestone 1.
-The live run is deferred.
+each Company acts for her. The sign-in is Omnia's Poppy issuer gateway
+(shipped in Omnia dd2e94540; Omnia's how-to "Sign Personal Agents in through
+Omnia's issuer gateway"). It needs management-api's session Redis, and token
+exchange (the account tools) needs Enterprise. Until Setup is done, leave
+`poppy.auth.enabled: false` and run milestone 1. The live run is deferred.
 
-### Setup [needs #4443 + Auth0]
+### Setup
 
-1. **[needs #4443] The gateway.** Each Company's Workspace names Omnia's
-   issuer gateway instead of an issuer (`auth.gateway`). Set
-   `poppy.auth.gateway.enabled: true` in the profile: without it the chart
-   renders `auth.issuer` and ignores the gateway's host and upstream. Give it
-   the `host` (`auth.larkmere.azure.altairalabs.ai`,
-   `auth.wrenmoor.azure.altairalabs.ai`) and the `upstream` tenant (`issuer`,
-   `clientID`, `clientSecretRef`). The account tools then accept tokens from
-   `https://<host>` only: leave `poppy.account.subjectIssuer` empty, as the
-   chart refuses any other value. Auth0 can't be the issuer itself: it accepts no ES256 or PS384 client assertions and has
-   no `protected_resources` (measured 2026-11-24). The gateway must also put
-   `email` and `email_verified: true` in the tokens it issues, copied from the
-   upstream user. The stub matches Ellen to her policy and account by that
-   verified email. There is no account-links table and no `sub` to copy in
-   by hand.
+1. **The gateway.** Each Company's Workspace sets `auth.issuer` to the
+   gateway's own URL (`https://auth.larkmere.azure.altairalabs.ai`,
+   `https://auth.wrenmoor.azure.altairalabs.ai`, no trailing slash) and
+   `auth.gateway` with the Auth0 `upstream`; both are in the profiles. With
+   `poppy.auth.enabled` and `poppy.auth.gateway.enabled` the chart renders
+   them, registers the account tools' exchange client in
+   `auth.gateway.exchangeClients`, and routes the issuer host to
+   management-api (HTTPRoute `poppy-issuer-<namespace>` in `omnia`: Exact
+   `/.well-known/oauth-authorization-server`, PathPrefix `/oauth/`, Host
+   unchanged). The account tools exchange at `https://<auth host>/oauth/token`
+   and accept tokens from the gateway only: leave `poppy.account.tokenURL` and
+   `subjectIssuer` empty, as the chart refuses any other value. Auth0 can't
+   be the issuer itself: it accepts no ES256 or PS384 client assertions and
+   has no `protected_resources` (measured 2026-11-24). The gateway puts
+   `email` and `email_verified: true` in an exchanged token when Auth0 marked
+   the email verified; the stub matches Ellen by it.
    The gateway hosts need DNS and a certificate SAN like the Company hosts.
    omnia-azure's `poppyHosts` and `make poppy-dns` (branch `feat/poppy-hosts`)
    already list `auth.larkmere.` and `auth.wrenmoor.`, so milestone 1 Setup
@@ -282,38 +285,41 @@ The live run is deferred.
    its Company's gateway host, so there is no `PoppyIssuerConflict`. The
    tenant has one regular web application per Company ("Larkmere Mutual Poppy
    gateway", "Wrenmoor Energy Poppy gateway"); their IDs and the tenant's
-   issuer are already in each profile's `poppy.auth.gateway.upstream`. When
-   #4443 ships, add the gateway's callback URL to each application's Allowed
-   Callback URLs. Ellen Whitcomb is a test user there,
-   `ellen.whitcomb@example.com` (Username-Password-Authentication), email
-   verified, with a password the presenter keeps. Each application's secret
-   goes in a Secret in its Company's namespace, never in a values file:
+   issuer are already in each profile's `poppy.auth.gateway.upstream`. Add
+   `https://auth.larkmere.azure.altairalabs.ai/oauth/callback` (and the
+   Wrenmoor one) to each application's Allowed Callback URLs. Ellen Whitcomb
+   is a test user there, `ellen.whitcomb@example.com`
+   (Username-Password-Authentication), email verified, with a password the
+   presenter keeps. Each application's secret goes in a Secret in its
+   Company's namespace, under `clientSecret`, never in a values file:
    ```bash
    kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-gateway-upstream \
      --from-literal=clientSecret=<the Auth0 application's client secret>
    ```
-   Do the same in `wrenmoor-energy` (`wrenmoor-gateway-upstream`), and name
-   each Secret in that profile's `poppy.auth.gateway.upstream.clientSecretRef`.
-   (#4443 has not fixed the key the gateway reads; `clientSecret` matches the
-   exchange client's Secret in step 3. Check it, and any label the gateway
-   requires, when #4443 ships.)
+   Do the same in `wrenmoor-energy` (`wrenmoor-gateway-upstream`).
    One scope per Company: Larkmere `claims`, Wrenmoor `outages`.
-3. **[needs #4443] The exchange client's secret.** The account tools swap the
-   token Ellen's assistant holds for one for the Company's API (RFC 8693,
-   `poppy.account.tokenURL`, `clientID`, `audience`). Put its secret in the
-   Company's namespace, with the label the operator looks for:
+3. **The exchange client's secret.** The account tools swap the token Ellen's
+   assistant holds for one for the Company's API (RFC 8693). The Workspace
+   registers the client (`larkmere-claims-exchange`,
+   `wrenmoor-account-exchange`) and the Connection uses it, both from
+   `poppy.account`. Its secret is at least 32 random bytes, under
+   `clientSecret`, with the label privacy-api requires:
    ```bash
+   openssl rand -base64 48 > /tmp/larkmere-exchange-secret
    kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-exchange-client \
-     --from-literal=clientSecret=<secret>
+     --from-file=clientSecret=/tmp/larkmere-exchange-secret
    kubectl --context aks-omnia-demo -n larkmere-mutual label secret larkmere-exchange-client \
      omnia.altairalabs.ai/token-exchange-client-secret=true
+   rm /tmp/larkmere-exchange-secret
    ```
-   Do the same in `wrenmoor-energy`, and name the Secret in
-   `poppy.account.clientSecretRef`. Don't put the secret in a values file.
-4. **[needs a Key Vault key] The Connection's KMS key.**
-   `poppy.account.encryption` (`{kmsProvider, keyID, secretRef: {name}}`) seals
-   the exchanged tokens. omnia-azure configures none today, so a key and its
-   credentials Secret come first.
+   Do the same in `wrenmoor-energy` (`wrenmoor-exchange-client`). Don't put
+   the secret in a values file.
+4. **[needs a Key Vault key] The Connection's KMS key.** The profiles'
+   `poppy.account.encryption` seals the exchanged tokens under Key Vault key
+   `omnia-connections`, with credentials Secret `kms-credentials` (key
+   `vault-url`) in each Company's namespace. omnia-azure configures neither
+   today, so make the key, grant the workspace's identity on it, and create
+   the Secret first.
 5. **Rebuild the stub image.** The pinned stub image (`mortgageUnderwriting`
    and `wren` in `profiles/azure/common.yaml`) predates the account routes.
    Without the new image the account tools answer 404.
@@ -330,18 +336,23 @@ The live run is deferred.
    ```bash
    kubectl --context aks-omnia-demo -n ellens-assistant get secret personal-agent-token-key
    ```
-7. **[needs #4443] Turn sign-in on.** Set `poppy.auth.enabled: true` in
-   `profiles/azure/larkmere-mutual.yaml` and `wrenmoor-energy.yaml`, together
-   with `poppy.auth.gateway.enabled: true`, its `host` and `upstream` (step 1
-   and 2) and the `poppy.account` values (`tokenURL`, `clientID`,
-   `clientSecretRef`, `encryption`; steps 3 and 4). The `scopes` and
-   `scopeHints` are already in the profiles. Then `make demos`.
+7. **Turn sign-in on.** Set `poppy.auth.enabled: true` and
+   `poppy.auth.gateway.enabled: true` in `profiles/azure/larkmere-mutual.yaml`
+   and `wrenmoor-energy.yaml`. Everything else (`issuer`, `upstream`,
+   `scopes`, `scopeHints`, `poppy.account`) is already there. Then
+   `make demos`.
    This also switches each Company Agent from the signed-out pack to its
    `-signin` pack, which carries the account tools. Both packs ship, and
    `poppy.auth.enabled` chooses.
-8. **Checks** [needs #4443 + Auth0], for each Company (Wrenmoor:
+8. **Checks**, for each Company (Wrenmoor:
    `wrenmoor-energy`, `wrenmoor-outages`, `wrenmoor.azure.altairalabs.ai`):
    ```bash
+   # The gateway is configured and its upstream answers: True, PoppyIssuerGatewayReady.
+   kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuerGateway")]}'
+
+   # The gateway's metadata, through the issuer route.
+   curl -s https://auth.larkmere.azure.altairalabs.ai/.well-known/oauth-authorization-server
+
    # The gateway is the issuer and verified: True, PoppyIssuerVerified.
    kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuer")]}'
 
@@ -360,7 +371,7 @@ The live run is deferred.
 With sign-in still off, the milestone 1 checks above are the only ones that
 apply, and no conversation shows a sign-in row.
 
-### The beats (steps 3 and 4) [needs #4443 + Auth0]
+### The beats (steps 3 and 4)
 
 Use **one tab** of the assistant's page. Pending sign-ins are held in memory by
 personal-agent, and a second tab, a reload or a restart in the middle of one
@@ -407,8 +418,8 @@ upstream, quoting the contradiction. Never loosen a gate to make it pass.
 - **`401 invalid_token` at the stub** (the account tool's call fails; read
   `logs deploy/claims-systems`, or `deploy/wren-account`). The exchanged token
   lacks `email`, lacks `email_verified: true`, or is not typed `at+jwt`
-  (RFC 9068). The usual cause is the gateway not mapping the claims: our
-  configuration of #4443, not a stub bug. The stub also refuses a wrong
+  (RFC 9068). The usual cause is an email Auth0 has not marked verified: the
+  gateway then leaves `email` out. Our configuration, not a stub bug. The stub also refuses a wrong
   `aud`, the other Company's issuer, an expired token or an `alg` other than
   RS256, and never falls back to the email header.
 - **`insufficient_scope`.** The token lacks the route's scope: `claims`
