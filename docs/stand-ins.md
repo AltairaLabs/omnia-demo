@@ -281,8 +281,9 @@ not speak PAP, and what a real Company would run here too. The stand-ins are
 what sits behind and beside it.
 
 - **Fakes:**
-  - **The upstream identity provider:** each Company's customer identity
-    provider is a free Auth0 tenant holding one test user, Ellen (see "Ellen
+  - **The upstream identity provider:** both Companies' customer identity
+    provider is one free Auth0 tenant, with a gateway application per Company
+    and one test user, Ellen (see "Ellen
     at the upstream identity provider" below).
   - **The account link:** the stub links a customer to a policy or account by
     the verified `email` the gateway copies from the tenant (see "Home claims
@@ -309,9 +310,13 @@ what sits behind and beside it.
     Company Agents run the signed-out pack. Turning it on selects the
     `-signin` pack, which adds the account tools. Both packs ship, and
     `poppy.auth.enabled` chooses.
-  - **One scope per Company** (Larkmere `claims`, Wrenmoor `outages`), and one
-    Auth0 tenant per Company (Larkmere's existing one, a second free tenant for
-    Wrenmoor), so the two issuers are distinct (`PoppyIssuerConflict`).
+  - **One scope per Company** (Larkmere `claims`, Wrenmoor `outages`).
+  - **One Auth0 tenant for both Companies.** Auth0's free plan allows one
+    tenant per team. The issuers stay distinct (no `PoppyIssuerConflict`)
+    because each is its Company's gateway host; the tenant is only upstream.
+    Two real Companies would never share a customer pool: here one login is
+    Ellen at both, and an Auth0 session from signing in to one carries over
+    to the other.
   - **The email link means whoever controls a verified email at the tenant is
     that customer**, and a gateway that does not map both `email` and
     `email_verified` locks every customer out: the stub refuses the token
@@ -321,7 +326,7 @@ what sits behind and beside it.
 
 - **Fakes:** Ellen's login at Larkmere and at Wrenmoor.
 - **Real system:** each Company's customer identity provider, with its own
-  accounts. Here each Company has an Auth0 tenant (one per Company) holding a
+  accounts. Here both Companies share one Auth0 tenant holding a
   test user, Ellen Whitcomb, `ellen.whitcomb@example.com`, with her email
   marked verified and a password kept by the presenter.
 - **Downstream:** anyone with that password signs in as Ellen at both

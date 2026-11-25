@@ -80,8 +80,8 @@ poppy:
   # Company sign-in, and the account tools that act as the signed-in member
   # (report a home claim, add to it, its status). OFF: turn on once Omnia
   # #4443 is deployed on omnia-azure. The issuer is that gateway, in front of
-  # Larkmere's own Auth0 tenant. Then also set gateway (enabled, host
-  # auth.larkmere.azure.altairalabs.ai, upstream): the gateway is what serves
+  # the demo's Auth0 tenant (shared with Wrenmoor). Then also set
+  # gateway.enabled: true (its host and upstream are below): the gateway is what serves
   # that issuer, so without it nothing does, and keeping `issuer` alone would
   # name an issuer that does not exist. Also set poppy.account.tokenURL,
   # clientID, clientSecretRef and encryption from the gateway's registration
@@ -91,6 +91,15 @@ poppy:
     enabled: false
     # Not used once gateway.enabled: the gateway's host is the issuer.
     issuer: https://auth.larkmere.azure.altairalabs.ai
+    gateway:
+      enabled: false
+      host: auth.larkmere.azure.altairalabs.ai
+      upstream:
+        # The demo's one Auth0 tenant; this is its "Larkmere Mutual Poppy gateway"
+        # application (Regular Web Application).
+        issuer: https://dev-kvf5kfvufbv6y3p6.us.auth0.com/
+        clientID: 4uxuGZw33S2pR6p940BENb6TCkot1lUx
+        clientSecretRef: larkmere-gateway-upstream
     scopes:
       claims: Report a home insurance claim, add items to it, and see its status
     scopeHints:

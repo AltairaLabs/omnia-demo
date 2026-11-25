@@ -8,8 +8,8 @@ reports back. Then the same conversations, seen from each company's side in
 the dashboard.
 
 This is **milestone 1, signed out**, with **milestone 2, signing in** built
-but not yet run live: it needs Omnia #4443 (the Poppy issuer gateway) and an
-Auth0 tenant per Company, neither of which exists yet (see
+but not yet run live: it needs Omnia #4443 (the Poppy issuer gateway), which
+does not exist yet, and Ellen's user at the demo's Auth0 tenant (see
 [Milestone 2: signing in](#milestone-2-signing-in)). The follow-up after a
 claims handler is not built (see [What isn't here yet](#what-isnt-here-yet)).
 
@@ -244,8 +244,9 @@ Milestone 1 is signed out. Not in this demo until milestone 2 is switched on:
 
 Story steps 3 and 4: Ellen signs in to each Company from her assistant, and
 each Company acts for her. **Every step marked [needs #4443 + Auth0] cannot be
-done today:** the gateway (Omnia #4443, proposed) and the Auth0 tenants do not
-exist yet. Until they do, leave `poppy.auth.enabled: false` and run milestone 1.
+done today:** the gateway (Omnia #4443, proposed) does not exist yet, and Ellen's
+user at the Auth0 tenant is still to be made (step 2). Until both are
+done, leave `poppy.auth.enabled: false` and run milestone 1.
 The live run is deferred.
 
 ### Setup [needs #4443 + Auth0]
@@ -276,13 +277,18 @@ The live run is deferred.
    Both names must resolve to the omnia-external gateway's address and appear
    in `dnsNames`, and the certificate must be `READY True`. If either is
    missing, run `make -C ../omnia-azure poppy-dns` from that branch again.
-2. **[needs Auth0] One tenant per Company.** Larkmere uses its existing Auth0
-   tenant and Wrenmoor a second free one, so the issuers differ
-   (`PoppyIssuerConflict` otherwise). In each, create Ellen Whitcomb as a test
-   user, `ellen.whitcomb@example.com`, with the email marked verified, and a
-   regular web application for the gateway, whose ID goes in the profile's
-   `poppy.auth.gateway.upstream.clientID`. Its secret goes in a Secret in the
-   Company's namespace, never in a values file:
+2. **The Auth0 tenant (done 2026-11-25).** Both Companies share one free
+   Auth0 tenant, `dev-kvf5kfvufbv6y3p6` (US), as their upstream: Auth0's free
+   plan allows one tenant per team. The issuers still differ, because each is
+   its Company's gateway host, so there is no `PoppyIssuerConflict`. The
+   tenant has one regular web application per Company ("Larkmere Mutual Poppy
+   gateway", "Wrenmoor Energy Poppy gateway"); their IDs and the tenant's
+   issuer are already in each profile's `poppy.auth.gateway.upstream`. When
+   #4443 ships, add the gateway's callback URL to each application's Allowed
+   Callback URLs. Still to do by hand: create Ellen Whitcomb as a test user,
+   `ellen.whitcomb@example.com` (Username-Password-Authentication), with a
+   password you keep and the email marked verified. Each application's secret
+   goes in a Secret in its Company's namespace, never in a values file:
    ```bash
    kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-gateway-upstream \
      --from-literal=clientSecret=<the Auth0 application's client secret>
