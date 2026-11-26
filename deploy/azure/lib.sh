@@ -33,17 +33,35 @@ site_req() {
 # run <cmd...>: execute, or print "DRY_RUN: <cmd>" when DRY_RUN=1.
 run() {
   if [ "${DRY_RUN:-0}" = "1" ]; then
-    echo "DRY_RUN: $*"
+    case "$(type -t "$1")" in
+      # az_in / azm print the az command they would run, not their own name.
+      function) echo "DRY_RUN: $(AZ_PRINT=1 "$@")" ;;
+      *) echo "DRY_RUN: $*" ;;
+    esac
   else
     "$@"
   fi
 }
 
+# az_in <subscription> <az args...>: run az pinned to a subscription. The real
+# az rejects a global argument before the command group, so --subscription goes
+# last. With AZ_PRINT=1 it prints the command instead (used by `run`).
+az_in() {
+  local sub="$1"
+  shift
+  if [ "${AZ_PRINT:-0}" = "1" ]; then
+    echo az "$@" --subscription "$sub"
+  else
+    az "$@" --subscription "$sub"
+  fi
+}
+
 # The three CLIs, each pinned to the install in site.yaml. A missing field
-# stops the sourcing script here, naming the field.
-_sub="$(site_req subscription)" || exit 1
+# stops the sourcing script here, naming the field. azm is az in the install's
+# subscription; a script that needs another uses az_in <sub> directly.
+AZ_SUB="$(site_req subscription)" || exit 1
 _ctx="$(site_req aks.kubeContext)" || exit 1
-AZ=(az --subscription "$_sub")
+azm() { az_in "$AZ_SUB" "$@"; }
 KUBECTL=(kubectl --context "$_ctx")
 HELM=(helm --kube-context "$_ctx")
-unset _sub _ctx
+unset _ctx

@@ -275,21 +275,54 @@ func TestDryRunPrintsWrites(t *testing.T) {
 }
 
 func TestRunExecutesWithoutDryRun(t *testing.T) {
-	log, _, err := runScript(t, libScript+`run "${AZ[@]}" identity create x`, siteEnv("site-min.yaml"), nil)
+	log, _, err := runScript(t, libScript+`run azm identity create x`, siteEnv("site-min.yaml"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(log) != 1 || log[0] != "az --subscription "+testSub+" identity create x" {
+	if len(log) != 1 || log[0] != "az identity create x --subscription "+testSub {
 		t.Errorf("log: %v", log)
 	}
 	assertContexts(t, log, testCtx, testSub)
+}
+
+// DRY_RUN prints the az command exactly as it would run, --subscription last.
+func TestDryRunPrintsAzWithSubscriptionLast(t *testing.T) {
+	log, out, err := runScript(t, libScript+`DRY_RUN=1 run azm identity create x
+DRY_RUN=1 run az_in other-sub group delete -n rg`, siteEnv("site-min.yaml"), nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	for _, want := range []string{
+		"DRY_RUN: az identity create x --subscription " + testSub + "\n",
+		"DRY_RUN: az group delete -n rg --subscription other-sub\n",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("out lacks %q: %q", want, out)
+		}
+	}
+	if len(log) != 0 {
+		t.Errorf("fake called: %v", log)
+	}
+}
+
+// The real az rejects a global argument before the command group; the fake
+// must too, or a wrong argument order passes every test.
+func TestFakeAzRejectsLeadingGlobalArgument(t *testing.T) {
+	_, out, err := runScript(t, `az --subscription x identity show`, nil, nil)
+	if exitCode(err) != 2 || !strings.Contains(out, "'--subscription' is misspelled or not recognized") {
+		t.Errorf("want exit 2 and the az error, got %v %q", err, out)
+	}
+	_, out, err = runScript(t, `az identity show -n y --subscription x`, nil, nil)
+	if err != nil {
+		t.Errorf("trailing --subscription must be accepted: %v %q", err, out)
+	}
 }
 
 func TestToolArraysCarryContext(t *testing.T) {
 	log, _, err := runScript(t, libScript+`
 "${KUBECTL[@]}" get ns
 "${HELM[@]}" list
-"${AZ[@]}" group show -n rg`, siteEnv("site-min.yaml"), nil)
+azm group show -n rg`, siteEnv("site-min.yaml"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}

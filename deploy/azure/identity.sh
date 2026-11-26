@@ -30,14 +30,14 @@ aks_rg="$(site_req aks.resourceGroup)"
 aks_name="$(site_req aks.name)"
 mi="$(site_req identityNamePrefix)-$tenant"
 
-client_id="$("${AZ[@]}" identity show -g "$rg" -n "$mi" --query clientId -o tsv)"
+client_id="$(azm identity show -g "$rg" -n "$mi" --query clientId -o tsv)"
 if [ -z "$client_id" ]; then
   echo "identity $mi not found in $rg (run make azure-tenant WS=$tenant first)" >&2
   exit 1
 fi
-tenant_id="$("${AZ[@]}" account show --query tenantId -o tsv)"
-issuer="$("${AZ[@]}" aks show -g "$aks_rg" -n "$aks_name" --query oidcIssuerProfile.issuerUrl -o tsv)"
-have="$("${AZ[@]}" identity federated-credential list -g "$rg" --identity-name "$mi" --query '[].subject' -o tsv)"
+tenant_id="$(azm account show --query tenantId -o tsv)"
+issuer="$(azm aks show -g "$aks_rg" -n "$aks_name" --query oidcIssuerProfile.issuerUrl -o tsv)"
+have="$(azm identity federated-credential list -g "$rg" --identity-name "$mi" --query '[].subject' -o tsv)"
 
 # The agents, as their <name>-facade ServiceAccounts. If this fails the script
 # stops here, before anything is created or pruned: treating "could not list"
@@ -57,10 +57,10 @@ for subject in $have; do
   sa="${subject#"$sa_prefix"}"
   case "$sa" in *-facade) ;; *) continue ;; esac
   case " $agents " in *" $sa "*) continue ;; esac
-  name="$("${AZ[@]}" identity federated-credential list -g "$rg" --identity-name "$mi" \
+  name="$(azm identity federated-credential list -g "$rg" --identity-name "$mi" \
     --query "[?subject=='$subject'].name | [0]" -o tsv)"
   echo "==> pruning $subject (no AgentRuntime ${sa%-facade})"
-  run "${AZ[@]}" identity federated-credential delete -g "$rg" --identity-name "$mi" \
+  run azm identity federated-credential delete -g "$rg" --identity-name "$mi" \
     --name "$name" --yes --output none
 done
 
@@ -75,7 +75,7 @@ for sa in arena-worker eval-worker "memory-$tenant-default" "privacy-$tenant" om
   subject="system:serviceaccount:$tenant:$sa"
   case " $(echo $have) " in *" $subject "*) continue ;; esac
   echo "==> federating $subject -> $mi"
-  run "${AZ[@]}" identity federated-credential create -g "$rg" --identity-name "$mi" \
+  run azm identity federated-credential create -g "$rg" --identity-name "$mi" \
     --name "$tenant-$sa" --issuer "$issuer" --subject "$subject" \
     --audience api://AzureADTokenExchange --output none
 done

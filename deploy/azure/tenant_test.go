@@ -50,7 +50,7 @@ func count(log []string, parts ...string) int {
 
 func TestTenantCreatesIdentityAndGrants(t *testing.T) {
 	r := runScriptFull(t, tenantScript, tenantEnv("site-full.yaml", map[string]string{
-		"FAKE_FAIL": "az * identity show*",
+		"FAKE_FAIL": "az identity show*", "FAKE_FAIL_MSG": identityNotFound,
 	}), tenantNewFixtures)
 	if r.Err != nil {
 		t.Fatal(r.Err, r.Out)
@@ -96,6 +96,49 @@ func TestTenantCreatesIdentityAndGrants(t *testing.T) {
 	}
 	if !(idx("identity create") < idx("role assignment create") && idx("role assignment create") < idx("upgrade --install") && idx("upgrade --install") < idx("label ns")) {
 		t.Errorf("order: %v", r.Log)
+	}
+}
+
+const identityNotFound = "(ResourceNotFound) The Resource 'Microsoft.ManagedIdentity/userAssignedIdentities/x' was not found."
+
+// Only a not-found answer to `identity show` means "create it"; any other
+// failure stops the script before a write.
+func TestTenantIdentityLookupFailureStopsBeforeWrites(t *testing.T) {
+	r := runScriptFull(t, tenantScript, tenantEnv("site-full.yaml", map[string]string{
+		"FAKE_FAIL":     "az identity show*",
+		"FAKE_FAIL_MSG": "(AuthorizationFailed) The client does not have authorization to perform action.",
+	}), tenantNewFixtures)
+	if exitCode(r.Err) != 1 {
+		t.Fatalf("want exit 1, got %v (%s)", r.Err, r.Out)
+	}
+	if !strings.Contains(r.Out, "AuthorizationFailed") {
+		t.Errorf("error not shown: %q", r.Out)
+	}
+	if w := writesIn(r.Log); len(w) != 0 {
+		t.Errorf("wrote after a failed lookup: %v", w)
+	}
+}
+
+func TestTenantIdentityNotFoundCreates(t *testing.T) {
+	r := runScriptFull(t, tenantScript, tenantEnv("site-full.yaml", map[string]string{
+		"FAKE_FAIL":     "az identity show*",
+		"FAKE_FAIL_MSG": identityNotFound,
+	}), tenantNewFixtures)
+	if r.Err != nil {
+		t.Fatal(r.Err, r.Out)
+	}
+	if count(r.Log, "az identity create") != 1 {
+		t.Errorf("want one identity create: %v", r.Log)
+	}
+}
+
+func TestTenantIdentityExistsDoesNotCreate(t *testing.T) {
+	log, out, err := runScript(t, tenantScript, tenantEnv("site-full.yaml", nil), tenantExistingFixtures)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "az identity create") != 0 {
+		t.Errorf("created an identity that exists: %v", log)
 	}
 }
 
@@ -166,7 +209,7 @@ func TestTenantNoVoiceNoAmbient(t *testing.T) {
 func TestTenantDryRun(t *testing.T) {
 	log, out, err := runScript(t, tenantScript, tenantEnv("site-full.yaml", map[string]string{
 		"DRY_RUN":   "1",
-		"FAKE_FAIL": "az * identity show*",
+		"FAKE_FAIL": "az identity show*", "FAKE_FAIL_MSG": identityNotFound,
 	}), tenantNewFixtures)
 	if err != nil {
 		t.Fatal(err, out)

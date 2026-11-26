@@ -112,25 +112,42 @@ rm -f "$probe"
 
 echo "==> tenant $tenant: identity $mi"
 ids_query='{clientId:clientId,principalId:principalId}'
-if ids="$("${AZ[@]}" identity show -g "$rg" -n "$mi" --query "$ids_query" -o json 2>/dev/null)"; then
+# Only a not-found answer means "create it"; any other failure (auth, wrong
+# subscription, network) stops the script before a write.
+show_err="$(mktemp)"
+if ids="$(azm identity show -g "$rg" -n "$mi" --query "$ids_query" -o json 2>"$show_err")"; then
+  :
+else
+  shown="$(cat "$show_err")"
+  case "$(printf '%s' "$shown" | tr '[:upper:]' '[:lower:]')" in
+    *resourcenotfound* | *"not found"* | *"not exist"* | *notfound*) ids="" ;;
+    *)
+      echo "looking up identity $mi failed: $shown" >&2
+      rm -f "$show_err"
+      exit 1
+      ;;
+  esac
+fi
+rm -f "$show_err"
+if [ -n "$ids" ]; then
   :
 elif [ "${DRY_RUN:-0}" = "1" ]; then
   # Nothing was created, so there are no ids; placeholders keep the plan whole.
-  run "${AZ[@]}" identity create -g "$rg" -n "$mi" -l "$location" -o none
+  run azm identity create -g "$rg" -n "$mi" -l "$location" -o none
   ids='{"clientId":"<client-id>","principalId":"<principal-id>"}'
 else
-  ids="$("${AZ[@]}" identity create -g "$rg" -n "$mi" -l "$location" --query "$ids_query" -o json)"
+  ids="$(azm identity create -g "$rg" -n "$mi" -l "$location" --query "$ids_query" -o json)"
 fi
 client_id="$(printf '%s' "$ids" | yq e '.clientId' -)"
 principal_id="$(printf '%s' "$ids" | yq e '.principalId' -)"
-tenant_id="$("${AZ[@]}" account show --query tenantId -o tsv)"
+tenant_id="$(azm account show --query tenantId -o tsv)"
 
 # grant <accountId>: Cognitive Services OpenAI User, if the identity lacks it.
 grant() {
   local role='Cognitive Services OpenAI User'
-  if [ -z "$("${AZ[@]}" role assignment list --assignee "$principal_id" --scope "$1" --role "$role" --query '[0].id' -o tsv)" ]; then
+  if [ -z "$(azm role assignment list --assignee "$principal_id" --scope "$1" --role "$role" --query '[0].id' -o tsv)" ]; then
     echo "==> granting $mi $role on ${1##*/}"
-    run "${AZ[@]}" role assignment create --assignee-object-id "$principal_id" \
+    run azm role assignment create --assignee-object-id "$principal_id" \
       --assignee-principal-type ServicePrincipal --role "$role" --scope "$1" -o none
   fi
 }

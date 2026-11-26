@@ -22,7 +22,7 @@ func identityFixtures(have, agents, annotation string) map[string]string {
 		"*identity_show*": "cid-1",
 		"*account_show*":  "tenant-1",
 		"*aks_show*":      "https://oidc.example.com/",
-		"*federated-credential_list*subject_-o_tsv": have,
+		"*federated-credential_list*subject_-o_tsv*": have,
 		"*federated-credential_list*gone-facade*":   "cred-gone",
 		"*get_agentruntime*":                        agents,
 		"*get_sa*":                                  annotation,

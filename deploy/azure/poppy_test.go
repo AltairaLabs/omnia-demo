@@ -69,7 +69,7 @@ func TestPoppyDNS(t *testing.T) {
 
 func TestPoppyDNSAddsWhenRecordSetIsNotFound(t *testing.T) {
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a show*",
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az network dns record-set a show*",
 		"FAKE_FAIL_MSG": "(ResourceNotFound) The Resource 'Microsoft.Network/dnszones/x/A/larkmere' was not found.",
 	}, poppyFixtures())
 	if err != nil {
@@ -86,7 +86,7 @@ func TestPoppyDNSAddsWhenRecordSetIsNotFound(t *testing.T) {
 
 func TestPoppyDNSStopsOnOtherShowFailure(t *testing.T) {
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a show*",
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az network dns record-set a show*",
 		"FAKE_FAIL_MSG": "(AuthorizationFailed) The client does not have authorization.",
 	}, poppyFixtures())
 	if err == nil {
@@ -117,7 +117,7 @@ func TestPoppyDNSDeletesExistingBeforeAdd(t *testing.T) {
 
 func TestPoppyDeleteFailureStops(t *testing.T) {
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a delete*",
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az network dns record-set a delete*",
 		"FAKE_FAIL_MSG": "throttled",
 	}, poppyFixtures())
 	if err == nil {
@@ -153,7 +153,7 @@ func TestPoppyNeedsAGatewayIP(t *testing.T) {
 func TestPoppyKeyOnlyWhenMissing(t *testing.T) {
 	// Missing: az resource show fails.
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-full.yaml", "FAKE_FAIL": "az * resource show*",
+		"SITEFILE": "site-full.yaml", "FAKE_FAIL": "az resource show*",
 	}, poppyFixtures())
 	if err != nil {
 		t.Fatal(err, out)
@@ -244,7 +244,7 @@ func TestPoppyGrantIsNoOpWhenHeld(t *testing.T) {
 
 func TestPoppyDryRunWritesNothing(t *testing.T) {
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-poppy-pip.yaml", "DRY_RUN": "1", "FAKE_FAIL": "az * resource show*",
+		"SITEFILE": "site-poppy-pip.yaml", "DRY_RUN": "1", "FAKE_FAIL": "az resource show*",
 	}, poppyFixtures())
 	if err != nil {
 		t.Fatal(err, out)

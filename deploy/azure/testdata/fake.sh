@@ -10,6 +10,17 @@
 tool="$1"
 shift
 line="$tool $*"
+# The real az rejects a global argument placed before the command group
+# ("az --subscription s identity show" fails); the fake does the same, so a
+# wrong argument order cannot pass the tests. The call is still logged.
+if [ "$tool" = "az" ]; then
+  case "${1:-}" in -*)
+    [ -z "${FAKE_LOG:-}" ] || printf '%s\n' "$line" >>"$FAKE_LOG"
+    echo "ERROR: '${1}' is misspelled or not recognized by the system." >&2
+    exit 2
+    ;;
+  esac
+fi
 if [ -n "${FAKE_LOG:-}" ]; then
   printf '%s\n' "$line" >>"$FAKE_LOG"
   # Piped stdin (e.g. `kubectl apply -f -`) goes to <log>.stdin.<n>, n being
