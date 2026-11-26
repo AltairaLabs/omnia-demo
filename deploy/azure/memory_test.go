@@ -46,7 +46,7 @@ func memFixtures() map[string]string {
 		"*storage_blob_list*":           "a.md\nb.md",
 		"*identity_show*":               "pid-1",
 		"*role_assignment_list*":        "/assignment/1",
-		"*get_jobs*":                    "memory-ingest-1 memory-ingest",
+		"*get_jobs*":                    "memory-ingest-1 CronJob/memory-ingest ",
 	}
 }
 
@@ -351,7 +351,7 @@ func TestMemoryStartsTheFirstRunWhenTheCronJobHasNeverRun(t *testing.T) {
 func TestMemoryStartsNothingWhenAJobAlreadyRan(t *testing.T) {
 	// Matched by owner name alone as well as by name prefix.
 	fx := memFixtures()
-	fx["*get_jobs*"] = "manual-run-9 memory-ingest"
+	fx["*get_jobs*"] = "manual-run-9 CronJob/memory-ingest "
 	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
 	if err != nil {
 		t.Fatal(err, out)
@@ -629,5 +629,41 @@ func TestPublishDocumentRejectsUnsafeArguments(t *testing.T) {
 				t.Errorf("want zero calls, got %v", log)
 			}
 		})
+	}
+}
+
+func TestMemoryOldHookJobDoesNotCountAsARun(t *testing.T) {
+	fx := memFixtures()
+	fx["*get_jobs*"] = "omnia-demo-memory-ingest \n"
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "create job --from=cronjob/memory-ingest") != 1 {
+		t.Errorf("only the old hook Job exists: want the first run: %v", log)
+	}
+}
+
+func TestMemoryJobNamedMemoryIngestDashCounts(t *testing.T) {
+	fx := memFixtures()
+	fx["*get_jobs*"] = "memory-ingest-123 \n"
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "create job") != 0 {
+		t.Errorf("a memory-ingest-* Job ran: %v", log)
+	}
+}
+
+func TestMemoryJobOwnedByTheCronJobCounts(t *testing.T) {
+	fx := memFixtures()
+	fx["*get_jobs*"] = "some-other-name CronJob/memory-ingest \n"
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "create job") != 0 {
+		t.Errorf("an owned Job ran: %v", log)
 	}
 }

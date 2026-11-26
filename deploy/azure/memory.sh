@@ -219,10 +219,19 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
     continue
   fi
   jobs="$("${KUBECTL[@]}" -n "$t" get jobs \
-    -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.ownerReferences[*].name}{"\n"}{end}' 2>/dev/null || true)"
+    -o jsonpath='{range .items[*]}{.metadata.name}{" "}{range .metadata.ownerReferences[*]}{.kind}/{.name}{" "}{end}{"\n"}{end}' 2>/dev/null || true)"
+  # One line per Job: its name, then each owner as Kind/name. Ours is a Job
+  # named memory-ingest-* or owned by CronJob/memory-ingest; the old hook Job
+  # omnia-demo-memory-ingest is neither, so it does not count.
+  ran=0
+  while IFS= read -r line; do
+    case " $line" in
+      " memory-ingest-"* | *" CronJob/memory-ingest "*) ran=1 ;;
+    esac
+  done <<<"$jobs"
   need=0
   case "$changed" in *" $t "*) need=1 ;; esac
-  case "$jobs" in *memory-ingest*) ;; *) need=1 ;; esac
+  [ "$ran" = 1 ] || need=1
   [ "$need" = 1 ] || continue
   case "$granted" in
     *" $t "*)
