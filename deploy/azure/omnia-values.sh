@@ -41,11 +41,11 @@ GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" ZONE="$zone"
 export GW_NAME GW_NS GW_SECTION ZONE
 
 doc="$(yq e -n '
-  .operator.defaultExposure.enabled = true |
-  .operator.defaultExposure.baseDomain = strenv(ZONE) |
-  .operator.defaultExposure.gateway.name = strenv(GW_NAME) |
-  .operator.defaultExposure.gateway.namespace = strenv(GW_NS) |
-  .operator.defaultExposure.gateway.sectionName = strenv(GW_SECTION)')"
+  .defaultExposure.enabled = true |
+  .defaultExposure.baseDomain = strenv(ZONE) |
+  .defaultExposure.gateway.name = strenv(GW_NAME) |
+  .defaultExposure.gateway.namespace = strenv(GW_NS) |
+  .defaultExposure.gateway.sectionName = strenv(GW_SECTION)')"
 for iss in "${issuers[@]}"; do
   export ISS="$iss"
   doc="$(printf '%s\n' "$doc" | yq e '.operator.delegationAPI.trustedIssuers += [strenv(ISS) + "=" + strenv(ISS) + "/.well-known/jwks.json"]' -)"

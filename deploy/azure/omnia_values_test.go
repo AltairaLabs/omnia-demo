@@ -50,10 +50,13 @@ func TestOmniaValuesUmbrellaRoot(t *testing.T) {
 	if got := yqRead(t, doc, ".omnia.operator.delegationAPI.trustedIssuers | length"); got != "4" {
 		t.Fatalf("want 4 issuers under omnia, got %s\n%s", got, doc)
 	}
+	if got := yqRead(t, doc, ".omnia.operator.defaultExposure"); got != "null" {
+		t.Errorf("defaultExposure is a sibling of operator, not under it: %s", got)
+	}
 	if got := yqRead(t, doc, ".operator"); got != "null" {
 		t.Errorf("nothing belongs at top level, got %s", got)
 	}
-	if got := yqRead(t, doc, ".omnia.operator.defaultExposure | [.enabled, .baseDomain, .gateway.name, .gateway.namespace, .gateway.sectionName] | join(\",\")"); got != "true,demo.example.com,omnia-external,omnia,https" {
+	if got := yqRead(t, doc, ".omnia.defaultExposure | [.enabled, .baseDomain, .gateway.name, .gateway.namespace, .gateway.sectionName] | join(\",\")"); got != "true,demo.example.com,omnia-external,omnia,https" {
 		t.Errorf("defaultExposure: %s", got)
 	}
 }
@@ -66,8 +69,11 @@ func TestOmniaValuesBareRoot(t *testing.T) {
 	if got := yqRead(t, doc, ".omnia"); got != "null" {
 		t.Errorf("no omnia key expected, got %s", got)
 	}
-	if got := yqRead(t, doc, ".operator.defaultExposure.baseDomain"); got != "demo.example.com" {
+	if got := yqRead(t, doc, ".defaultExposure.baseDomain"); got != "demo.example.com" {
 		t.Errorf("baseDomain: %s", got)
+	}
+	if got := yqRead(t, doc, ".operator.defaultExposure"); got != "null" {
+		t.Errorf("defaultExposure is a sibling of operator, not under it: %s", got)
 	}
 }
 
