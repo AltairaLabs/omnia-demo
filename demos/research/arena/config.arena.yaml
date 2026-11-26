@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Halvern Partners' research function (demo 10, "research on a budget"). The
+# knowledge team runs it in batches, one client matter per invocation, under a
+# daily spend cap on its own workspace (halvern-research).
+#
+# On the Azure deployment it runs on a mock Provider priced high
+# (researchFunction.provider.pricing), so a few runs reach a small cap without
+# spending real money. The point of the demo is that spending stops, not what
+# the summaries say.
+#
+# Regenerate with: hack/build-packs.sh research
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: research
+spec:
+  prompt_configs:
+    - id: matter-research
+      file: prompts/matter-research.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  scenarios:
+    - file: scenarios/one-matter.scenario.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 600
+    output:
+      dir: out
+      formats: ["json"]

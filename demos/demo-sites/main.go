@@ -8,6 +8,9 @@
 //	halvern-partners  Halvern Partners' public site, its Practice Desk (the
 //	                  internal view of client engagements and agents) and its
 //	                  design-system reference.
+//	ellens-assistant  Not a company: Ellen Whitcomb's own assistant, an
+//	                  unbranded phone-shaped page, with the assistant's
+//	                  conversations from personal-agent (--personal-agent-url).
 //
 // Why a site at all rather than driving a demo from the dashboard Console: the
 // Console is an OPERATOR surface. Filming a customer typing into admin tooling
@@ -31,6 +34,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 )
 
 func main() {
@@ -38,19 +43,39 @@ func main() {
 	name := flag.String("site", "larkmere-mutual", "which site to serve: "+strings.Join(brandNames(), ", "))
 	agent := flag.String("agent-url", "http://localhost:8080",
 		"base URL of the agent facade's external listener")
+	phone := flag.String("phone-agent-url", "",
+		"base URL of the voice agent's facade, served as the card line at "+phonePath+"; empty: no phone line")
 	backend := flag.String("backend-url", "",
 		"base URL of the account back end for the assistant's consent and receipt routes; empty: those routes are off")
+	personalAgent := flag.String("personal-agent-url", "",
+		"base URL of the personal-agent service, whose page routes are served at /api/conversations, /api/updates and /api/direct; empty: those routes are off")
 	var m member
 	flag.StringVar(&m.id, "member-id", "", "customer id asserted to the agent (x-user-id); empty: the site's default")
 	flag.StringVar(&m.email, "member-email", "", "customer email asserted to the agent (x-user-email); empty: the site's default")
 	flag.StringVar(&m.roles, "member-roles", "", "roles asserted to the agent (x-user-roles); empty: the site's default")
+	issuerURL := flag.String("issuer-url", "",
+		"sign a token for the member on each assistant connection, as this issuer (its JWKS at "+demoidp.JWKSPath+
+			"); empty: assert the member in headers only, and the conversation has no verified user")
+	var eu endUserPlane
+	flag.StringVar(&eu.url, "enduser-url", "",
+		"base URL of Omnia's management-api, whose end-user plane serves the member's My data page at "+myDataPrefix+
+			"; needs --issuer-url, --enduser-workspace and --enduser-audience; empty: My data is off")
+	flag.StringVar(&eu.workspace, "enduser-workspace", "", "the member's Omnia Workspace")
+	flag.StringVar(&eu.audience, "enduser-audience", "",
+		"the aud of the member's end-user token: the Workspace's spec.endUserAuth.oidc.audience, never an agent's")
 	flag.Parse()
 
 	b, err := lookupBrand(*name, m)
 	if err != nil {
 		log.Fatalf("site: %v", err)
 	}
-	handler, err := newServer(b, *agent, *backend)
+	var iss *demoidp.Issuer
+	if *issuerURL != "" {
+		if iss, err = demoidp.New(*issuerURL); err != nil {
+			log.Fatalf("issuer: %v", err)
+		}
+	}
+	handler, err := newServer(b, *agent, *phone, *backend, iss, eu, *personalAgent)
 	if err != nil {
 		log.Fatalf("server: %v", err)
 	}

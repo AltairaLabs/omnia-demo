@@ -10,11 +10,11 @@ spec:
   providers:
     - file: providers/mock.yaml
 
-  # Order is the order a claim is worked: read it, read the schedule that
-  # governs it, then either pay it or hand it on.
+  # Order is the order a claim is worked: read it, then either pay it or hand
+  # it on. There is no tool that tells the agent the rules: those are the
+  # ToolPolicy's.
   tools:
     - file: tools/claim-fetch.tool.yaml
-    - file: tools/claim-policy-fetch.tool.yaml
     - file: tools/claim-settle.tool.yaml
     - file: tools/claim-refer.tool.yaml
 

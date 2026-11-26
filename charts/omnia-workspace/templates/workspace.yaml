@@ -1,0 +1,355 @@
+{{- $ws := required "name is required (the workspace and its namespace)" .Values.name }}
+{{- /* The admin password comes from exactly one place. Failing here, before
+       anything renders, beats a release whose Secrets never appear. */}}
+{{- $pw := .Values.postgres.password | default dict }}
+{{- $ext := $pw.externalSecret }}
+{{- $ref := $pw.secretRef }}
+{{- if and $ext $ref }}
+{{- fail "postgres.password: set exactly one of externalSecret or secretRef, not both" }}
+{{- end }}
+{{- if not (or $ext $ref) }}
+{{- fail "postgres.password: set exactly one of externalSecret {store, key} or secretRef {name, key}" }}
+{{- end }}
+{{- $store := "" }}
+{{- $remoteKey := "" }}
+{{- $refresh := "" }}
+{{- $refName := "" }}
+{{- $refKey := "" }}
+{{- if $ext }}
+{{- $store = required "postgres.password.externalSecret.store is required (the ClusterSecretStore's name)" $ext.store }}
+{{- $remoteKey = $ext.key | default "omnia-postgres-admin-password" }}
+{{- $refresh = $ext.refreshInterval | default "1h" }}
+{{- end }}
+{{- if $ref }}
+{{- $refName = required "postgres.password.secretRef.name is required" $ref.name }}
+{{- $refKey = required "postgres.password.secretRef.key is required" $ref.key }}
+{{- if not (regexMatch "^[-._a-zA-Z0-9]+$" (toString $refKey)) }}
+{{- fail "postgres.password.secretRef.key must be a Kubernetes Secret key (letters, digits, '-', '_', '.')" }}
+{{- end }}
+{{- end }}
+{{- $slug := replace "-" "_" $ws }}
+{{- $dbs := list (dict "secret" "omnia-postgres" "db" (printf "omnia_sessions_%s" $slug)) (dict "secret" "omnia-postgres-memory" "db" (printf "omnia_memory_%s" $slug)) (dict "secret" "omnia-postgres-privacy" "db" (printf "omnia_consent_%s" $slug)) }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $ws }}
+  labels:
+    omnia.altairalabs.ai/managed: "true"
+    omnia.altairalabs.ai/workspace: {{ $ws | quote }}
+    omnia.altairalabs.ai/environment: {{ .Values.environment | quote }}
+---
+# What this workspace offers whoever installs into it. A Workspace and its
+# agents set the identity annotations; demos pick Providers by name.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: omnia-workspace
+  namespace: {{ $ws }}
+data:
+  workloadIdentityClientId: {{ .Values.identity.clientId | quote }}
+  workloadIdentityTenantId: {{ .Values.identity.tenantId | quote }}
+  {{- $names := list }}{{- range .Values.foundry.providers }}{{- $names = append $names .name }}{{- end }}
+  providers: {{ join "," $names | quote }}
+  {{- range .Values.foundry.providers }}
+  provider.{{ .role }}.{{ .name }}: {{ .model | quote }}
+  {{- end }}
+  sessionSecret: omnia-postgres
+  memorySecret: omnia-postgres-memory
+  privacySecret: omnia-postgres-privacy
+  {{- if .Values.nfs.enabled }}
+  storageClass: {{ .Values.nfs.storageClass | quote }}
+  {{- end }}
+{{- if $ext }}
+{{- range $d := $dbs }}
+---
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ $d.secret }}
+  namespace: {{ $ws }}
+spec:
+  refreshInterval: {{ $refresh }}
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $store }}
+  target:
+    name: {{ $d.secret }}
+    deletionPolicy: Retain
+    template:
+      engineVersion: v2
+      data:
+        POSTGRES_CONN: |-
+          postgres://{{ $.Values.postgres.adminLogin }}:{{ `{{ .pgpassword }}` }}@{{ $.Values.postgres.host }}:5432/{{ $d.db }}?sslmode=require
+  data:
+    - secretKey: pgpassword
+      remoteRef:
+        key: {{ $remoteKey }}
+{{- end }}
+{{- end }}
+{{- if $ref }}
+---
+# secretRef mode: no External Secrets operator, so a Job writes the three
+# tenant Secrets from the admin Secret in the release namespace. The Job runs
+# in the release namespace, where that Secret is, and takes the password as an
+# env var from it (a pod can only reference Secrets in its own namespace), so
+# it needs no right to read Secrets there. Its ServiceAccount's only rights
+# are a Role in the tenant namespace, limited to Secrets: create, and change
+# only the three it owns. The password is URL-encoded, since it sits inside
+# the connection URL, and travels by stdin, never in process arguments.
+#
+# The Job is a post-install/post-upgrade hook, unlike the databases' pre-hook:
+# these Secrets live in a namespace the release creates, and a pre-install
+# hook would run before that namespace (and this Role) existed. Agents start
+# only after the release, so the Secrets still arrive in time.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workspace-{{ $ws }}-secrets
+  namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workspace-{{ $ws }}-secrets
+  namespace: {{ $ws }}
+rules:
+  # create cannot be limited by name: the object does not exist yet.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames:
+      {{- range $d := $dbs }}
+      - {{ $d.secret }}
+      {{- end }}
+    verbs: [get, patch, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workspace-{{ $ws }}-secrets
+  namespace: {{ $ws }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workspace-{{ $ws }}-secrets
+subjects:
+  - kind: ServiceAccount
+    name: workspace-{{ $ws }}-secrets
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workspace-{{ $ws }}-secrets
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      serviceAccountName: workspace-{{ $ws }}-secrets
+      containers:
+        - name: secrets
+          image: {{ .Values.secretsJob.image }}
+          env:
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $refName | quote }}, key: {{ $refKey | quote }} } }
+          command:
+            - /bin/sh
+            - -euc
+            - |
+              test -n "$PGPASSWORD"
+              pw=$(printf %s "$PGPASSWORD" | jq -sRr @uri)
+              {{- range $d := $dbs }}
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: {{ $d.secret }}
+                namespace: {{ $ws }}
+              type: Opaque
+              stringData:
+                POSTGRES_CONN: "postgres://{{ $.Values.postgres.adminLogin }}:${pw}@{{ $.Values.postgres.host }}:5432/{{ $d.db }}?sslmode=require"
+              EOF
+              {{- end }}
+{{- end }}
+{{- range $p := .Values.foundry.providers }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: {{ $p.name }}
+  namespace: {{ $ws }}
+spec:
+  type: openai
+  role: {{ $p.role }}
+  model: {{ $p.model }}
+  platform:
+    type: azure
+    region: {{ $.Values.foundry.region | quote }}
+    endpoint: {{ $.Values.foundry.endpoint | quote }}
+  auth:
+    type: workloadIdentity
+  {{- if eq $p.role "llm" }}
+  capabilities: [text, streaming, tools, json, vision]
+  {{- end }}
+  {{- with $p.defaults }}
+  defaults:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
+{{- if .Values.voice.endpoint }}
+{{- range $p := .Values.voice.providers }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: {{ $p.name }}
+  namespace: {{ $ws }}
+spec:
+  type: openai
+  role: {{ $p.role }}
+  model: {{ $p.model }}
+  platform:
+    type: azure
+    region: {{ $.Values.voice.region | quote }}
+    endpoint: {{ $.Values.voice.endpoint | quote }}
+  auth:
+    type: workloadIdentity
+  {{- with $p.capabilities }}
+  capabilities: {{ toJson . }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- if .Values.nfs.enabled }}
+{{- $server := printf "%s.file.core.windows.net" .Values.nfs.storageAccount }}
+---
+# Native NFS scoped to this workspace's subtree of the share
+# (/<account>/<share>/<workspace>/<namespace>), so isolation is enforced by
+# storage: a pod mounting the claim cannot reach another workspace's content.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: workspace-{{ $ws }}-content-nfs
+spec:
+  capacity:
+    storage: {{ .Values.nfs.size }}
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: {{ .Values.nfs.storageClass }}
+  mountOptions: [vers=4, minorversion=1, sec=sys, nconnect=4]
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: workspace-{{ $ws }}-content
+    namespace: {{ $ws }}
+  nfs:
+    server: {{ $server | quote }}
+    path: {{ printf "/%s/%s/%s/%s" .Values.nfs.storageAccount .Values.nfs.shareName $ws $ws | quote }}
+---
+# The claim the operator would create lazily on first Arena use; made here
+# with its name and labels so the operator adopts it. Kept on uninstall.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: workspace-{{ $ws }}-content
+  namespace: {{ $ws }}
+  labels:
+    omnia.altairalabs.ai/workspace: {{ $ws | quote }}
+    omnia.altairalabs.ai/workspace-managed: "true"
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: {{ .Values.nfs.storageClass }}
+  volumeName: workspace-{{ $ws }}-content-nfs
+  resources:
+    requests:
+      storage: {{ .Values.nfs.size }}
+{{- if .Values.nfs.rootClaim }}
+---
+# The PV above mounts the workspace's subtree, and NFS refuses a path that
+# doesn't exist ("No such file or directory"), so every pod using the claim
+# fails to start until something writes it. Omnia's source-sync writes it on a
+# workspace's first content sync; a workspace whose first use is a sandbox or
+# an Arena run never gets one. Create it here, idempotently, through the
+# share-root claim the release namespace already has.
+#
+# Owned by 65532, the uid every Omnia component runs as, as source-sync would
+# have made it. The image runs as root, and a root-owned 2755 subtree refuses
+# the arena controller its project repositories ("arenarepo: lock: mkdir
+# .../arena: permission denied"); the chown also repairs one made that way.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workspace-{{ $ws }}-subtree
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: mkdir
+          image: {{ .Values.dbBootstrap.image }}
+          command: ["/bin/sh", "-euc", "mkdir -p /share/{{ $ws }}/{{ $ws }} && chown 65532:65532 /share/{{ $ws }} /share/{{ $ws }}/{{ $ws }}"]
+          volumeMounts:
+            - { name: share, mountPath: /share }
+      volumes:
+        - name: share
+          persistentVolumeClaim:
+            claimName: {{ .Values.nfs.rootClaim }}
+{{- end }}
+{{- end }}
+---
+# The workspace's own databases, created idempotently with the admin login.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workspace-{{ $ws }}-db
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 4
+  activeDeadlineSeconds: 300
+  template:
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      containers:
+        - name: psql
+          image: {{ .Values.dbBootstrap.image }}
+          env:
+            - { name: PGHOST, value: {{ .Values.postgres.host | quote }} }
+            - { name: PGUSER, value: {{ .Values.postgres.adminLogin | quote }} }
+            - { name: PGSSLMODE, value: require }
+            - { name: PGDATABASE, value: postgres }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: {{ if $ref }}{{ $refName }}{{ else }}{{ .Values.dbBootstrap.adminSecret }}{{ end }}, key: {{ if $ref }}{{ $refKey }}{{ else }}PGPASSWORD{{ end }} } }
+          command:
+            - /bin/sh
+            - -euc
+            - |
+              {{- range $d := $dbs }}
+              psql -v ON_ERROR_STOP=1 -tAc "SELECT 1 FROM pg_database WHERE datname = '{{ $d.db }}'" | grep -q 1 \
+                || psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE {{ $d.db }}"
+              {{- end }}
+              # pgvector where embeddings are stored: sessions and memory.
+              {{- range $d := $dbs }}
+              {{- if ne $d.secret "omnia-postgres-privacy" }}
+              psql -d {{ $d.db }} -v ON_ERROR_STOP=1 -c "CREATE EXTENSION IF NOT EXISTS vector;"
+              {{- end }}
+              {{- end }}

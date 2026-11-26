@@ -1,0 +1,173 @@
+{{- if .Values.analystWorkbench.enabled }}
+{{- $aw := .Values.analystWorkbench }}
+{{- $ns := .Values.namespace }}
+{{- $provider := include "omnia-demo.llmProvider" (dict "root" $ "own" "analyst-workbench-llm" "demoRef" $aw.providerRef) }}
+{{- /*
+  The sandbox reaches the generation data by the Service's ClusterIP, so it
+  needs no DNS: the class leaves DNS off, because the cluster resolver forwards
+  what it can't answer and a process that can query it can encode data into
+  names. On the first install the Service doesn't exist yet to look up, so the
+  class falls back to its name, with DNS on, until the next upgrade.
+*/}}
+{{- $grid := lookup "v1" "Service" $ns "wrenmoor-grid-data" }}
+{{- $gridIP := "" }}
+{{- if $grid }}{{ $gridIP = $grid.spec.clusterIP }}{{ end }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: analyst-workbench-pack
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: analyst-workbench-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: analyst-workbench-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/analyst-workbench/arena. Regenerate with:
+#   hack/build-packs.sh analyst-workbench
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analyst-workbench-pack-v1
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ .Files.Get "files/arena/analyst-workbench-pack.json" | indent 4 }}
+---
+# What every analyst sandbox is. The agent chooses none of this: the
+# ToolRegistry below names the class, and the operator builds each claim's pod
+# from it. The containment is all here, none of it in the prompt:
+#   - its own VM (runtimeClassName: Kata on the sandbox pool);
+#   - no network except the generation data service, and no DNS;
+#   - outside any Istio ambient mesh: the operator labels every sandbox pod
+#     `istio.io/dataplane-mode: none` (Omnia #4112), so the NetworkPolicy is
+#     the boundary in both directions, and a Kata VM stays reachable;
+#   - restricted pod security and no service-account token (the operator's
+#     defaults for every sandbox);
+#   - CPU and memory limits, mandatory for a class that runs agent code.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: SandboxClass
+metadata:
+  name: analyst-sandbox
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  image: {{ include "omnia-demo.image" (dict "root" $ "image" $aw.image) | quote }}
+  imagePullPolicy: IfNotPresent
+  args: ["-addr=:8080", "-workspace=/workspace"]
+  env:
+    - { name: HOME, value: /sandbox-cache }
+    - { name: MPLCONFIGDIR, value: /sandbox-cache/matplotlib }
+    - name: GRID_DATA_URL
+      value: {{ printf "http://%s:8080" (default "wrenmoor-grid-data" $gridIP) | quote }}
+  ports:
+    - { name: mcp, port: 8080 }
+  filesystem:
+    workspace: { mountPath: /workspace }
+    scratch:
+      - { name: cache, mountPath: /sandbox-cache, sizeLimit: 1Gi }
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: "1", memory: 1Gi }
+  {{- with $aw.runtimeClassName }}
+  runtimeClassName: {{ . | quote }}
+  {{- end }}
+  {{- with $aw.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with $aw.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  egress:
+    {{- if not $gridIP }}
+    dns: true
+    {{- end }}
+    allowedServices:
+      - name: wrenmoor-grid-data
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: analyst-workbench-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  sandboxes:
+    - name: analyst
+      class:
+        name: analyst-sandbox
+        kind: SandboxClass
+  handlers:
+    - name: analyst
+      type: mcp
+      # A first call can wait for a sandbox node to be added (the pool scales
+      # from zero), the image to pull and the VM to boot.
+      timeout: 8m
+      sandbox:
+        name: analyst
+        port: mcp
+      mcpConfig:
+        transport: sse
+        endpoint: /sse
+        toolFilter:
+          allowlist: [Write, Read, Edit, Bash]
+---
+# Every sandbox tool is permitted: with a shell in the list, a tool-by-tool
+# rule would be a statement of intent, not a boundary. The sandbox above is the
+# boundary. Without a ToolPolicy, Cedar's default deny refuses every call.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: analyst-workbench-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: analyst-workbench-tools
+  mode: enforce
+  onFailure: deny
+  policy: |
+    @id("permit-sandbox-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"analyst-workbench-tools");
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: analyst-workbench
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: analyst-workbench
+spec:
+  promptPackRef:
+    name: analyst-workbench-pack
+  toolRegistryRef:
+    name: analyst-workbench-tools
+  sandbox:
+    enabled: true
+    maxConcurrent: {{ $aw.maxConcurrent }}
+    idleTimeout: {{ $aw.idleTimeout | quote }}
+  facades:
+    - type: websocket
+      port: 8080
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ $provider }}
+{{- end }}

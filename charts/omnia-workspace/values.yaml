@@ -1,0 +1,115 @@
+# One Omnia workspace's Azure plumbing. The deploy script fills the
+# REPLACED_AT_INSTALL_TIME values from site.yaml and the install's outputs.
+
+# The workspace name: also its namespace, and the Workspace CR's name.
+name: ""
+environment: development
+
+postgres:
+  host: REPLACED_AT_INSTALL_TIME
+  adminLogin: REPLACED_AT_INSTALL_TIME
+  # Where the admin password comes from. Set exactly one of the two forms;
+  # neither, or both, fails the render.
+  #
+  # externalSecret: the password sits in a vault behind a ClusterSecretStore,
+  #   and each tenant Secret is an ExternalSecret that builds POSTGRES_CONN.
+  #     store: the ClusterSecretStore's name (required)
+  #     key: the remote key (default omnia-postgres-admin-password)
+  #     refreshInterval: default 1h
+  # secretRef: a Secret in the release namespace (Omnia's). A post-install Job
+  #   reads it and writes the three tenant Secrets, so no External Secrets
+  #   operator is needed. The databases Job reads the same Secret and key, in
+  #   place of dbBootstrap.adminSecret.
+  #     name: the Secret's name (required)
+  #     key: the key holding the password (required; a Kubernetes Secret key:
+  #       letters, digits, '-', '_', '.')
+  password: {}
+  # externalSecret:
+  #   store: azure-kv
+  #   key: omnia-postgres-admin-password
+  #   refreshInterval: 1h
+  # secretRef:
+  #   name: omnia-db-admin
+  #   key: PGPASSWORD
+
+# The image of the secretRef-mode Job. It needs kubectl, jq and a POSIX shell.
+# alpine/k8s carries all three; 1.31.13 is listed active on Docker Hub.
+secretsJob:
+  image: alpine/k8s:1.31.13
+
+# Creates the workspace's three databases (session, memory, consent) with the
+# admin login, from the release namespace, reusing the umbrella's
+# omnia-db-admin Secret. Each workspace needs its OWN databases: session-api,
+# memory-api and privacy-api bind theirs to the workspace's pseudonym-key
+# fingerprint and refuse another workspace's key.
+dbBootstrap:
+  adminSecret: omnia-db-admin
+  image: postgres:17-alpine
+
+# Keyless Foundry Providers in the workspace's namespace (a Workspace cannot
+# use another namespace's Provider). Workload identity: each agent's own SA is
+# federated to the workspace's managed identity by the deploy script.
+foundry:
+  endpoint: REPLACED_AT_INSTALL_TIME
+  region: REPLACED_AT_INSTALL_TIME
+  providers:
+    - name: azure-foundry-gpt-4o
+      model: gpt-4o
+      role: llm
+    # Long structured answers: ~3.4k output tokens and a slow first token.
+    - name: azure-foundry-gpt-4o-long
+      model: gpt-4o
+      role: llm
+      defaults:
+        maxTokens: 16384
+        streamIdleTimeout: "120s"
+    - name: azure-foundry-gpt-5-4-mini
+      model: gpt-5.4-mini
+      role: llm
+    - name: azure-foundry-embedding
+      model: text-embedding-3-small
+      role: embedding
+
+# Keyless voice Providers on the voice Foundry account, another region from the
+# main one. Empty endpoint: none are made.
+# gpt-realtime is a realtime voice model (speech in, speech out) and the
+# default provider of a voice agent. The transcribe and tts Providers serve a
+# cascaded voice agent (speech to text, an llm, text to speech). All three
+# authenticate with workload identity: Omnia passes spec.platform through for
+# the tts and stt roles from PromptKit v2.21.0 (Omnia #4118, PromptKit #2681);
+# before that it skipped them, because PromptKit built them from a key only.
+voice:
+  endpoint: ""
+  region: ""
+  providers:
+    - name: azure-foundry-gpt-realtime
+      model: gpt-realtime
+      role: llm
+      capabilities: [text, streaming, tools, audio, duplex]
+    # whisper, not gpt-4o-mini-transcribe: PromptKit's OpenAI STT asks for
+    # response_format verbose_json, which only whisper accepts.
+    - name: azure-foundry-transcribe
+      model: whisper
+      role: stt
+    - name: azure-foundry-tts
+      model: gpt-4o-mini-tts
+      role: tts
+
+# The workspace-content volume: a native NFS PV scoped to this workspace's
+# subtree of the Azure Files share, and the claim the operator would create
+# lazily on first Arena use (it reports the Workspace not Ready until then).
+nfs:
+  enabled: true
+  storageAccount: REPLACED_AT_INSTALL_TIME
+  shareName: workspace-content
+  storageClass: omnia-nfs-static
+  size: 100Gi
+  # The share-root claim in the release namespace (the umbrella's), used once
+  # per install to create this workspace's subtree. Empty: not created here.
+  rootClaim: omnia-workspace-content-nfs
+
+# Written to the omnia-workspace ConfigMap for whatever installs into the
+# workspace (the client id goes on each agent's ServiceAccount).
+identity:
+  clientId: ""
+  tenantId: ""

@@ -1,0 +1,8 @@
+# Shared values, not a tenant: must never be granted.
+poppy:
+  enabled: true
+  auth:
+    enabled: true
+  account:
+    encryption:
+      kmsProvider: azure-keyvault

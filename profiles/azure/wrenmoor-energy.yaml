@@ -21,8 +21,88 @@ wren: { enabled: true }
 wrenmoorSite: { enabled: true }
 incidentAgent: { enabled: true }
 dataAnalyst: { enabled: true }
+# The analyst workbench. Each sandbox runs on your cluster's Kata
+# node pool, its own VM: the RuntimeClass's own
+# scheduling picks the Kata nodes, and the toleration admits the pool's taint.
+# The pool scales from zero, so a first sandbox waits a few minutes for a node.
+#
+# This namespace is in Istio's ambient mesh with a waypoint. Omnia labels
+# every sandbox pod `istio.io/dataplane-mode: none` (#4112, fixed in #4147),
+# so the mesh never captures it: the runtime reaches the VM, and the sandbox
+# reaches wrenmoor-grid-data in plaintext on the port its NetworkPolicy
+# allows. That holds only while grid-data accepts plaintext; under a STRICT
+# PeerAuthentication it would need a workload-scoped PERMISSIVE one (Omnia's
+# "Sandboxes and a service mesh").
+#
+# Its image (omnia-demo-analyst-sandbox) has no ghcr tag yet: `make images`
+# builds it into the dev registry, or run the publish workflow and pin its
+# sha-<short> here as image.tag, like the pins in common.yaml. Without one the
+# sandbox pod can't pull, and the first tool call times out.
+analystWorkbench:
+  enabled: true
+  runtimeClassName: kata-vm-isolation
+  tolerations:
+    - { key: workload, operator: Equal, value: sandbox, effect: NoSchedule }
 fieldService: { enabled: true }
-# The field manuals, ingested as institutional memory for the copilot.
+# The field manuals (memory-documents/wrenmoor-energy/), ingested from the
+# tenant's Blob container as institutional memory for the copilot.
 memory:
   enabled: true
-  fixtures: wrenmoor-field-procedures
+
+# A Poppy Company: Personal Agents find it at its own domain. Only the demo's
+# Poppy assistant is admitted.
+poppy:
+  enabled: true
+  # domain, allow (only the demo's Poppy assistant is admitted), and the
+  # hosts and ids below that come from your install (auth.issuer,
+  # auth.gateway.upstream.issuer and clientID, auth.accessTokens.audiences,
+  # account.audience, account.encryption.vaultURL) are set by
+  # deploy/azure/site-values.sh from site.yaml.
+  # The Company Agent, wrenmoor-outages, at https://<domain>/poppy. Its one
+  # tool, outage_status, calls wren-account's /wren/outage-status, so the
+  # wren image pinned in common.yaml must include that route (checked in
+  # demos/personal-agent/RUNBOOK.md, Checks).
+  agent:
+    enabled: true
+    company: wrenmoor
+    description: Power cuts, restoration times and compensation for Wrenmoor Energy customers
+  # Company sign-in, and the account tools that act as the signed-in customer
+  # (their own outage and the compensation they're owed). OFF until the deploy
+  # prep in demos/personal-agent/RUNBOOK.md (milestone 2) is done: the upstream
+  # sign-in callback, the three Secrets and the issuer host's TLS. Then set
+  # auth.enabled and gateway.enabled together. The issuer is Omnia's issuer
+  # gateway (Omnia dd2e94540) on auth.wrenmoor.<your zone>, in front of your
+  # upstream sign-in provider (shared with Larkmere); without gateway.enabled
+  # nothing serves that issuer. account.tokenURL and account.subjectIssuer
+  # stay empty: they default to the gateway.
+  auth:
+    enabled: true
+    # issuer, the gateway's own URL (Omnia serves the gateway on its host), is
+    # set from site.yaml.
+    gateway:
+      enabled: true
+      upstream:
+        # The upstream sign-in provider's issuer and this Company's client at it
+        # (site.yaml poppy.upstream and poppy.companies); one provider serves
+        # both Companies.
+        clientSecretRef: wrenmoor-gateway-upstream
+    scopes:
+      outages: See how long your supply has been off and the compensation you're owed
+    scopeHints:
+      outages: { changes: none, personalData: true }
+    # accessTokens.audiences is set from site.yaml.
+  account:
+    # The exchange client the gateway registers (auth.gateway.exchangeClients)
+    # and the Connection uses. Its Secret, wrenmoor-exchange-client, holds a
+    # random clientSecret and carries the token-exchange-client-secret label.
+    clientID: wrenmoor-account-exchange
+    clientSecretRef: wrenmoor-exchange-client
+    # Exchanged tokens are sealed under the install's Key Vault key.
+    encryption:
+      kmsProvider: azure-keyvault
+      keyID: omnia-connections
+      secretRef: { name: kms-credentials }
+      # vaultURL, your Key Vault (site.yaml keyVault.name); privacy-api reaches
+      # it keylessly (Omnia #4466).
+    # account.audience, the account API's audience (the stub accepts only tokens
+    # for it), is set from site.yaml.

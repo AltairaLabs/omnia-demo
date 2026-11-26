@@ -1,0 +1,100 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "research",
+  "name": "research",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "matter_research": {
+      "id": "matter_research",
+      "name": "matter-research",
+      "description": "Halvern Partners' knowledge team: summarise what one regulatory change means for one client matter, for the supervising lawyer.",
+      "version": "1.0.0",
+      "system_template": "You work in Halvern Partners' knowledge team. You will be given a client\nmatter reference and a regulatory change. In three or four sentences, say\nwhat the change means for that matter and what the supervising lawyer\nshould check. Say plainly when you don't know the matter's facts well\nenough to judge. This is research for a lawyer, not advice to a client.\n",
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.2
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-dev",
+    "created_at": "2026-11-12T17:19:27Z",
+    "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "325f6fa9cb919b57c543c42bde7a16f2cef3ce35",
+      "working_tree_clean": false,
+      "source_describe": "325f6fa"
+    },
+    "asserted": {
+      "domain": "legal-services",
+      "tags": [
+        "research",
+        "batch",
+        "budgeted"
+      ],
+      "approved_by": "Head of Knowledge, Halvern Partners",
+      "approval_date": "2026-11-12"
+    },
+    "governance": {
+      "intended_purpose": "Summarise what one regulatory change means for one client matter, for Halvern Partners' supervising lawyers, run in batches by the knowledge team.",
+      "foreseeable_misuse": [
+        "Sending its summaries to a client as advice; they are research for a lawyer",
+        "Running unbounded batches; the workspace's daily budget caps them"
+      ],
+      "autonomy_level": "suggests",
+      "accountable_owner": "Halvern Partners Knowledge Team",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:RiskLevelMinimal",
+      "intended_deployment_contexts": [
+        "Internal legal research, batch"
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": false
+    }
+  }
+}

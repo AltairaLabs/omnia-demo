@@ -4,31 +4,27 @@ import { IconButton } from "../../components/core/IconButton.jsx";
 import { Icon } from "../../components/core/Icon.jsx";
 import { Badge } from "../../components/core/Badge.jsx";
 import { Input } from "../../components/forms/Input.jsx";
+import { CardLineCall } from "./CardLine.jsx";
 
 // Suggested openers, shown before the member has said anything. None of them
-// carries personal data: the member opens by saying what is wrong, and the
-// agent asks for identification on its own turn.
+// carries personal data. The member is signed in, so the assistant knows who
+// they are and never asks.
 //
-// The upstream kit's openers (premiums, dividends, deductibles) belonged to an
-// insurance assistant with canned answers. This panel now talks to the
-// card-support agent, so they would go unanswered.
+// Each is something the member assistant can actually do with its tools: look
+// up the card, freeze or unfreeze it. An opener it had no tool for would teach
+// the audience it pretends.
 const OPENERS = [
-  { label: "I've lost my card", text: "Hi, I've lost my card." },
+  { label: "I've lost my card", text: "Hi, I think I've lost my card." },
   { label: "Is my card still active?", text: "Is my card still active?" },
-  { label: "When is my next payment due?", text: "When is my next payment due?" },
+  { label: "A payment I don't recognise", text: "There's a payment on my card I don't recognise." },
 ];
 
-// There is deliberately NO chip that fills in the member's own details, and
-// none that closes the call for them.
+// There is deliberately NO chip that closes the conversation for the member: a
+// canned mid-conversation reply reads as staged the moment it is on camera.
+// Suggested OPENERS are a real pattern and stay; canned answers are not.
 //
-// Both existed and both were cut: a portal that offers to type your Social
-// Security number for you is not a thing any real product does, and a canned
-// mid-conversation reply reads as staged the moment it is on camera. Suggested
-// OPENERS are a real pattern and stay; canned answers are not.
-//
-// So the member's verification details and their sign-off get typed. For the
-// recording that is the point — the audience watches a person put an SSN into
-// a chat box, which is exactly the thing the rest of the demo is about.
+// What the member types is theirs. In the redaction beat they paste a full card
+// number anyway, and the stored record keeps it only as [REDACTED_...].
 
 function Chip({ label, onClick }) {
   return (
@@ -114,17 +110,24 @@ export function AssistantLauncher({ onClick, open }) {
 
 export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
   const [thread, setThread] = useState([
-    // A plain greeting. The AGENT asks for identification, on its own second
-    // turn, after the member has said what they want — see the turn note in
-    // the deterministic demo script. It must not be asked here:
-    // a demo where the member volunteers an SSN into a chat box unprompted is
-    // demonstrating the wrong thing, and an agent that verified someone who had
-    // never been asked would be worse.
-    { from: "bot", text: "Morning, Ellen. I look after cards on your Larkmere account — reporting one lost, checking its status, ordering a replacement. What can I do?" },
+    // A plain greeting, rendered by the page, not the agent. The member is
+    // signed in, so there is no identification step at all.
+    { from: "bot", text: "Morning, Ellen. I can help with your Larkmere card: freezing it if it's lost, checking its status, or explaining what happens next. What can I do?" },
   ]);
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [disclosure, setDisclosure] = useState(null);
+  // On a call to the card line (CardLine.jsx) instead of chatting. The chat
+  // stays connected underneath; the call is its own session on its own agent.
+  const [calling, setCalling] = useState(false);
+  // Offered only when the site has a phone line (api/phone/status is 204).
+  const [phoneLine, setPhoneLine] = useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    fetch(new URL("../../api/phone/status", window.location.href))
+      .then((r) => setPhoneLine(r.status === 204))
+      .catch(() => setPhoneLine(false));
+  }, [open]);
   const scrollRef = useRef(null);
   const sockRef = useRef(null);
   const sessionRef = useRef(null);
@@ -233,8 +236,13 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
             <span style={{ font: "var(--type-body-s)", color: "var(--green-200)" }}>Answers from your own accounts</span>
           </div>
         </div>
-        <IconButton icon="x" label="Close" onClick={onClose} style={{ color: "var(--sand-50)" }} />
+        {calling || !phoneLine ? null : (
+          <IconButton icon="phone" label="Call the card line" onClick={() => setCalling(true)} style={{ color: "var(--sand-50)" }} />
+        )}
+        <IconButton icon="x" label="Close" onClick={() => { setCalling(false); onClose(); }} style={{ color: "var(--sand-50)" }} />
       </header>
+
+      {calling ? <CardLineCall onEnd={() => setCalling(false)} /> : (<>
 
       <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", padding: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-5)" }}>
         {thread.map((m, i) => (
@@ -301,6 +309,7 @@ export function AssistantPanel({ open, onClose, onToast, onNavigate }) {
           </div>
         ) : null}
       </footer>
+      </>)}
     </aside>
   );
 }

@@ -4,11 +4,13 @@ metadata:
   name: switch_tariff
 spec:
   name: switch_tariff
+  # States no rule. That a contract change needs the customer's OK is the
+  # ToolPolicy's (WE-CX-03, wren-tools.yaml) and the account system's, and Wren
+  # learns it when the policy refuses a switch without a consent_id. A
+  # description that said so would be obeyed and the control never seen.
   description: >-
-    Switch the signed-in customer's tariff from a future date. Needs the
-    consent_id request_consent returned when the customer agreed to exactly
-    this tariff and date; each consent works once. The customer can switch back
-    within 14 days at no cost.
+    Switch the signed-in customer's tariff from a future date. The customer can
+    switch back within 14 days at no cost.
   input_schema:
     type: object
     properties:
@@ -21,8 +23,8 @@ spec:
         description: When the change takes effect, YYYY-MM-DD (default 2026-12-01)
       consent_id:
         type: string
-        description: The consent_id from request_consent, exactly as returned
-    required: [tariff, effective_date, consent_id]
+        description: The customer's consent reference for this change, if you have one
+    required: [tariff, effective_date]
   output_schema:
     type: object
     properties:

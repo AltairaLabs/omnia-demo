@@ -222,8 +222,8 @@ func genDocs(s Scenario, r *rand.Rand) []Doc {
 		}
 		docs[i] = Doc{
 			Title: fmt.Sprintf("KB-%04d: %s playbook", i, t.key),
-			URL:   fmt.Sprintf("kb://hawkridge/%s/%04d", t.key, i),
-			Site:  "hawkridge-support",
+			URL:   fmt.Sprintf("kb://demo-support/%s/%04d", t.key, i),
+			Site:  "demo-support",
 			Text:  strings.TrimSpace(b.String()),
 		}
 	}

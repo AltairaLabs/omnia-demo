@@ -1,0 +1,94 @@
+# Per-tenant L7 waypoint for Istio ambient. tenant.sh applies this with the
+# placeholders below filled in, and labels the namespace to use it.
+#
+# Why a waypoint: an operator-managed rollout with trafficRouting mode=mesh
+# emits weighted VirtualService/DestinationRule routing. Ambient's ztunnel is
+# L4 only and ignores it; only a waypoint applies it.
+#
+#   __WORKSPACE_NS__  the tenant's namespace
+#   __OMNIA_NS__      the namespace Omnia is installed in (omnia.namespace)
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: waypoint
+  namespace: __WORKSPACE_NS__
+  labels:
+    istio.io/waypoint-for: service
+spec:
+  gatewayClassName: istio-waypoint
+  listeners:
+    - name: mesh
+      port: 15008
+      protocol: HBONE
+---
+# Let ambient's HBONE tunnel (TCP 15008) reach the operator-managed workspace
+# services. In ambient, mesh traffic to a pod, whether from the waypoint or
+# straight from another ambient pod's ztunnel, arrives on :15008 and not on the
+# service port. The operator's service-auth-<ws> NetworkPolicy admits only
+# :8080, so with Cilium enforcing it every call through the waypoint was
+# dropped, and the Arena builder's facade never became Ready ("session store
+# unavailable: ping: 503"). Same pods and source namespaces as that policy;
+# NetworkPolicies add up, so this widens it by that one port only.
+#
+# The selector must stay no wider than service-auth-<ws>'s (managed-by plus the
+# workspace label). Agent pods such as arena-builder carry managed-by but no
+# workspace label, so no policy selects them and all their ingress is allowed.
+# Select them here and they become ingress-isolated to :15008 alone: the
+# dashboard's WebSocket to the facade's :18080 management port then times out.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ambient-hbone
+  namespace: __WORKSPACE_NS__
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: omnia-operator
+    matchExpressions:
+      - key: omnia.altairalabs.ai/workspace
+        operator: Exists
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: __WORKSPACE_NS__
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: __OMNIA_NS__
+      ports:
+        - port: 15008
+          protocol: TCP
+---
+# Let the waypoint reach the Arena builder's sandbox pods over HBONE.
+#
+# For each builder session the operator writes a per-sandbox NetworkPolicy
+# that admits only the arena-builder agent pod and denies all egress. Once the
+# namespace is bound to the waypoint, the agent's MCP connection to the sandbox
+# Service is delivered by the waypoint pod as HBONE on :15008, so Cilium sees
+# the waypoint as the source and drops it. Every Bash/Read/Write tool call then
+# fails after 30s ("connect sandbox ... Service Unavailable").
+#
+# Trade-off: whatever can reach the sandbox Service through the waypoint gets
+# in, not only the builder. The Service is per-session and ClusterIP-only, and
+# the sandbox's egress deny is untouched.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ambient-hbone-sandbox
+  namespace: __WORKSPACE_NS__
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: sandbox
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              gateway.networking.k8s.io/gateway-name: waypoint
+      ports:
+        - port: 15008
+          protocol: TCP

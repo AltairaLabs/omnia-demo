@@ -20,10 +20,21 @@ func TestTextLike(t *testing.T) {
 }
 
 func TestLoadConfigRequiresCoreSettings(t *testing.T) {
-	for _, name := range []string{"MEMORY_API_URL", "WORKSPACE_ID", "S3_BUCKET"} {
+	for _, name := range []string{"MEMORY_API_URL", "WORKSPACE_ID", "BLOB_ACCOUNT_URL", "BLOB_CONTAINER"} {
 		t.Setenv(name, "")
 	}
 	if _, err := loadConfig(); err == nil {
 		t.Fatal("loadConfig() succeeded without required settings")
+	}
+}
+
+func TestHiddenSkipsDotSegments(t *testing.T) {
+	for key, want := range map[string]bool{
+		"switching.md": false, "manuals/switching.md": false,
+		"..data/switching.md": true, "..2026_11_10_10_54_16.553700652/switching.md": true, ".hidden.md": true,
+	} {
+		if got := hidden(key); got != want {
+			t.Errorf("hidden(%q) = %v, want %v", key, got, want)
+		}
 	}
 }

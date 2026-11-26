@@ -1,0 +1,11 @@
+apiVersion: v2
+name: omnia-workspace
+description: >-
+  The Azure side of one Omnia workspace: its namespace, its own Postgres
+  databases, the DB Secrets (from Key Vault via External Secrets, or written by
+  a Job from a Secret already on the cluster), keyless Foundry Providers, its
+  workspace-content volume and a ConfigMap describing it. One release per
+  workspace. Knows nothing about what runs in the workspace.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

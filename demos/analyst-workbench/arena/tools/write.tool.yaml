@@ -1,0 +1,30 @@
+# The codegen sandbox's own Write tool, as its MCP server describes it. The
+# runtime serves it from the sandbox (ToolRegistry analyst-workbench-tools);
+# the pack carries the schema the model is shown. Keep in step with the
+# sandbox image (demos/analyst-sandbox).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: Write
+spec:
+  name: Write
+  description: Write a file. Overwriting an existing file requires a prior Read.
+  input_schema:
+    properties:
+      content:
+        type: string
+      file_path:
+        type: string
+    required:
+      - file_path
+      - content
+    type: object
+  action_scope:
+    effect: write
+    reversibility: reversible
+    data_classes:
+      - sandbox-workspace
+  output_schema:
+    type: string
+  mode: mock
+  mock_result: '(mock: runs in the sandbox in Omnia)'

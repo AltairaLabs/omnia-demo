@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"embed"
 	"errors"
 	"fmt"
@@ -17,6 +18,9 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/AltairaLabs/omnia-demo/demos/demoidp"
 )
 
 // site holds every brand's design-system export, plus the scripts they share.
@@ -39,14 +43,22 @@ const sharedDir = "shared"
 // member is the identity the site asserts to the agent.
 //
 // The site is the trusted EDGE: it owns the visitor's signed-in session, so it
-// is the thing that knows who is asking. The AgentRuntime's
-// externalAuth.edgeTrust reads these headers and does not re-verify them, which
-// is exactly the arrangement a real deployment has behind an API gateway — and
-// it means the demo needs no API key, no secret and no dashboard-minted JWT.
+// is the thing that knows who is asking. A real edge does two things, and the
+// site does both (docs/stand-ins.md):
 //
-// There is no login here and there should not be: authenticating a fictional
-// customer would be a page of theatre in front of the thing the demo is
-// actually about.
+//   - it asserts the user in the headers the AgentRuntime's
+//     externalAuth.edgeTrust reads (x-user-id, x-user-email, x-user-roles),
+//     which admit the conversation;
+//   - it forwards the user's token from the identity provider, which Omnia's
+//     mint exchanges for the subject proof that gives the conversation a
+//     VERIFIED user. Without it the conversation has no user for memory: no
+//     memory tools, no member memories recalled. With --issuer-url the site
+//     is that provider (demos/demoidp), signing a token for the member it
+//     asserts; the install trusts it in delegation.trustedIssuers.
+//
+// There is no login page: the site's member is fixed and fictional, and
+// signing them in would be theatre in front of what the demo is about. The
+// token is what makes the identity real to the platform.
 type member struct {
 	id    string
 	email string
@@ -90,6 +102,15 @@ var brands = map[string]brand{
 		// The Practice Desk's signed-in delivery partner. No Halvern page
 		// talks to an agent yet; this is who it will be.
 		who: member{id: "hp-0042", email: "rhiannon.vale@example.com", roles: "staff"},
+	},
+	// Not a company: Ellen Whitcomb's own assistant, the person's side of the
+	// Poppy demo (docs/stand-ins.md, "Personal Agent"). Unbranded, one page.
+	// Ellen is asserted to HER assistant, whose user she is; the companies
+	// never see this identity, only the Personal Agent's (demos/personal-agent).
+	"ellens-assistant": {
+		dir:   "ellens-assistant",
+		index: "ui_kits/phone/",
+		who:   member{id: "ellen-whitcomb", email: "ellen.whitcomb@example.com", roles: "user"},
 	},
 }
 
@@ -163,6 +184,16 @@ func siteFS(b brand) (fs.FS, error) {
 // that held a credential would be handing it to every visitor.
 const assistantPath = "/api/assistant/ws"
 
+// phonePath is the card line: a voice agent behind the same edge, so the call
+// carries the same signed-in member as the chat. The browser sends and plays
+// audio over the socket (OMNI binary frames); the proxy is the same one, which
+// passes binary frames through untouched.
+const phonePath = "/api/phone/ws"
+
+// phoneStatusPath answers 204 when the site has a phone line, so the page
+// offers a call only when one can connect; without one it is a 404.
+const phoneStatusPath = "/api/phone/status"
+
 // The two account-system routes the assistant panel uses besides the socket,
 // proxied to --backend-url (the stub that also backs the agent's tools):
 //
@@ -179,10 +210,36 @@ const (
 	receiptsPath = "/api/assistant/receipts"
 )
 
+// myDataPrefix is where the portal's My data page calls: the member's own
+// consent, memories and erasure requests, proxied to Omnia's end-user plane.
+const myDataPrefix = "/api/me/"
+
+// endUserPlane is Omnia's end-user API for the member's workspace:
+// management-api's /api/v1/me/workspaces/<workspace> routes, which accept only
+// the person's own bearer token, checked against the Workspace's
+// spec.endUserAuth.oidc (this site's issuer, and audience).
+type endUserPlane struct {
+	// url is management-api's base URL; empty turns My data off.
+	url       string
+	workspace string
+	// audience is the `aud` of the member's token for this plane, the
+	// Workspace's spec.endUserAuth.oidc.audience. Never the agent's.
+	audience string
+}
+
 // newServer returns the site handler: the embedded site, the assistant proxy,
 // a redirect from the root to the brand's public site, and a health endpoint.
 // backendURL may be empty, in which case the consent and receipt routes 404.
-func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
+//
+// iss, when set, signs a token for the member on every assistant connection
+// and serves its JWKS at demoidp.JWKSPath and its discovery document at
+// demoidp.DiscoveryPath; nil asserts the member in headers only.
+//
+// eu, when its url is set, serves My data at myDataPrefix. It needs iss: the
+// end-user plane takes nothing but the member's token.
+//
+// phoneURL, when set, serves the voice agent at phonePath; empty: no phone line.
+func newServer(b brand, agentURL, phoneURL, backendURL string, iss *demoidp.Issuer, eu endUserPlane, personalAgentURL string) (http.Handler, error) {
 	// A .jsx is served as source (the pages load the compiled app.js). Go's
 	// mime package has no entry for .jsx, so without this it is served as
 	// application/octet-stream — which some browsers refuse to eval, and the
@@ -202,16 +259,46 @@ func newServer(b brand, agentURL, backendURL string) (http.Handler, error) {
 	}
 	files := gzipped(root, http.FileServer(http.FS(root)))
 
-	proxy, err := assistantProxy(agentURL, b.who)
+	proxy, err := assistantProxy(agentURL, b.who, iss)
 	if err != nil {
 		return nil, err
 	}
 
 	mux := http.NewServeMux()
+	if iss != nil {
+		mux.HandleFunc(demoidp.JWKSPath, iss.ServeJWKS)
+		mux.HandleFunc(demoidp.DiscoveryPath, iss.ServeDiscovery)
+	}
+	if eu.url != "" {
+		myData, err := myDataProxy(eu, b.who, iss)
+		if err != nil {
+			return nil, err
+		}
+		mux.Handle(myDataPrefix, myData)
+	}
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	mux.Handle(assistantPath, proxy)
+	if phoneURL != "" {
+		phone, err := assistantProxy(phoneURL, b.who, iss)
+		if err != nil {
+			return nil, err
+		}
+		mux.Handle(phonePath, phone)
+		mux.HandleFunc(phoneStatusPath, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		})
+	}
+	if personalAgentURL != "" {
+		pa, err := personalAgentProxy(personalAgentURL)
+		if err != nil {
+			return nil, err
+		}
+		for route := range personalAgentRoutes {
+			mux.Handle(route, pa)
+		}
+	}
 	if backendURL != "" {
 		account, err := accountProxy(backendURL, b.who)
 		if err != nil {
@@ -300,7 +387,7 @@ func gzipped(root fs.FS, next http.Handler) http.Handler {
 // The header names are edgeTrust's defaults (x-user-id, x-user-email,
 // x-user-roles). The roles header name is NOT configurable on the CRD side, so
 // don't rename it here expecting the facade to follow.
-func assistantProxy(agentURL string, m member) (http.Handler, error) {
+func assistantProxy(agentURL string, m member, iss *demoidp.Issuer) (http.Handler, error) {
 	target, err := url.Parse(agentURL)
 	if err != nil {
 		return nil, err
@@ -330,6 +417,10 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 			// check any site could open a socket here and talk to the agent as
 			// this customer.
 			pr.Out.Header.Del("Origin")
+			// The sites are served under the dashboard's host, so the browser
+			// sends the dashboard's session cookie here too. The agent has no
+			// use for an operator credential: it never leaves this proxy.
+			pr.Out.Header.Del("Cookie")
 
 			// The identity the edge asserts, set on the OUTBOUND request only.
 			// Whatever the browser sent under these names is overwritten: a
@@ -337,6 +428,14 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 			pr.Out.Header.Set("x-user-id", m.id)
 			pr.Out.Header.Set("x-user-email", m.email)
 			pr.Out.Header.Set("x-user-roles", m.roles)
+			// The member's token, as a real edge forwards the IdP's: the
+			// browser's own Authorization (it has none) never passes. It was
+			// signed before the proxy ran (below), so the headers above never
+			// go without it.
+			pr.Out.Header.Del("Authorization")
+			if tok, ok := pr.In.Context().Value(memberTokenKey{}).(string); ok {
+				pr.Out.Header.Set("Authorization", "Bearer "+tok)
+			}
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
 			// Loud, and on the way out. A silent proxy failure looks exactly
@@ -356,9 +455,31 @@ func assistantProxy(agentURL string, m member) (http.Handler, error) {
 			http.Error(w, "forbidden", http.StatusForbidden)
 			return
 		}
+		// With an issuer the site is the member's identity provider, and the
+		// asserted member goes to the agent only with a token for them. A token
+		// that can't be signed refuses the connection: forwarding the headers
+		// alone would hand the agent's tools a member nobody verified.
+		if iss != nil {
+			tok, err := iss.Sign(m.id, m.email, memberTokenTTL)
+			if err != nil {
+				log.Printf("assistant: signing the member token: %v", err)
+				http.Error(w, "assistant unavailable", http.StatusBadGateway)
+				return
+			}
+			r = r.WithContext(context.WithValue(r.Context(), memberTokenKey{}, tok))
+		}
 		proxy.ServeHTTP(w, r)
 	}), nil
 }
+
+// memberTokenKey carries the member's signed token from the handler to the
+// proxy's Rewrite.
+type memberTokenKey struct{}
+
+// memberTokenTTL bounds a member token. Nothing Omnia mints from it outlives
+// it, and a conversation re-exchanges it on every message, so it covers the
+// longest conversation a visitor has.
+const memberTokenTTL = 8 * time.Hour
 
 // accountProxy forwards the panel's consent and receipt requests to the account
 // back end, asserting the customer's identity the same way the runtime does on
@@ -383,7 +504,9 @@ func accountProxy(backendURL string, m member) (http.Handler, error) {
 			pr.Out.Header.Del("Origin")
 			pr.Out.Header.Del("Cookie")
 			// Overwritten, never passed through: the browser does not get to
-			// say whose consent this is.
+			// say whose consent this is. The back end reads the email before
+			// the id, so a browser-sent email is dropped too.
+			pr.Out.Header.Del("X-Omnia-User-Email")
 			pr.Out.Header.Set("X-Omnia-User-Id", m.id)
 		},
 		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
@@ -408,6 +531,170 @@ func accountProxy(backendURL string, m member) (http.Handler, error) {
 		proxy.ServeHTTP(w, r)
 	}), nil
 }
+
+// personalAgentRoutes are the personal-agent service's page routes, by path
+// and method, which Ellen's assistant's page reaches through this site at the
+// same paths. Never its /tools/*: those are the assistant agent's, and anyone
+// who could call them could speak to a company as Ellen.
+//
+//	GET  /api/conversations  every conversation's state and messages
+//	GET  /api/updates        server-sent events, one per new event
+//	POST /api/direct         Ellen's own line to a company (a Direct Conversation)
+var personalAgentRoutes = map[string]string{
+	"/api/conversations": http.MethodGet,
+	"/api/updates":       http.MethodGet,
+	"/api/direct":        http.MethodPost,
+}
+
+// personalAgentProxy forwards the page's routes to the personal-agent service.
+//
+// It asserts no identity: the service has one user, Ellen, and admits only
+// the page's pod (its NetworkPolicy). The page stands in for her signed-in
+// app, and the catalogue's dashboard sign-in in front of it is what vouches
+// for "Ellen" (docs/stand-ins.md, "Personal Agent"). The browser's cookie,
+// Authorization and identity headers never pass: they mean nothing to the
+// service, and the cookie is an operator's dashboard session.
+func personalAgentProxy(personalAgentURL string) (http.Handler, error) {
+	target, err := url.Parse(personalAgentURL)
+	if err != nil {
+		return nil, err
+	}
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			pr.Out.URL.Path = pr.In.URL.Path
+			pr.Out.URL.RawPath = ""
+			pr.Out.URL.RawQuery = ""
+			for _, h := range []string{"Origin", "Cookie", "Authorization",
+				"X-User-Id", "X-User-Email", "X-User-Roles", "X-Omnia-User-Id", "X-Omnia-User-Email"} {
+				pr.Out.Header.Del(h)
+			}
+		},
+		// Pass each update on as it arrives: the stream is the point.
+		FlushInterval: -1,
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			log.Printf("personal-agent proxy failed: %v", err)
+			http.Error(w, "assistant unavailable", http.StatusBadGateway)
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if personalAgentRoutes[r.URL.Path] != r.Method {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// Taking a conversation over is a state change made from a browser:
+		// another site must not be able to speak to a company as Ellen.
+		if !sameOrigin(r) {
+			log.Printf("personal-agent: refused cross-origin %s %s from %q", r.Method, r.URL.Path, r.Header.Get("Origin"))
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}), nil
+}
+
+// myDataRoutes are the end-user routes My data may reach, by path under
+// myDataPrefix and method. Everything else under the prefix is refused: the
+// plane also serves an MCP endpoint and opt-outs, which this page does not
+// offer, and a proxy that forwarded any path would offer them anyway.
+var myDataRoutes = map[string][]string{
+	"privacy/consent": {http.MethodGet, http.MethodPut},
+	"privacy/erasure": {http.MethodGet, http.MethodPost},
+	"memories":        {http.MethodGet},
+}
+
+// memoryQuery are the query parameters GET memories passes on. The subject is
+// never among them: the plane takes it from the token alone.
+var memoryQuery = []string{"limit", "offset", "type"}
+
+// myDataRoute reports whether method on rest (the path under myDataPrefix) is
+// a route My data may reach. DELETE memories/<id> forgets one memory.
+func myDataRoute(method, rest string) bool {
+	if id, ok := strings.CutPrefix(rest, "memories/"); ok {
+		return method == http.MethodDelete && id != "" && !strings.ContainsAny(id, "/?#%") && id != "." && id != ".."
+	}
+	for _, m := range myDataRoutes[rest] {
+		if m == method {
+			return true
+		}
+	}
+	return false
+}
+
+// myDataProxy forwards the My data page's calls to Omnia's end-user plane as
+// the signed-in member: a bearer token this site signs for them, with the
+// plane's audience, and nothing of the browser's. The plane picks the subject
+// from that token alone, so the page can only ever see and change the member's
+// own data.
+//
+//	GET|PUT   <site>/api/me/privacy/consent  -> <mgmt>/api/v1/me/workspaces/<ws>/privacy/consent
+//	GET|POST  <site>/api/me/privacy/erasure  -> .../privacy/erasure
+//	GET       <site>/api/me/memories         -> .../memories
+//	DELETE    <site>/api/me/memories/<id>    -> .../memories/<id>
+func myDataProxy(eu endUserPlane, m member, iss *demoidp.Issuer) (http.Handler, error) {
+	if iss == nil {
+		return nil, errors.New("my data: the end-user plane takes only the member's token, so it needs --issuer-url")
+	}
+	if eu.workspace == "" || eu.audience == "" {
+		return nil, errors.New("my data: a workspace and an audience are required")
+	}
+	target, err := url.Parse(eu.url)
+	if err != nil {
+		return nil, err
+	}
+	base := path.Join(target.Path, "/api/v1/me/workspaces", url.PathEscape(eu.workspace))
+
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(pr *httputil.ProxyRequest) {
+			pr.SetURL(target)
+			rest := strings.TrimPrefix(pr.In.URL.Path, myDataPrefix)
+			pr.Out.URL.Path = base + "/" + rest
+			pr.Out.URL.RawPath = ""
+			q := url.Values{}
+			if rest == "memories" {
+				for _, k := range memoryQuery {
+					for _, v := range pr.In.URL.Query()[k] {
+						q.Add(k, v)
+					}
+				}
+			}
+			pr.Out.URL.RawQuery = q.Encode()
+			// The browser's credentials and claimed identity never pass: the
+			// dashboard's session cookie (the sites share its host), any
+			// Authorization, and Omnia's identity headers.
+			for _, h := range []string{"Origin", "Cookie", "Authorization", "X-Omnia-User-Id", "X-Omnia-User-Email"} {
+				pr.Out.Header.Del(h)
+			}
+			tok, err := iss.SignFor(m.id, m.email, eu.audience, myDataTokenTTL)
+			if err != nil {
+				log.Printf("my data: signing the member token: %v", err)
+				return
+			}
+			pr.Out.Header.Set("Authorization", "Bearer "+tok)
+		},
+		ErrorHandler: func(w http.ResponseWriter, _ *http.Request, err error) {
+			log.Printf("my data proxy failed: %v", err)
+			http.Error(w, "privacy service unavailable", http.StatusBadGateway)
+		},
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !myDataRoute(r.Method, strings.TrimPrefix(r.URL.Path, myDataPrefix)) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		// Revoking consent and requesting erasure are state changes made from
+		// a browser: another site must not be able to make them for the member.
+		if !sameOrigin(r) {
+			log.Printf("my data: refused cross-origin %s %s from %q", r.Method, r.URL.Path, r.Header.Get("Origin"))
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		proxy.ServeHTTP(w, r)
+	}), nil
+}
+
+// myDataTokenTTL bounds a My data token: one is signed per call.
+const myDataTokenTTL = 5 * time.Minute
 
 // sameOrigin reports whether the request's Origin, if any, matches the host it
 // was sent to.

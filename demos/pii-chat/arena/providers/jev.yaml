@@ -1,0 +1,22 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# The classifier behind the card-support prompt's topic_policy guardrail: Jev,
+# TypeSafe's System One model, through the Vercel AI Gateway. It answers a
+# choice question with a probability per label rather than generating text,
+# so it decides scope; it never writes a reply.
+#
+# Used only when running this kit through PromptArena locally, with the
+# gateway key in AI_GATEWAY_API_KEY. In Omnia the guard slot is bound to the
+# `jev` Provider CR instead (charts/omnia-demo/templates/pii-chat-agent.yaml).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: guard
+spec:
+  id: guard
+  role: inference
+  type: systemone
+  base_url: https://ai-gateway.vercel.sh/typesafe/v1
+  model: typesafe-ai/jev
+  credential:
+    credential_env: AI_GATEWAY_API_KEY

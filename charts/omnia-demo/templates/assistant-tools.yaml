@@ -1,0 +1,171 @@
+{{- if .Values.personalAgent.enabled }}
+{{- $ns := .Values.namespace }}
+{{- /* Example hosts in the descriptions: the Companies in personalAgent.knownCompanies. */}}
+{{- $larkmere := include "omnia-demo.companyHost" (list . "larkmere") }}
+{{- $wrenmoor := include "omnia-demo.companyHost" (list . "wrenmoor") }}
+{{- $pa := printf "http://personal-agent.%s:8080/tools" $ns }}
+---
+# Ellen's assistant's six tools, all on the personal-agent service
+# (demos/personal-agent/server.go), reached in-cluster; the public HTTPRoute
+# never routes /tools/*:
+#
+#   find_company         PAP discovery of a domain (reads public documents)
+#   start_conversation   open a conversation with a Company, first message
+#   send_message         another message in it
+#   read_conversation    what the conversation's Reader has stored
+#   close_conversation   end it
+#   sign_in              begin a sign-in for Ellen at a company (PAP §4.2)
+#
+# A refusal comes back non-2xx with {"error": "..."}; the runtime gives the
+# model "HTTP <status>: <body>" (the first 512 bytes), so the reason reaches
+# it. find_company's not-found is a 200 {"found": false, "reason": ...}.
+# No retryPolicy, on purpose: a retried send_message would send the message
+# twice.
+#
+# The descriptions and schemas here are the BINDING, not what the model reads.
+# PromptKit builds the model's tool descriptors from the pack
+# (demos/personal-agent/arena/tools/), including the action_scope. Kept in
+# step anyway, because a drifted schema here breaks dispatch.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: assistant-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: find-company-handler
+      type: http
+      # Discovery waits up to 30s on the Company.
+      timeout: 45s
+      tool:
+        name: find_company
+        description: "Look up a company's Poppy agents by its domain (for example {{ $larkmere }}). Returns the company's name, its domain and what each of its agents can talk about, with its access: \"session\" (no sign-in needed) or \"signed_in\" (the company needs Ellen signed in). When the domain has no Poppy agent it returns found false and a reason; that is an answer, not a failure to retry. When the company couldn't be reached right now, the reason says so (\"couldn't reach ... right now\"); that may pass, so try once more, and if it fails again tell Ellen."
+        inputSchema:
+          type: object
+          properties:
+            domain: { type: string, description: "The company's domain name, with no scheme or path, e.g. {{ $wrenmoor }}" }
+          required: ["domain"]
+      httpConfig:
+        endpoint: {{ $pa }}/find_company
+        method: POST
+        contentType: application/json
+    - name: start-conversation-handler
+      type: http
+      timeout: 45s
+      tool:
+        name: start_conversation
+        description: "Open a conversation with a company's Poppy agent and send it the first message, for Ellen. The domain must be one Ellen has an account at or one find_company found. Returns the conversation_id and the company's name. The company replies in its own time: read its reply with read_conversation. If it says it couldn't reach the company, nothing was sent, and you may try once more."
+        inputSchema:
+          type: object
+          properties:
+            domain: { type: string, description: "The company's domain name, e.g. {{ $larkmere }}" }
+            message: { type: string, description: "The first message to the company, written as Ellen's assistant acting for her" }
+          required: ["domain", "message"]
+      httpConfig:
+        endpoint: {{ $pa }}/start_conversation
+        method: POST
+        contentType: application/json
+    - name: send-message-handler
+      type: http
+      timeout: 45s
+      tool:
+        name: send_message
+        description: "Send another message in an open conversation with a company, for Ellen. Not for a conversation Ellen has taken over herself (that one is hers), nor a closed one. The company replies in its own time: read its reply with read_conversation."
+        inputSchema:
+          type: object
+          properties:
+            conversation_id: { type: string, description: "The conversation_id start_conversation returned" }
+            text: { type: string, description: "The message to the company" }
+          required: ["conversation_id", "text"]
+      httpConfig:
+        endpoint: {{ $pa }}/send_message
+        method: POST
+        contentType: application/json
+    - name: read-conversation-handler
+      type: http
+      # Reads the service's store only, never the Company. wait_seconds
+      # holds it up to 20s (maxReadWait in server.go), so this stays above.
+      timeout: 35s
+      tool:
+        name: read_conversation
+        description: "Read a conversation with a company so far: every message (role \"user\" is what was sent for Ellen, role \"company\" is the company's reply; author \"agent\" or \"human\" says whether a person at the company wrote it), whether the company is still working on a reply (working), whether a person at the company is taking it over (handoff \"pending\", else \"none\"), whether it is closed, and, if the assistant can no longer follow it, why (stopped, for example when the company asks for Ellen to sign in), and sign_in, present while the company wants Ellen signed in or a sign-in with it has begun or ended (needed; scopes, space-separated; status needed, pending, signed_in or declined). Changes nothing. With wait_seconds it first waits, up to that many seconds, for something to change: a new reply from the company, the company no longer working, a person taking over, the conversation closing or stopping. It answers as soon as one does, or when the time is up, the same way either way."
+        inputSchema:
+          type: object
+          properties:
+            conversation_id: { type: string, description: "The conversation_id start_conversation returned" }
+            wait_seconds: { type: integer, minimum: 0, maximum: 20, description: "How long to wait for the company to reply or the conversation to change before answering, 0 to 20 seconds. 0 (the default) answers at once." }
+          required: ["conversation_id"]
+      httpConfig:
+        endpoint: {{ $pa }}/read_conversation
+        method: POST
+        contentType: application/json
+    - name: close-conversation-handler
+      type: http
+      timeout: 45s
+      tool:
+        name: close_conversation
+        description: "Close a conversation with a company once Ellen's request is dealt with. It cannot be reopened; a new request needs a new conversation. Not for a conversation Ellen has taken over herself."
+        inputSchema:
+          type: object
+          properties:
+            conversation_id: { type: string, description: "The conversation_id start_conversation returned" }
+          required: ["conversation_id"]
+      httpConfig:
+        endpoint: {{ $pa }}/close_conversation
+        method: POST
+        contentType: application/json
+    - name: sign-in-handler
+      type: http
+      # Discovery and the issuer's metadata wait up to 30s each.
+      timeout: 45s
+      tool:
+        name: sign_in
+        description: "Start a sign-in for Ellen at a company, so its agent can reach her account there. Call it only after Ellen has clearly said yes. It puts a sign-in button on her screen; she signs in on the company's own page, and you never see her password, any code or the sign-in link. Returns the company, the scopes asked for, the status and a note saying where the button is, or, when no conversation with the company is open, that one must be started first. Pass the scopes read_conversation showed (sign_in.scopes), space-separated; leave them out only when it showed none."
+        inputSchema:
+          type: object
+          properties:
+            domain: { type: string, description: "The company's domain name, e.g. {{ $larkmere }}" }
+            scopes: { type: string, description: "The scopes to sign in for, space-separated, as read_conversation's sign_in.scopes gave them. Leave out only when none were given." }
+          required: ["domain"]
+      httpConfig:
+        endpoint: {{ $pa }}/sign_in
+        method: POST
+        contentType: application/json
+---
+# THE CONTROL: the assistant acts only for its one user, Ellen.
+#
+# Its tools speak only to companies she has accounts at: personal-agent
+# enforces that itself (--known-companies), so the policy needn't. It does not
+# gate on effect: send_message and start_conversation are writes by design,
+# and the prompt's "ask Ellen before agreeing to anything" is not a policy.
+# What the policy does is refuse a tool that does not declare what it does.
+#
+# Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: assistant-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: assistant-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+  policy: |
+    @id("permit-assistant-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"assistant-tools");
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so Ellen's assistant may not call it.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
+{{- end }}

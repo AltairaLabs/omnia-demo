@@ -49,7 +49,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 data:
   pack.json: |
-{{ .Files.Get "files/arena/pii-chat-pack.json" | indent 4 }}
+{{ include "omnia-demo.piiChatPackJSON" (dict "root" $ "file" "files/arena/pii-chat-pack.json") | indent 4 }}
 {{- if .Values.piiChat.deterministic }}
 ---
 # The scripted model turns, mounted at the path the mock-provider annotation

@@ -5,6 +5,7 @@ import { PolicyDetail } from "./PolicyDetail.jsx";
 import { Claims } from "./Claims.jsx";
 import { Transfer } from "./Transfer.jsx";
 import { AssistantLauncher, AssistantPanel } from "./Assistant.jsx";
+import { MyData } from "./MyData.jsx";
 
 // The four screens the design project ships for this kit. PolicyDetail, Claims
 // and Transfer arrived later than the rest: the original handoff was a
@@ -42,6 +43,9 @@ const SCREENS = {
   policy: { title: "Home & contents", Screen: PolicyDetail },
   claims: { title: "Claims", Screen: Claims },
   transfer: { title: "Move money", Screen: Transfer },
+  // Not from the design project: the consent and erasure demo's page, built
+  // from the kit's own components (MyData.jsx).
+  data: { title: "Your data", Screen: MyData },
 };
 
 function App() {

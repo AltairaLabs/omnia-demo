@@ -1,0 +1,85 @@
+{{- if and .Values.poppy.enabled .Values.poppy.agent.enabled (eq .Values.poppy.agent.company "wrenmoor") }}
+{{- $ns := .Values.namespace }}
+{{- $acct := printf "http://wren-account.%s:8080" $ns }}
+---
+# wrenmoor-outages' one tool, a public read on the Wrenmoor stub:
+#
+#   outage_status   the power cut at a postcode (outages.go, no customer needed)
+#
+# Not get_weather: /wren/weather serves only the signed-in customer, and with
+# no identity the stub falls back to Amira's account, which would leak one
+# customer into another's conversation.
+#
+# The descriptions and schemas here are the BINDING, not what the model reads.
+# PromptKit builds the model's tool descriptors from the pack
+# (demos/wren/poppy/tools/), including the action_scope. Kept in step anyway,
+# because a drifted schema here breaks dispatch.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: wrenmoor-outages-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    - name: outage-status-handler
+      type: http
+      timeout: 30s
+      tool:
+        name: outage_status
+        description: "The power cut affecting a postcode in Wrenmoor Energy's area: whether the supply is off or restored, when it went off, the estimated restoration time, when it was restored (if it has been), how many customers are affected and the cause. Times are UTC. When there is no outage on record for the postcode's district it returns an error saying so."
+        inputSchema:
+          type: object
+          properties:
+            postcode: { type: string, description: "A full postcode or a postcode district, e.g. HX7 8AD or HX7" }
+          required: ["postcode"]
+      httpConfig:
+        endpoint: {{ $acct }}/wren/outage-status
+        method: POST
+        contentType: application/json
+---
+# THE CONTROL: the Company Agent may only read.
+#
+# The Wrenmoor Company Agent talks to anyone's Personal Agent, signed out, so
+# it holds no customer identity and must never change anything. Its only tool,
+# outage_status, is a public read. The policy keeps it that way: any tool that
+# declares a non-read effect is refused, keyed on the declared effect rather
+# than the tool's name, so a write added later is blocked until someone decides
+# otherwise. An undeclared tool is refused outright.
+#
+# Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: wrenmoor-outages-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: wrenmoor-outages-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+    - name: nonReadTool
+      type: cel
+      cel: 'tool.declared && tool.effect != "read"'
+  policy: |
+    @id("permit-wrenmoor-outages-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"wrenmoor-outages-tools");
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so the Wrenmoor Company Agent may not call it.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
+
+    @id("deny-non-read-tool")
+    @message("The Wrenmoor Company Agent talks to anyone, signed out, so it may only read. This tool changes something, so it is refused.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.nonReadTool };
+{{- end }}

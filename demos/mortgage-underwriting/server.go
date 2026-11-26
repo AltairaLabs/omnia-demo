@@ -59,12 +59,6 @@ type toolRequest struct {
 	Note           string `json:"note"`
 	Recommendation string `json:"recommendation"`
 
-	// SSN and DOB belong to verify_identity, in the card-support demo. They
-	// are the only PII this service accepts, and they are never logged — see
-	// verifyIdentity.
-	SSN string `json:"ssn"`
-	DOB string `json:"dob"`
-
 	// ClaimRef, AmountPence and Reason belong to claims triage.
 	//
 	// AmountPence is an int, and the ToolPolicy reads the same field off the
@@ -130,8 +124,15 @@ type caseNoteResponse struct {
 	FiledFor string `json:"filed_for_review_by"`
 }
 
-// newServer returns the handler for every stub back-office service.
+// newServer returns the handler for every stub back-office service, with no
+// Company account routes.
 func newServer() http.Handler {
+	return newServerWith(accountConfig{})
+}
+
+// newServerWith is newServer plus the account routes acct names (obo.go),
+// each answering only a verified on-behalf-of token.
+func newServerWith(acct accountConfig) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/case", jsonTool("case_fetch", fetchCase))
 	mux.HandleFunc("/credit-report", jsonTool("credit_report", fetchCredit))
@@ -140,24 +141,30 @@ func newServer() http.Handler {
 	mux.HandleFunc("/valuation", jsonTool("property_valuation", valueProperty))
 	mux.HandleFunc("/aml-screen", jsonTool("aml_screen", screenAML))
 	mux.HandleFunc("/case-note", jsonTool("case_note_write", writeCaseNote))
-	mux.HandleFunc("/verify-identity", jsonTool("verify_identity", verifyIdentity))
-	// Claims triage. claim_settle is the one the ToolPolicy guards; the other
-	// three are the reads and the escape hatch that make the refusal
-	// actionable rather than a dead end.
+	// The member assistant's card system (cards.go).
+	newCardDesk().register(mux)
+	// Claims triage. claim_settle is the one the ToolPolicy guards; the read
+	// and the escape hatch make the refusal actionable rather than a dead end.
+	// /policy/claim-peril is not a tool: the ToolPolicy's producer asks it.
 	mux.HandleFunc("/claim", jsonTool("claim_fetch", fetchClaim))
-	mux.HandleFunc("/claim-policy", jsonTool("claim_policy_fetch", fetchSettlementPolicy))
 	mux.HandleFunc("/claim-settle", jsonTool("claim_settle", settleClaim))
 	mux.HandleFunc("/claim-refer", jsonTool("claim_refer", referClaim))
+	mux.HandleFunc("/policy/claim-peril", claimPerilFact)
 	// Wrenmoor Energy: on-call operations and grid data. Fresh in-memory state
 	// per server, so a rollback in one test or one pod never leaks into
 	// another.
 	newWrenmoor(time.Now).register(mux)
 	// Wren, Wrenmoor Energy's customer assistant: Amira's account, and the
 	// consent and receipt routes the customer portal uses (wren.go).
-	newWren(time.Now).register(mux)
+	wr := acct.wren
+	if wr == nil {
+		wr = newWren(time.Now)
+	}
+	wr.register(mux)
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
+	acct.register(mux, wr)
 	return mux
 }
 
@@ -198,6 +205,10 @@ func jsonTool(name string, fn func(toolRequest) (any, int)) http.HandlerFunc {
 		log.Printf("tool request received: tool=%s ref=%s remote=%s", name, req.ref(), r.RemoteAddr)
 
 		body, status := fn(req)
+		// The outcome too, not only the arrival: an agent that retries a tool
+		// call is usually being told no, and the request line alone cannot
+		// say so.
+		log.Printf("tool response: tool=%s status=%d", name, status)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(status)
 		if err := json.NewEncoder(w).Encode(body); err != nil {
@@ -278,34 +289,5 @@ func writeCaseNote(req toolRequest) (any, int) {
 		CaseRef:  req.ref(),
 		NoteID:   "NOTE-" + req.ref(),
 		FiledFor: "R. Nkemdirim, Head of Credit Risk",
-	}, http.StatusOK
-}
-
-// verifyIdentity is the card-support demo's identity check. It requires BOTH
-// the SSN and the date of birth, so the agent genuinely has to put the SSN in
-// the tool call rather than merely mention it in conversation — the recorded
-// tool-call arguments are half of what the demo shows.
-//
-// Note what is missing: a log line naming the subject. jsonTool logs
-// req.ref(), which is empty here, and that is deliberate. The only identifier
-// this endpoint receives is an SSN, and a demo about not persisting SSNs must
-// not print one into a container log that someone may well open on camera.
-func verifyIdentity(req toolRequest) (any, int) {
-	h, ok := cardholders[req.SSN]
-	if !ok {
-		// Same answer for an unknown SSN and a mismatched DOB. Distinguishing
-		// them would turn this into an oracle that confirms whether a given
-		// SSN is on file.
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	if req.DOB != h.DOB {
-		return errorBody("identity could not be verified"), http.StatusNotFound
-	}
-	return identityResponse{
-		Verified:    true,
-		CustomerRef: h.CustomerRef,
-		FullName:    h.FullName,
-		CardLast4:   h.CardLast4,
-		CardStatus:  h.CardStatus,
 	}, http.StatusOK
 }

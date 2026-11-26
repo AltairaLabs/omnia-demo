@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for larkmere-claims-desk, Larkmere Mutual's Company Agent:
+# the agent a member's Personal Agent talks to over the Personal Agent
+# Protocol (the AgentRuntime's poppy facade,
+# charts/omnia-demo/templates/poppy-company-agent.yaml).
+#
+# The SIGNED-OUT pack, shipped unless Company sign-in is on. No tools. It
+# answers from the society's guidance for members in institutional memory,
+# retrieved into {{memory_context}} the way the claims assessor reads it.
+# Reporting a claim needs the member signed in, which needs the Company's
+# issuer: with poppy.auth.enabled the chart ships config.signin.arena.yaml's
+# pack instead, which has the account tools.
+#
+# The chart ships a COMPILED pack
+# (charts/omnia-demo/files/arena/larkmere-claims-desk-pack.json) with the
+# governance block merged in.
+#
+# Regenerate with: hack/build-packs.sh larkmere-claims-desk
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: larkmere-claims-desk
+spec:
+  prompt_configs:
+    - id: claims-desk
+      file: prompts/larkmere-claims-desk.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

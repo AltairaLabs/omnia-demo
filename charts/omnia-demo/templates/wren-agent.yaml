@@ -60,6 +60,9 @@ spec:
         - name: stub
           image: {{ include "omnia-demo.image" (dict "root" $ "image" $w.image) }}
           imagePullPolicy: {{ $w.image.pullPolicy }}
+          {{- /* With Company sign-in: the signed-in customer's outage and
+                 compensation, on the public host (poppy-account-tools.yaml). */}}
+          {{- with include "omnia-demo.accountAPIArgs" (dict "root" $ "company" "wrenmoor") | trim }}{{ . | nindent 10 }}{{- end }}
           ports:
             - name: http
               containerPort: 8080

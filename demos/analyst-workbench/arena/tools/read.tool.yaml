@@ -1,0 +1,34 @@
+# The codegen sandbox's own Read tool, as its MCP server describes it. The
+# runtime serves it from the sandbox (ToolRegistry analyst-workbench-tools);
+# the pack carries the schema the model is shown. Keep in step with the
+# sandbox image (demos/analyst-sandbox).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: Read
+spec:
+  name: Read
+  description: Read a file from the workspace. Returns cat -n style line-numbered text.
+  input_schema:
+    properties:
+      file_path:
+        description: Absolute or workspace-relative path.
+        type: string
+      limit:
+        description: Maximum number of lines to return (default 2000).
+        type: number
+      offset:
+        description: 1-based line to start at (default 1).
+        type: number
+    required:
+      - file_path
+    type: object
+  action_scope:
+    effect: read
+    reversibility: reversible
+    data_classes:
+      - sandbox-workspace
+  output_schema:
+    type: string
+  mode: mock
+  mock_result: '(mock: runs in the sandbox in Omnia)'

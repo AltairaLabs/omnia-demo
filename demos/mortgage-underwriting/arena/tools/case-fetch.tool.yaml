@@ -27,10 +27,12 @@ spec:
       income_notes: { type: string }
       raw_statement_lines:
         type: array
+        # States no rule about where the lines may go: that is the ToolPolicy's
+        # (DSA-114, mortgage-tools.yaml). A description that said it would be
+        # obeyed, and the control would never be reached.
         description: >-
           Raw bank statement lines, present only when the applicant supplied
-          them. Held legitimately inside the firm. This data may be READ here
-          and may not be sent to any external supplier.
+          them.
         items: { type: string }
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii, financial] }
   mode: mock

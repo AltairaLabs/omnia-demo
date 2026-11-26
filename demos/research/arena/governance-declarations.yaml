@@ -1,0 +1,17 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh. ASSERTED, not evidence.
+intended_purpose: >-
+  Summarise what one regulatory change means for one client matter, for
+  Halvern Partners' supervising lawyers, run in batches by the knowledge team.
+foreseeable_misuse:
+  - Sending its summaries to a client as advice; they are research for a lawyer
+  - Running unbounded batches; the workspace's daily budget caps them
+autonomy_level: suggests
+accountable_owner: Halvern Partners Knowledge Team
+operator_role: eu-aiact:AIDeployer
+risk_classification: eu-aiact:RiskLevelMinimal
+intended_deployment_contexts:
+  - Internal legal research, batch
+approved_environments:
+  - demo
+requires_ai_disclosure: false

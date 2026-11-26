@@ -1,0 +1,252 @@
+{
+  "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "id": "analyst-workbench",
+  "name": "analyst-workbench",
+  "version": "v1.0.0",
+  "description": "Pack containing 1 prompts",
+  "template_engine": {
+    "version": "v1",
+    "syntax": "{{variable}}",
+    "features": [
+      "basic_substitution"
+    ]
+  },
+  "prompts": {
+    "analyst_workbench": {
+      "id": "analyst_workbench",
+      "name": "analyst-workbench",
+      "description": "Answers questions about Wrenmoor Energy's generation by writing and running Python analyses over the half-hourly site data.",
+      "version": "1.0.0",
+      "system_template": "You are the analyst workbench for Wrenmoor Energy's {{team}} team. You\nanswer questions about its three generation sites by writing a\nshort Python script, running it, and reporting what it found:\n\n  WM-EDGE   Wrenmoor Edge, wind, 14 turbines, 29 MW\n  WM-CRAGG  Cragg Vale Solar, 18 MW\n  WM-HEPT   Heptonstall Store, a 40 MWh battery\n\nYou work in a sandbox with Python 3, pandas and matplotlib. The generation\ndata service is at the URL in the environment variable GRID_DATA_URL. Every\ncall is an HTTP POST with a JSON body, answered in JSON:\n\n  /grid/sites            {}                                the sites\n  /grid/output           {\"site_id\": \"WM-EDGE\", \"date\": \"YYYY-MM-DD\"}\n                         one site's day: peak_mw, energy_mwh,\n                         capacity_factor_pct, missing_readings, and\n                         readings, 48 half-hours of {\"start\", \"mw\"}\n                         (mw is null for a missing reading)\n  /grid/mix              {\"date\": \"YYYY-MM-DD\"}            a day's energy by source\n  /grid/daily-summaries  {\"cursor\": \"YYYY-MM-DD\"}          days after the cursor\n\nHow to work:\n- Write the script to a file with Write, run it with Bash\n  (python3 analysis.py), and read its output. Use urllib.request from the\n  standard library for the HTTP calls.\n- Print the figures your answer rests on. If the script fails, read the\n  error, fix it and run it again.\n- For a chart, save it as a PNG next to the script and say its file name.\n- A missing reading means no data arrived from the export meter: count it,\n  never treat it as zero output or a site going offline. Wind is weather;\n  a still day is low output, not a fault.\n\nAnswer in a few sentences with the figures and their units (MWh, MW, %\ncapacity factor), then show the script you ran.\n",
+      "variables": [
+        {
+          "name": "team",
+          "type": "string",
+          "required": false,
+          "default": "generation analytics",
+          "description": "The team the workbench serves"
+        }
+      ],
+      "tools": [
+        "Write",
+        "Read",
+        "Edit",
+        "Bash"
+      ],
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_policy": {
+                "backoff": "exponential",
+                "initial_delay_ms": 100,
+                "max_retries": 3
+              },
+              "timeout_ms": 30000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "collect_all_errors": true,
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "parameters": {
+        "temperature": 0.1
+      }
+    }
+  },
+  "tools": {
+    "Bash": {
+      "name": "Bash",
+      "description": "Run a shell command in the workspace via bash -c. Runs from the workspace root (use `cd subdir && ...` to move); stdin is closed; env is inherited from the server. Returns combined stdout+stderr, capped at 100 KiB with a '... (output truncated, N bytes elided)' marker — late output such as the last few lines of a build log may be elided. A trailing 'exit: N' line is emitted for non-zero exits. A 'timed out after Ns' marker is emitted on timeout (exit code 124), and the entire process group is killed so backgrounded children do not survive. A small set of dangerous tokens (sudo, su, shutdown, reboot, halt, poweroff, chroot, mount, umount, mkfs) at plausible command positions are rejected before the command runs.",
+      "parameters": {
+        "properties": {
+          "command": {
+            "description": "Shell command to run.",
+            "type": "string"
+          },
+          "description": {
+            "description": "5-10 word description of what this command does. Recorded for agent context; does not affect execution.",
+            "type": "string"
+          },
+          "run_in_background": {
+            "description": "If true, spawn the command in the background and return a shell_id immediately. Use BashOutput to poll and KillShell to terminate.",
+            "type": "boolean"
+          },
+          "timeout": {
+            "description": "Timeout in seconds. Default 120, clamped to a maximum of 600.",
+            "type": "number"
+          }
+        },
+        "required": [
+          "command",
+          "description"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "sandbox-workspace"
+        ]
+      }
+    },
+    "Edit": {
+      "name": "Edit",
+      "description": "Exact-string replace within a file. Requires a prior Read. On Go projects, lint findings for the edited file are appended to the success message as 'post-edit lint findings (N):' — best effort, silent on linter failure or absence.",
+      "parameters": {
+        "properties": {
+          "file_path": {
+            "type": "string"
+          },
+          "new_string": {
+            "type": "string"
+          },
+          "old_string": {
+            "type": "string"
+          },
+          "replace_all": {
+            "description": "If true, replace every occurrence; default false.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "file_path",
+          "old_string",
+          "new_string"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "sandbox-workspace"
+        ]
+      }
+    },
+    "Read": {
+      "name": "Read",
+      "description": "Read a file from the workspace. Returns cat -n style line-numbered text.",
+      "parameters": {
+        "properties": {
+          "file_path": {
+            "description": "Absolute or workspace-relative path.",
+            "type": "string"
+          },
+          "limit": {
+            "description": "Maximum number of lines to return (default 2000).",
+            "type": "number"
+          },
+          "offset": {
+            "description": "1-based line to start at (default 1).",
+            "type": "number"
+          }
+        },
+        "required": [
+          "file_path"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "sandbox-workspace"
+        ]
+      }
+    },
+    "Write": {
+      "name": "Write",
+      "description": "Write a file. Overwriting an existing file requires a prior Read.",
+      "parameters": {
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "file_path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "file_path",
+          "content"
+        ],
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "sandbox-workspace"
+        ]
+      }
+    }
+  },
+  "compilation": {
+    "compiled_with": "packc-dev",
+    "created_at": "2026-11-14T18:20:53Z",
+    "schema": "v1"
+  },
+  "metadata": {
+    "observed": {
+      "source_commit": "3ac5c87a79623e47534e0c2ddc045c228c75a198",
+      "working_tree_clean": true,
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-14T18:20:52Z",
+      "source_describe": "3ac5c87"
+    },
+    "asserted": {
+      "domain": "energy-utilities",
+      "tags": [
+        "grid-analytics",
+        "code-execution"
+      ],
+      "approved_by": "Head of Generation Analytics, Wrenmoor Energy",
+      "approval_date": "2026-11-14",
+      "change_ticket": "WE-CHG-2391",
+      "decision_authority": "Reporting only. It runs analyses in an isolated sandbox and takes no action on the sites, the battery or the platform.",
+      "data_classification": "Aggregate site generation and export-meter data. No customer-level data.",
+      "retention": "Session transcripts and sandbox files 90 days",
+      "review_due": "2027-05-14",
+      "review_trigger": "Any change to what the sandbox can reach"
+    },
+    "governance": {
+      "intended_purpose": "Answer Wrenmoor Energy's generation analysts' questions by writing and running Python analyses over the half-hourly site data.",
+      "foreseeable_misuse": [
+        "Asking it to send data, or anything else, outside Wrenmoor; its sandbox reaches only the generation data service",
+        "Treating a gap in export readings as lost generation, or a still day as a fault",
+        "Using its figures for settlement or billing, which run from metered data it does not see"
+      ],
+      "autonomy_level": "suggests",
+      "accountable_owner": "Wrenmoor Energy Generation Analytics",
+      "operator_role": "eu-aiact:AIDeployer",
+      "risk_classification": "eu-aiact:RiskLevelMinimal",
+      "intended_deployment_contexts": [
+        "Generation and operations reporting, internal"
+      ],
+      "approved_environments": [
+        "demo"
+      ],
+      "requires_ai_disclosure": false
+    }
+  }
+}

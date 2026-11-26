@@ -8,8 +8,10 @@ on:
       - memory-ingestion/**
       - demos/memory-seeder/**
       - demos/mortgage-underwriting/**
+      - demos/personal-agent/**
       - demos/sharepoint-adapter/**
       - demos/demo-sites/**
+      - demos/analyst-sandbox/**
       - .github/workflows/publish.yml
   workflow_dispatch:
 
@@ -35,6 +37,10 @@ jobs:
             context: .
             file: demos/mortgage-underwriting/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
+          - name: personal-agent
+            context: .
+            file: demos/personal-agent/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-personal-agent
           - name: sharepoint-adapter
             context: .
             file: demos/sharepoint-adapter/Dockerfile
@@ -45,6 +51,11 @@ jobs:
             context: .
             file: demos/demo-sites/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-sites
+          # The analyst workbench sandbox: Omnia's codegen sandbox plus Python.
+          - name: analyst-sandbox
+            context: demos/analyst-sandbox
+            file: demos/analyst-sandbox/Dockerfile
+            image: ghcr.io/altairalabs/omnia-demo-analyst-sandbox
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3

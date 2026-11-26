@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 )
 
@@ -18,13 +20,34 @@ func fetchClaim(req toolRequest) (any, int) {
 	return c, http.StatusOK
 }
 
-// fetchSettlementPolicy returns the delegated authority schedule.
+// claimPerilFact answers the claims ToolPolicy's http producer: the peril of
+// the claim a tool call names, so the policy can hold a peril rule (flood
+// claims go to Flood Response, CP-7) that the call's own arguments can't
+// express. The agent is never told the rule; the policy asks the system of
+// record.
 //
-// A tool rather than a line in the system prompt: an operator can change the
-// limit without redeploying a pack, and on camera it shows the agent reading
-// policy rather than remembering it.
-func fetchSettlementPolicy(_ toolRequest) (any, int) {
-	return delegatedAuthority, http.StatusOK
+// The request is the policy broker's ({"producer", "tool", "args", "run"}), and
+// the answer is {"value": <string>}. A call that names no claim, or one this
+// system doesn't hold, answers "": the fact is always a string, so it never
+// fails a call that has nothing to do with a claim's peril.
+func claimPerilFact(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req struct {
+		Args struct {
+			ClaimRef string `json:"claim_ref"`
+		} `json:"args"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	peril := claims[req.Args.ClaimRef].Peril
+	log.Printf("policy lookup claim-peril claim_ref=%q peril=%q", req.Args.ClaimRef, peril)
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"value": peril})
 }
 
 // settleClaim authorises payment.
@@ -83,10 +106,16 @@ func referClaim(req toolRequest) (any, int) {
 	c.Status = statusReferred
 	claims[req.ClaimRef] = c
 
+	// Routed by peril, as a claims system routes work: the agent gives the
+	// reason, never the destination.
+	to, queue := "Ruth Alderman", "Household claims approvals"
+	if c.Peril == "Flood" {
+		to, queue = "Dev Okafor", "Flood Response"
+	}
 	return referralResponse{
 		ClaimRef:   c.ClaimRef,
-		ReferredTo: "Ruth Alderman",
-		Queue:      "Household claims — approvals above delegated authority",
+		ReferredTo: to,
+		Queue:      queue,
 		Status:     statusReferred,
 	}, http.StatusOK
 }

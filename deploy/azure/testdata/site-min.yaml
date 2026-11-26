@@ -1,0 +1,9 @@
+# Only what every script needs; every optional section is absent.
+subscription: 00000000-0000-0000-0000-000000000000
+location: westeurope
+identityResourceGroup: rg-identities
+identityNamePrefix: mi-demo
+aks:
+  resourceGroup: rg-aks
+  name: aks-demo
+  kubeContext: kind-demo

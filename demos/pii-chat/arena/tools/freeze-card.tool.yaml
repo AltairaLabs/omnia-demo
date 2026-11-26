@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/tool.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: freeze_card
+spec:
+  name: freeze_card
+  # No arguments: the card system acts on the signed-in member's card, named by
+  # the runtime on the call, never by anything the model writes
+  # (demos/mortgage-underwriting/cards.go).
+  description: >-
+    Freeze the member's card so no new payments go through, for example when
+    it is lost or stolen. Returns the card's last four digits and new status;
+    changed is false if it was already frozen.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      full_name: { type: string }
+      card_last4: { type: string }
+      card_status: { type: string }
+      changed: { type: boolean }
+  action_scope: { effect: write, reversibility: reversible, data_classes: [card-account] }
+  # The executor in the cluster is the ToolRegistry's (pii-chat-tools.yaml);
+  # mock applies only to a local arena run.
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    full_name: "Ellen Whitcomb"
+    card_last4: "4471"
+    card_status: "frozen"
+    changed: true

@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/tool.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: unfreeze_card
+spec:
+  name: unfreeze_card
+  # The pair of freeze_card; see there.
+  description: >-
+    Unfreeze the member's card so it works again, for example when they have
+    found it. Returns the card's last four digits and new status; changed is
+    false if it was not frozen.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      full_name: { type: string }
+      card_last4: { type: string }
+      card_status: { type: string }
+      changed: { type: boolean }
+  action_scope: { effect: write, reversibility: reversible, data_classes: [card-account] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    full_name: "Ellen Whitcomb"
+    card_last4: "4471"
+    card_status: "active"
+    changed: true

@@ -1,0 +1,12 @@
+# Governance metadata merged into the compiled pack under metadata.asserted by
+# hack/build-packs.sh. ASSERTED: typed by a human and verified by nothing. The
+# keys are Halvern Partners' own schema.
+
+domain: legal-services
+tags:
+  - research
+  - batch
+  - budgeted
+
+approved_by: "Head of Knowledge, Halvern Partners"
+approval_date: "2026-11-12"

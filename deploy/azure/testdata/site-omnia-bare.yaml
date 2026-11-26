@@ -1,0 +1,12 @@
+subscription: 00000000-0000-0000-0000-000000000000
+aks:
+  kubeContext: kind-demo
+dns:
+  zone: demo.example.com
+gateway:
+  name: omnia-external
+  namespace: omnia
+  sectionName: https
+dashboardHost: dashboard.demo.example.com
+omnia:
+  valuesRoot: ""

@@ -1,0 +1,23 @@
+# What tenant.sh needs and nothing optional: no voice, nfs, images.
+subscription: 00000000-0000-0000-0000-000000000000
+location: westeurope
+identityResourceGroup: rg-identities
+identityNamePrefix: mi-demo
+aks:
+  resourceGroup: rg-aks
+  name: aks-demo
+  kubeContext: kind-demo
+postgres:
+  host: pg.example.com
+  adminLogin: pgadmin
+  adminPassword:
+    secret:
+      namespace: omnia
+      name: pg-admin
+      key: password
+foundry:
+  endpoint: https://foundry.example.com
+  accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/foundry
+  region: swedencentral
+omnia:
+  namespace: omnia

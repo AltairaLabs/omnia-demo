@@ -1,0 +1,196 @@
+{{- if and .Values.poppy.enabled .Values.poppy.agent.enabled .Values.poppy.auth.enabled }}
+{{- $ns := .Values.namespace }}
+{{- $domain := required "poppy.domain" .Values.poppy.domain }}
+{{- $acct := .Values.poppy.account }}
+{{- /* The account tools of each Company: the routes its stub serves behind the
+     on-behalf-of guard (demos/mortgage-underwriting/obo.go), the Service that
+     serves them, and the one scope the stub checks on every route. One scope
+     per Company, so the customer consents once. */}}
+{{- $companies := dict
+      "larkmere" (dict
+        "agent" "larkmere-claims-desk"
+        "service" "claims-systems"
+        "scope" "claims"
+        "tools" (list
+          (dict "name" "claim_open" "handler" "claim-open-handler" "path" "/api/claims/open"
+                "description" "Report a new home insurance claim for the signed-in member, on their home policy. Give the peril (what caused the loss, e.g. Escape of water, Storm, Flood, Theft, Fire), what happened in the member's words, and the date it happened. Returns the new claim: its reference (LM-…), the policy, the status, the items so far (none) and the next steps. Amounts are in pence. Refused until the member has signed in."
+                "schema" "{type: object, properties: {peril: {type: string, description: 'What caused the loss, e.g. Escape of water, Storm, Flood, Theft, Fire'}, description: {type: string, description: 'What happened, in the member''s words'}, occurred_on: {type: string, description: 'The date it happened, YYYY-MM-DD'}}, required: [peril]}")
+          (dict "name" "claim_add_item" "handler" "claim-add-item-handler" "path" "/api/claims/add-item"
+                "description" "Add one damaged or lost item to one of the signed-in member's open home claims: what it is, what it is worth in pence, and what damaged it. Returns the claim with every item and the total claimed, in pence. A claim the member did not report is not found. Refused until the member has signed in."
+                "schema" "{type: object, properties: {claim_ref: {type: string, description: 'The claim reference, e.g. LM-41001'}, description: {type: string, description: 'The item, e.g. Oak dining table'}, value_pence: {type: integer, minimum: 1, description: 'What it is worth, in pence (£450 is 45000)'}, cause: {type: string, description: 'What damaged it, as the member said'}}, required: [claim_ref, description, value_pence]}")
+          (dict "name" "claim_status" "handler" "claim-status-handler" "path" "/api/claims/status"
+                "description" "The status of one of the signed-in member's home claims: its peril, when it happened and was reported, its status, every item and the total claimed, in pence, and the next steps. With no claim reference, all of the member's claims. Refused until the member has signed in."
+                "schema" "{type: object, properties: {claim_ref: {type: string, description: 'The claim reference, e.g. LM-41001. Omit for all of the member''s claims'}}}"))
+      )
+      "wrenmoor" (dict
+        "agent" "wrenmoor-outages"
+        "service" "wren-account"
+        "scope" "outages"
+        "tools" (list
+          (dict "name" "my_outage" "handler" "my-outage-handler" "path" "/api/account/outage"
+                "description" "The power cut on the signed-in customer's own supply: their account and postcode, whether the supply is off or restored, when it went off, how many whole hours it has been off and the estimated restoration time. Times are UTC. {\"status\": \"on\"} when their supply is not affected. Refused until the customer has signed in."
+                "schema" "{type: object, properties: {}}")
+          (dict "name" "compensation_status" "handler" "compensation-status-handler" "path" "/api/account/compensation"
+                "description" "The compensation the signed-in customer is owed for the power cut on their supply under Wrenmoor's guaranteed standard: the hours off, whether they are eligible, the amount in pence, the rule it was worked out by and its status (owed or not_yet). Paid automatically; this only reports it. Refused until the customer has signed in."
+                "schema" "{type: object, properties: {}}"))
+      ) }}
+{{- $c := required "poppy.agent.company must be larkmere or wrenmoor" (get $companies .Values.poppy.agent.company) }}
+{{- if not (hasKey (.Values.poppy.auth.scopes | default dict) $c.scope) }}
+{{- fail (printf "poppy.auth.scopes must describe %q: the account tools need it" $c.scope) }}
+{{- end }}
+{{- $issuer := include "omnia-demo.subjectIssuer" . }}
+{{- $enc := $acct.encryption | default dict }}
+---
+# The account tools' credential. When a Personal Agent sends a conversation
+# with the customer's Company access token, the poppy facade enrols it here:
+# privacy-api exchanges it at the issuer (RFC 8693) for a token scoped to the
+# Company's own API (`audience`), keeps that token for this conversation only,
+# sealed under `encryption`, until it expires, and hands it to an oauthOBO
+# handler's call. `subjectIssuer` binds the Connection to the Company's issuer:
+# a token from any other issuer is never exchanged here, and no refresh token
+# is kept (PAP gives refresh tokens to the Personal Agent only).
+#
+# The exchange client (clientID, its Secret) is registered at the issuer for
+# this purpose alone. With poppy.auth.gateway.enabled that is Omnia's issuer
+# gateway: the Workspace lists the client in auth.gateway.exchangeClients
+# (workspace.yaml), and tokenURL is the gateway's <issuer>/oauth/token.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Connection
+metadata:
+  name: {{ $c.agent }}-account
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  # The token goes only to handlers whose endpoint is on this host.
+  hosts: [{{ $domain | quote }}]
+  credential:
+    kind: tokenExchange
+    tokenExchange:
+      tokenURL: {{ include "omnia-demo.accountTokenURL" . | quote }}
+      clientID: {{ required "poppy.account.clientID" $acct.clientID | quote }}
+      clientSecretRef:
+        name: {{ required "poppy.account.clientSecretRef" $acct.clientSecretRef }}
+      scopes: [{{ $c.scope | quote }}]
+      audience: {{ required "poppy.account.audience" $acct.audience | quote }}
+      subjectIssuer: {{ $issuer | quote }}
+      encryption:
+        kmsProvider: {{ required "poppy.account.encryption.kmsProvider" $enc.kmsProvider }}
+        keyID: {{ required "poppy.account.encryption.keyID" $enc.keyID | quote }}
+        {{- with $enc.secretRef }}
+        secretRef:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+---
+# The account tools: each calls the Company's API as the signed-in customer,
+# on the Company's public host (the route below), with the token the
+# Connection exchanged for this conversation. A customer who has not signed in,
+# or whose sign-in lacks the scope, gets no token, and the call is refused
+# before it is made: on a poppy conversation the facade then asks the Personal
+# Agent to sign in. No other credential is ever sent instead, and the stub
+# refuses a request without a verified token (401) anyway.
+#
+# The descriptions and schemas here are the BINDING; the model reads the
+# pack's (Task 13). Kept in step, because a drifted schema breaks dispatch.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolRegistry
+metadata:
+  name: {{ $c.agent }}-account-tools
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  handlers:
+    {{- range $c.tools }}
+    - name: {{ .handler }}
+      type: http
+      timeout: 30s
+      tool:
+        name: {{ .name }}
+        description: {{ .description | quote }}
+        inputSchema:
+          {{- toYaml (fromYaml .schema) | nindent 10 }}
+      httpConfig:
+        endpoint: https://{{ $domain }}{{ .path }}
+        method: POST
+        contentType: application/json
+      auth:
+        type: oauthOBO
+        oauthOBO:
+          connection: {{ $c.agent }}-account
+          scopes: [{{ $c.scope | quote }}]
+    {{- end }}
+---
+# THE CONTROL for the account tools. Every handler in this registry acts as
+# the signed-in customer, with their own exchanged token, on their own
+# account. That is why writes (claim_open, claim_add_item) are permitted here
+# and nowhere else: the Company Agent's other tools serve anyone, signed out,
+# and their policies refuse anything but a read.
+#
+# Still refused here: a tool that does not declare what it does, and one that
+# reaches outside the Company (effect external).
+#
+# permit and forbid only, no @refer: a call made on behalf of the customer
+# can't be held for a person to approve and resumed later (Omnia #4257,
+# closed as intended). Cedar is default-deny, so the permit is not decoration.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: ToolPolicy
+metadata:
+  name: {{ $c.agent }}-account-policy
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    registry: {{ $c.agent }}-account-tools
+  mode: enforce
+  onFailure: deny
+  producers:
+    - name: undeclared
+      type: cel
+      cel: "!tool.declared"
+    - name: externalTool
+      type: cel
+      cel: 'tool.declared && tool.effect == "external"'
+  policy: |
+    @id("permit-{{ $c.agent }}-account-tools")
+    permit (principal, action == Action::"invoke",
+            resource in Registry::"{{ $c.agent }}-account-tools");
+
+    @id("deny-undeclared-tool")
+    @message("This tool does not declare what it does, so it may not act on a customer's account.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.undeclared };
+
+    @id("deny-external-tool")
+    @message("This tool reaches outside the Company, so it may not act on a customer's account.")
+    forbid (principal, action == Action::"invoke", resource)
+    when { context.externalTool };
+---
+# The account API on the Company's public host: only the account tools' exact
+# paths, to the stub. Each path refuses any request without a verified
+# on-behalf-of token from the Company's issuer, for this API's audience and
+# with the scope (401/403, obo.go): nothing here is served to an anonymous
+# caller. The stub's other routes (/wren/*, /claims/*, which trust the edge's
+# headers) stay in-cluster.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $c.agent }}-account-api
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  parentRefs:
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
+  hostnames:
+    - {{ $domain | quote }}
+  rules:
+    - matches:
+        {{- range $c.tools }}
+        - path: { type: Exact, value: {{ .path }} }
+        {{- end }}
+      backendRefs:
+        - name: {{ $c.service }}
+          port: 8080
+{{- end }}

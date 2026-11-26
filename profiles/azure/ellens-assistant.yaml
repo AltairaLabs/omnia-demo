@@ -1,0 +1,41 @@
+# Ellen's assistant: the PERSON's side of the Poppy demo, not a fourth
+# company. Ellen Whitcomb (a Larkmere Mutual member and a Wrenmoor Energy
+# customer) has her own assistant, which reaches those two Companies under the
+# Personal Agent Protocol.
+#
+# STAND-IN for a consumer Personal Agent (docs/stand-ins.md, "Personal
+# Agent"). The real one is another company's product, on its own
+# infrastructure; here it is a workspace on the same Omnia install as the
+# Companies, reaching them over public HTTPS, with its conversation store in
+# the demo's shared Redis (see docs/stand-ins.md for what that exposes).
+#
+# First install, in this order (the keys need the namespace, and the
+# Deployment cannot start without the keys, so helm --wait would hang):
+#   make azure-tenant WS=ellens-assistant
+#   hack/personal-agent-keys.sh
+#   make images        # no published personal-agent image is pinned yet
+#   make demos TENANTS=ellens-assistant
+# Without `make images` (.images.env) the personal-agent pod sits in
+# ImagePullBackOff and make demos times out.
+workspace:
+  displayName: Ellen's assistant
+  description: Stand-in for a person's own Personal Agent (Ellen Whitcomb). Not a company; it talks to Larkmere Mutual and Wrenmoor Energy over Poppy.
+
+personalAgent:
+  enabled: true
+  # host (assistant.<your zone>) and knownCompanies, the Companies she has
+  # accounts at (larkmere.<zone>, wrenmoor.<zone>), are set by
+  # deploy/azure/site-values.sh from site.yaml. The chart puts the same hosts in
+  # the assistant's prompt.
+  # No pin: the sha-682590d build common.yaml pins predates the
+  # personal-agent image, and the demo-sites image it pins has no
+  # ellens-assistant site. Run both from `make images` (.images.env), or pin
+  # a publish of a later commit here.
+  #
+  # The page (templates/assistant-page.yaml) is served by the catalogue
+  # (halvern-partners.yaml, catalogue.proxies) at /ellens-assistant/. Its
+  # issuer, http://assistant-page.ellens-assistant.svc.cluster.local:8080,
+  # goes in your Omnia install's delegation.trustedIssuers beside the portals', or
+  # the assistant's conversations have no verified user.
+  page:
+    enabled: true
