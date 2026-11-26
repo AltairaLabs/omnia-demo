@@ -61,7 +61,7 @@ IMAGES := \
   omnia-demo-sites,.,demos/demo-sites/Dockerfile \
   omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
 
-.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy omnia-values
+.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy azure-memory omnia-values
 
 # A tenant's Azure side on your own Omnia install, described by
 # deploy/azure/site.yaml (see site.example.yaml). DRY_RUN=1 prints every write.
@@ -89,6 +89,14 @@ azure-identity:
 # tenant whose profile uses it. Prints the vault URL for the profiles.
 azure-poppy:
 	@deploy/azure/poppy.sh
+
+# Institutional memory's Azure side: a private Blob container per memory tenant,
+# its documents from memory-documents/<tenant>/ (only changed files upload; files
+# removed here are deleted there), and Storage Blob Data Reader on the container
+# for the tenant's identity. A no-op without a `memory` block in site.yaml. Run
+# it before or after `make demos`; the CronJob it triggers comes from demos.
+azure-memory:
+	@deploy/azure/memory.sh
 
 # The Omnia Helm values the demo needs on your install (trusted issuers, default
 # exposure), from deploy/azure/site.yaml into out/omnia-values.yaml. Prints the
