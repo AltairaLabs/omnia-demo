@@ -84,10 +84,11 @@ func TestPostFailsOnRejectionAndOnAClientError(t *testing.T) {
 	}
 }
 
-func TestLoadConfigDirNeedsNoBucket(t *testing.T) {
+func TestLoadConfigDirNeedsNoBlob(t *testing.T) {
 	t.Setenv("MEMORY_API_URL", "http://memory")
 	t.Setenv("WORKSPACE_ID", "ws")
-	t.Setenv("S3_BUCKET", "")
+	t.Setenv("BLOB_ACCOUNT_URL", "")
+	t.Setenv("BLOB_CONTAINER", "")
 	t.Setenv("SOURCE_DIR", "/fixtures")
 	if _, err := loadConfig(); err != nil {
 		t.Fatalf("loadConfig with SOURCE_DIR: %v", err)

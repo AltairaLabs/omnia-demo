@@ -20,7 +20,7 @@ func TestTextLike(t *testing.T) {
 }
 
 func TestLoadConfigRequiresCoreSettings(t *testing.T) {
-	for _, name := range []string{"MEMORY_API_URL", "WORKSPACE_ID", "S3_BUCKET"} {
+	for _, name := range []string{"MEMORY_API_URL", "WORKSPACE_ID", "BLOB_ACCOUNT_URL", "BLOB_CONTAINER"} {
 		t.Setenv(name, "")
 	}
 	if _, err := loadConfig(); err == nil {

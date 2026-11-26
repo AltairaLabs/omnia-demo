@@ -3,10 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Command memory-ingestion is a small, source-only example of an ingestion
-// service. It reads text-like objects from S3, or text-like files from a local
-// directory (SOURCE_DIR, for example a mounted ConfigMap), and sends documents to
-// Omnia's institutional batch-ingest API. It never connects to the memory
-// database.
+// service. It reads text-like blobs from an Azure Blob container (keyless, with
+// workload identity), or text-like files from a local directory (SOURCE_DIR,
+// for local runs), and sends documents to Omnia's institutional batch-ingest
+// API. FORGET_SOURCE=<source> instead removes everything stored for that
+// source. It never connects to the memory database.
 package main
 
 import (
@@ -22,10 +23,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const (
@@ -33,13 +30,8 @@ const (
 	maxObjectBytes = 16 << 20
 )
 
-type objectStore interface {
-	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
-	GetObject(context.Context, *s3.GetObjectInput, ...func(*s3.Options)) (*s3.GetObjectOutput, error)
-}
-
 type config struct {
-	memoryURL, workspace, bucket, prefix, source, tokenPath, dir string
+	memoryURL, workspace, blobAccountURL, blobContainer, source, tokenPath, dir, forgetSource string
 }
 
 type document struct {
@@ -91,6 +83,13 @@ func main() {
 	}
 
 	ctx := context.Background()
+	if cfg.forgetSource != "" {
+		if err := forget(ctx, cfg, http.DefaultClient, log); err != nil {
+			log.Error("forget failed", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if cfg.dir != "" {
 		if err := syncDir(ctx, cfg, http.DefaultClient, log); err != nil {
 			log.Error("sync failed", "error", err)
@@ -98,18 +97,12 @@ func main() {
 		}
 		return
 	}
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(env("S3_REGION", "us-east-1")))
+	store, err := newBlobStore(cfg)
 	if err != nil {
-		log.Error("load AWS configuration", "error", err)
+		log.Error("connect to blob storage", "error", err)
 		os.Exit(1)
 	}
-	client := s3.NewFromConfig(awsCfg, func(options *s3.Options) {
-		if endpoint := os.Getenv("S3_ENDPOINT"); endpoint != "" {
-			options.BaseEndpoint = aws.String(endpoint)
-		}
-		options.UsePathStyle = strings.EqualFold(os.Getenv("S3_FORCE_PATH_STYLE"), "true")
-	})
-	if err := sync(ctx, client, cfg, http.DefaultClient, log); err != nil {
+	if err := syncBlob(ctx, store, cfg, http.DefaultClient, log); err != nil {
 		log.Error("sync failed", "error", err)
 		os.Exit(1)
 	}
@@ -118,13 +111,14 @@ func main() {
 func loadConfig() (config, error) {
 	c := config{
 		memoryURL: env("MEMORY_API_URL", ""), workspace: env("WORKSPACE_ID", ""),
-		bucket: env("S3_BUCKET", ""), prefix: env("S3_PREFIX", ""),
-		source: env("MEMORY_SOURCE", "s3"), tokenPath: env("MEMORY_TOKEN_PATH", ""),
-		dir: env("SOURCE_DIR", ""),
+		blobAccountURL: env("BLOB_ACCOUNT_URL", ""), blobContainer: env("BLOB_CONTAINER", ""),
+		source: env("MEMORY_SOURCE", "blob"), tokenPath: env("MEMORY_TOKEN_PATH", ""),
+		dir: env("SOURCE_DIR", ""), forgetSource: env("FORGET_SOURCE", ""),
 	}
 	required := map[string]string{"MEMORY_API_URL": c.memoryURL, "WORKSPACE_ID": c.workspace}
-	if c.dir == "" {
-		required["S3_BUCKET"] = c.bucket
+	if c.dir == "" && c.forgetSource == "" {
+		required["BLOB_ACCOUNT_URL"] = c.blobAccountURL
+		required["BLOB_CONTAINER"] = c.blobContainer
 	}
 	for name, value := range required {
 		if value == "" {
@@ -132,51 +126,6 @@ func loadConfig() (config, error) {
 		}
 	}
 	return c, nil
-}
-
-func sync(ctx context.Context, store objectStore, cfg config, client *http.Client, log *slog.Logger) error {
-	var n tally
-	present := &manifest{Kind: "document", Keys: []string{}}
-	batch := make([]document, 0, batchSize)
-	var continuation *string
-	for {
-		page, err := store.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-			Bucket: aws.String(cfg.bucket), Prefix: aws.String(cfg.prefix), ContinuationToken: continuation,
-		})
-		if err != nil {
-			return fmt.Errorf("list S3 objects: %w", err)
-		}
-		for _, object := range page.Contents {
-			key := aws.ToString(object.Key)
-			if hidden(strings.TrimPrefix(key, cfg.prefix)) {
-				continue // not part of the source; see hidden
-			}
-			url := "s3://" + cfg.bucket + "/" + key
-			present.Keys = append(present.Keys, url)
-			doc, err := read(ctx, store, cfg.bucket, key, object.LastModified)
-			if err != nil {
-				log.Warn("skip object", "key", key, "error", err)
-				continue
-			}
-			batch = append(batch, doc)
-			if len(batch) == batchSize {
-				if err := post(ctx, client, cfg, batch, nil, &n); err != nil {
-					return err
-				}
-				batch = batch[:0]
-			}
-		}
-		if !aws.ToBool(page.IsTruncated) || page.NextContinuationToken == nil {
-			break
-		}
-		continuation = page.NextContinuationToken
-	}
-	if err := post(ctx, client, cfg, batch, present, &n); err != nil {
-		return err
-	}
-	log.Info("sync complete", "bucket", cfg.bucket, "prefix", cfg.prefix, "documents", len(present.Keys),
-		"accepted", n.accepted, "skipped", n.skipped, "forgotten", n.forgotten, "embedding_backlog", n.backlog)
-	return nil
 }
 
 // syncDir ingests every text-like file directly in cfg.dir, then sends the
@@ -196,7 +145,7 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 		if strings.HasPrefix(name, ".") || entry.IsDir() || !textLike(name) {
 			continue
 		}
-		// In the manifest before it is read, as the S3 path does: a file that
+		// In the manifest before it is read, as syncBlob does: a file that
 		// fails to read this time is skipped, but memory-api keeps the copy it
 		// already holds rather than forgetting it.
 		url := "file://" + cfg.source + "/" + name
@@ -225,30 +174,6 @@ func syncDir(ctx context.Context, cfg config, client *http.Client, log *slog.Log
 	log.Info("sync complete", "dir", cfg.dir, "documents", len(present.Keys),
 		"accepted", n.accepted, "skipped", n.skipped, "forgotten", n.forgotten, "embedding_backlog", n.backlog)
 	return nil
-}
-
-func read(ctx context.Context, store objectStore, bucket, key string, modified *time.Time) (document, error) {
-	if !textLike(key) {
-		return document{}, fmt.Errorf("unsupported file type")
-	}
-	out, err := store.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(bucket), Key: aws.String(key)})
-	if err != nil {
-		return document{}, fmt.Errorf("get object: %w", err)
-	}
-	defer func() { _ = out.Body.Close() }()
-	body, err := io.ReadAll(io.LimitReader(out.Body, maxObjectBytes+1))
-	if err != nil {
-		return document{}, fmt.Errorf("read object: %w", err)
-	}
-	if len(body) > maxObjectBytes {
-		return document{}, fmt.Errorf("object exceeds %d-byte limit", maxObjectBytes)
-	}
-	hash := sha256.Sum256(body)
-	doc := document{Title: filepath.Base(key), URL: "s3://" + bucket + "/" + key, Site: "s3://" + bucket, Text: string(body), ContentHash: "sha256:" + hex.EncodeToString(hash[:])}
-	if modified != nil {
-		doc.ModifiedAt = modified.UTC().Format(time.RFC3339)
-	}
-	return doc, nil
 }
 
 // post sends one batch and adds memory-api's counts to n. A network error, a
