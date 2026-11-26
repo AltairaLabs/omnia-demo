@@ -403,3 +403,161 @@ func TestMemoryRefusesAnEmptyDocumentsDirectory(t *testing.T) {
 		t.Errorf("must stop before looking at blobs: %v", log)
 	}
 }
+
+// memDocsNested is memDocs plus member-guidance/g.md, and dotfiles that are
+// not documents (.hidden, .git/x.md).
+func memDocsNested(t *testing.T) string {
+	t.Helper()
+	dir := memDocs(t)
+	for p, c := range map[string]string{
+		"member-guidance/g.md": "guide\n",
+		".hidden":              "x\n",
+		".git/x.md":            "x\n",
+	} {
+		full := filepath.Join(dir, "mem-a", p)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(full, []byte(c), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+func memNestedFixtures() map[string]string {
+	fx := memFixtures()
+	fx["*storage_blob_show*_-n_member-guidance_g.md_*"] = md5b64("guide\n")
+	fx["*storage_blob_list*"] = "a.md\nb.md\nmember-guidance/g.md"
+	return fx
+}
+
+func TestMemoryUploadsANestedFileUnderItsFolder(t *testing.T) {
+	fx := memNestedFixtures()
+	fx["*storage_blob_show*_-n_member-guidance_g.md_*"] = "stale"
+	log, out, err := runScript(t, memScript, memEnv(memDocsNested(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertContexts(t, log, testCtx, testSub)
+	if count(log, "storage blob upload") != 1 ||
+		count(log, "storage blob upload", "-c "+memContainer, "-n member-guidance/g.md ", "--content-md5 "+md5b64("guide\n")) != 1 {
+		t.Errorf("want one upload of member-guidance/g.md: %v", log)
+	}
+	if count(log, "storage blob delete") != 0 {
+		t.Errorf("a listed nested blob with a file must not be deleted: %v", log)
+	}
+}
+
+func TestMemoryNestedUnchangedWritesNothing(t *testing.T) {
+	log, out, err := runScript(t, memScript, memEnv(memDocsNested(t), nil), memNestedFixtures())
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertNoWrites(t, log)
+	// a.md, b.md and the nested one are checked; the dotfiles are not documents.
+	if n := count(log, "storage blob show"); n != 3 {
+		t.Errorf("want a hash check per document (3), got %d: %v", n, log)
+	}
+}
+
+func TestMemoryDeletesANestedBlobWithNoFile(t *testing.T) {
+	fx := memNestedFixtures()
+	fx["*storage_blob_list*"] = "a.md\nb.md\nmember-guidance/g.md\nmember-guidance/gone.md"
+	log, out, err := runScript(t, memScript, memEnv(memDocsNested(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "storage blob delete") != 1 || count(log, "storage blob delete", "-n member-guidance/gone.md") != 1 {
+		t.Errorf("want one delete of member-guidance/gone.md: %v", log)
+	}
+}
+
+func TestMemoryRefusesADirectoryHoldingOnlyDotfiles(t *testing.T) {
+	docs := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(docs, "mem-a", ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(docs, "mem-a", ".git", "x.md"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	log, out, err := runScript(t, memScript, memEnv(docs, nil), memFixtures())
+	if exitCode(err) != 1 || !strings.Contains(out, "no documents in") {
+		t.Fatalf("want exit 1, got %v (%s)", err, out)
+	}
+	assertNoWrites(t, log)
+}
+
+const publishScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ../../hack/publish-document.sh "$DOC" mem-a member-guidance/
+`
+
+func publishDoc(t *testing.T) string {
+	t.Helper()
+	p := filepath.Join(t.TempDir(), "flood-claims.md")
+	if err := os.WriteFile(p, []byte("flood\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestPublishDocumentUploadsToTheFolderAndStartsARun(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t)}, nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertContexts(t, log, testCtx, testSub)
+	if count(log, "storage blob upload", "--auth-mode login", "--account-name stdocs", "-c "+memContainer,
+		"-n member-guidance/flood-claims.md ", "--overwrite", "--content-md5 "+md5b64("flood\n"), "--content-type text/markdown") != 1 {
+		t.Errorf("upload shape: %v", log)
+	}
+	if count(log, "kubectl", "-n mem-a ", "create job --from=cronjob/memory-ingest memory-ingest-publish-") != 1 {
+		t.Errorf("job create: %v", log)
+	}
+	// writesIn does not know "upload" as a write verb, so only the job counts.
+	if len(log) != 2 || len(writesIn(log)) != 1 {
+		t.Errorf("want exactly the upload and the job: %v", log)
+	}
+}
+
+func TestPublishDocumentHonoursKubeContext(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "KUBE_CONTEXT": "other-ctx"}, nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "kubectl --context other-ctx", "create job") != 1 {
+		t.Errorf("want the override context: %v", log)
+	}
+}
+
+func TestPublishDocumentDryRunWritesNothing(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "DRY_RUN": "1"}, nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertNoWrites(t, log)
+	for _, want := range []string{"DRY_RUN: az storage blob upload", "DRY_RUN: kubectl"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("dry-run output lacks %q: %s", want, out)
+		}
+	}
+}
+
+func TestPublishDocumentNeedsAMemoryBlock(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-min.yaml", "DOC": publishDoc(t)}, nil)
+	if exitCode(err) == 0 || !strings.Contains(out, "memory") {
+		t.Fatalf("want a failure naming the memory block, got %v (%s)", err, out)
+	}
+	if len(log) != 0 {
+		t.Errorf("want zero calls, got %v", log)
+	}
+}
+
+func TestPublishDocumentNeedsAFile(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": "/no/such/file.md"}, nil)
+	if exitCode(err) == 0 || !strings.Contains(out, "no such file") {
+		t.Fatalf("want a failure, got %v (%s)", err, out)
+	}
+	if len(log) != 0 {
+		t.Errorf("want zero calls, got %v", log)
+	}
+}

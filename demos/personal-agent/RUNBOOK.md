@@ -105,12 +105,14 @@ already has the demos you can skip what's done.
    make azure-memory
    ```
    The first run for a tenant grants its identity read access, which takes a
-   few minutes to apply: run `make azure-memory` again then. To add the flood
-   guidance, copy `demos/claims-triage/flood-claims.md` into
-   `memory-documents/larkmere-mutual/` first (uncommitted).
-   `larkmere-claims-desk` is meant to read only member-guidance documents;
-   the claims-handling rules in the same store are filtered out of what it
-   can read (see the known gap in the flood runbook).
+   few minutes to apply: run `make azure-memory` again then. To give the
+   claims desk its guidance, publish the flood document:
+   ```bash
+   hack/publish-document.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
+   ```
+   `larkmere-claims-desk` reads only documents under `member-guidance/`.
+   The claims-handling rules in the same store are filtered out of what it
+   can read.
 
 ## Checks before presenting
 
@@ -485,8 +487,8 @@ Between takes, close the conversations and clear the assistant's store.
 4. **Reload the page.** It loads `/api/conversations` first, then follows
    `/api/updates`.
 
-Reset Larkmere's guidance only if you changed it (remove your file from
-`memory-documents/larkmere-mutual/` and run `make azure-memory`, as in
+Reset Larkmere's guidance only if you changed it (`make azure-memory` restores the
+repo's documents and removes what `hack/publish-document.sh` added, as in
 Setup). Redis here is not persistent: if `demo-redis` itself restarts, every
 `pa:*` key goes with it, and the strip starts empty.
 

@@ -229,3 +229,37 @@ func TestAzblobStoreListsAndReads(t *testing.T) {
 		t.Errorf("body = %q", data)
 	}
 }
+
+// The claims agents' access filter keeps documents whose reference contains
+// /member-guidance/. A blob in that folder must therefore be listed (a flat
+// listing returns nested names) and carry a URL that contains it, in the
+// document and in the manifest, while a top-level blob does not.
+func TestSyncBlobNestedFolderURLMatchesTheMemberGuidanceFilter(t *testing.T) {
+	srv, got := recorder(t)
+	store := &fakeStore{blobs: []fakeBlob{
+		{info: blobInfo{Name: "member-guidance/flood-claims.md"}, body: "# flood"},
+		{info: blobInfo{Name: "claims-handling.md"}, body: "# rules"},
+	}}
+	cfg := config{memoryURL: srv.URL, workspace: "ws", source: "blob",
+		blobAccountURL: "https://acct.blob.core.windows.net", blobContainer: "larkmere-mutual-documents"}
+	if err := syncBlob(context.Background(), store, cfg, srv.Client(), quiet()); err != nil {
+		t.Fatalf("syncBlob: %v", err)
+	}
+	req := (*got)[0]
+	const want = "https://acct.blob.core.windows.net/larkmere-mutual-documents/member-guidance/flood-claims.md"
+	var matched []string
+	for _, d := range req.Documents {
+		if strings.Contains(d.URL, "/member-guidance/") {
+			matched = append(matched, d.URL)
+		}
+	}
+	if len(matched) != 1 || matched[0] != want {
+		t.Errorf("documents matching the filter = %v, want [%s]", matched, want)
+	}
+	if req.Present == nil || len(req.Present.Keys) != 2 {
+		t.Fatalf("present = %+v", req.Present)
+	}
+	if !strings.Contains(strings.Join(req.Present.Keys, " "), want) {
+		t.Errorf("manifest lacks %s: %v", want, req.Present.Keys)
+	}
+}

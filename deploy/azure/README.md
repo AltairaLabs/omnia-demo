@@ -79,8 +79,8 @@ Jobs, so the context needs rights to do that and to read AgentRuntimes.
    and `make demos` first, which installs the CronJob). For each tenant whose
    profile sets `memory.enabled`, it creates the private container
    `<tenant>-documents` in `memory.storageAccount`, uploads
-   `memory-documents/<tenant>/` (only files whose MD5 changed, and it deletes
-   blobs with no file), grants the tenant identity `Storage Blob Data Reader`
+   `memory-documents/<tenant>/` (subfolders become blob folders; only files
+   whose MD5 changed, and it deletes blobs with no file), grants the tenant identity `Storage Blob Data Reader`
    on that container, and starts a first run of the `memory-ingest` CronJob when
    it has never run. **A new grant needs a few minutes** to apply, so that
    first run is not started then: run `make azure-memory` again. Edit a

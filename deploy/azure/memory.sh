@@ -8,7 +8,8 @@
 #
 # Which tenants get a container is read from the profiles in this repo
 # (profiles/azure/<tenant>.yaml, memory.enabled: true), never from the cluster.
-# Their documents are memory-documents/<tenant>/. A site.yaml without a `memory`
+# Their documents are memory-documents/<tenant>/, subfolders included: a blob's
+# name is the file's path under that directory (member-guidance/x.md). A site.yaml without a `memory`
 # block turns memory off: this script then does nothing.
 #
 # Access is Entra ID only (--auth-mode login). No account key, connection
@@ -62,6 +63,14 @@ fi
 # Principal ids, read now so a missing identity or documents directory stops
 # the script before any write. (${#tenants[@]} guards: an empty array trips
 # set -u on bash 3.2.)
+#
+# list_docs <dir>: the documents under dir, one path relative to dir per line
+# (member-guidance/x.md). A blob's name is that relative path. Dotfiles and
+# anything under a dot-directory are not documents.
+list_docs() {
+  (cd "$1" && find . -type f ! -name '.*' ! -path '*/.*' | sed 's|^\./||' | sort)
+}
+
 principals=()
 for ((i = 0; i < ${#tenants[@]}; i++)); do
   t="${tenants[$i]}"
@@ -72,9 +81,9 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
   # An empty documents directory (or a wrong DOCS_DIR) would make every blob
   # look removed and delete them all: refuse before any write.
   nfiles=0
-  for f in "$docs/$t"/*; do
-    [ -f "$f" ] && nfiles=$((nfiles + 1))
-  done
+  while IFS= read -r f; do
+    [ -n "$f" ] && nfiles=$((nfiles + 1))
+  done < <(list_docs "$docs/$t")
   if [ "$nfiles" -eq 0 ]; then
     echo "no documents in $docs/$t: refusing to seed (it would delete every blob in $t-documents)" >&2
     exit 1
@@ -129,10 +138,14 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
     fi
   fi
 
-  # Uploads: only what differs.
-  for file in "$docs/$t"/*; do
-    [ -f "$file" ] || continue
-    name="$(basename "$file")"
+  # Uploads: only what differs. The names are read into an array first so no
+  # az call can swallow the list from stdin.
+  names=()
+  while IFS= read -r name; do
+    [ -n "$name" ] && names+=("$name")
+  done < <(list_docs "$docs/$t")
+  for name in "${names[@]}"; do
+    file="$docs/$t/$name"
     want="$(md5_b64 "$file")"
     if have="$(azm storage blob show --auth-mode login --account-name "$acct" -c "$c" -n "$name" \
       --query properties.contentSettings.contentMd5 -o tsv 2>"$errf")"; then
@@ -160,7 +173,7 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
       [ -n "$name" ] || continue
       if [ ! -f "$docs/$t/$name" ]; then
         echo "==> deleting $c/$name (no such document)"
-        run azm storage blob delete --auth-mode login --account-name "$acct" -c "$c" -n "$name"
+        run azm storage blob delete --auth-mode login --account-name "$acct" -c "$c" -n "$name" </dev/null
         did=1
       fi
     done <<<"$listed"

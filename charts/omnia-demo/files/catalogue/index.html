@@ -245,9 +245,8 @@ make canary-reset       # afterwards</pre></li>
           <li><b>Before.</b> <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>, with <code>{"claim_ref": "LM-40751", "peril": "Flood"}</code>. £420 is within the £500 limit, so it's <b>SETTLED</b>. Reset the claims system.</li>
           <li><b>The rule.</b> Turn on CP-7, every flood claim goes to Flood Response, as a ToolPolicy rule:
 <pre>helm --kube-context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
-          <li><b>The guidance</b>, what a flooded member needs to know. Add it to Larkmere's documents and seed them (this uploads the new file and starts an ingest run), then reset the claims system again:
-<pre>cp demos/claims-triage/flood-claims.md memory-documents/larkmere-mutual/
-make azure-memory
+          <li><b>The guidance</b>, what a flooded member needs to know. Publish it to Larkmere's document store, as an editor would (this uploads it to the <code>member-guidance</code> folder and starts an ingest run), then reset the claims system again. <code>make azure-memory</code> is the reset: it restores the repo's documents and removes the published one.
+<pre>hack/publish-document.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
 kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
             Wait about 25 seconds after it reports ready: the claims system's peril classifier answers 503 for a while after a restart, and the policy then refuses the call (fail-closed) instead of applying CP-7.</li>
           <li><b>After.</b> Run the same test. The settlement is refused (<code>deny-flood-settlement</code>), the claim is referred to Flood Response, and the note tells the member the team will contact them within one working day. Show the session's system prompt: the flood guidance is under "The society's guidance".</li>

@@ -40,15 +40,14 @@ memory through retrieval).
    larkmere-mutual get toolpolicy claims-triage-policy -o yaml`): it asks the
    claims system for the claim's peril and refuses a payment on a flood claim.
    A policy change takes effect on the next invocation.
-4. **Add the guidance.** Add it to Larkmere's documents and seed them. `make
-   azure-memory` uploads the new file to the tenant's Blob container and
-   starts an ingest run (an upgrade does not touch the documents):
+4. **Add the guidance.** Publish it to Larkmere's document store, as an editor
+   would. The script uploads it to `larkmere-mutual-documents/member-guidance/`
+   and starts an ingest run (an upgrade does not touch the documents):
    ```bash
-   cp demos/claims-triage/flood-claims.md memory-documents/larkmere-mutual/
-   make azure-memory
+   hack/publish-document.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
    ```
-   Leave the copy uncommitted. The assessor's retrieval keeps only
-   member-guidance documents (see Setup).
+   It must go under `member-guidance/`: the assessor's retrieval keeps only
+   that folder (see Setup).
    Restart `claims-systems` too, as in step 2.
 5. **After.** Invoke again. The assessor tries to settle; the broker refuses
    with `deny-flood-settlement`; the assessor refers the claim, and the claims
@@ -64,10 +63,10 @@ flood claims on its own, because retrieval searches on the claim reference and
 peril and returns passages, not the document: a section that says only "the
 team contacts the member" is not found.
 
-Put it back after: `--set claimsTriage.floodRule=false`, delete
-`memory-documents/larkmere-mutual/flood-claims.md` and run `make azure-memory`
-(a blob with no file behind it is deleted, and the next ingest run forgets the
-document), and restart `claims-systems`.
+Put it back after: `--set claimsTriage.floodRule=false`, run `make
+azure-memory` (it restores the repo's documents and deletes the published
+one, which has no file in `memory-documents/`; it starts an ingest run, which
+forgets the document), and restart `claims-systems`.
 
 ## Setup already in place
 
@@ -84,10 +83,5 @@ document), and restart `claims-systems`.
   (`memory-documents/larkmere-mutual/`), seeded into the tenant's private Blob
   container by `make azure-memory` and ingested by the hourly `memory-ingest`
   CronJob. None of them covers flood.
-- **Known gap.** The assessor's access filter matches a `/member-guidance/`
-  path in the document's `source_ref`, but the container holds the documents
-  flat (`make azure-memory` uploads files by name, with no folders), so no
-  document matches it. Until the filter or the layout is changed, the assessor
-  retrieves no guidance.
 - The flood claim `LM-40751` in the claims stub, and its `/policy/claim-peril`
   lookup for the policy.

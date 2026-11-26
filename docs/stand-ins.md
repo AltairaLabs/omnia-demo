@@ -390,9 +390,14 @@ what sits behind and beside it.
     Reader` on its own container only, granted by the same script. A real
     company grants its connector read on its source. A new grant takes a few
     minutes to apply, so the first run waits for a second `make azure-memory`.
-  - **The container is flat.** Documents are identified by blob name, with no
-    folders. Anything that filters by a path in the document's reference (the
-    claims desk's member-guidance filter) sees no folder.
+  - **A document's folder is part of its identity.** Subfolders of
+    `memory-documents/<tenant>/` become blob folders, and the document's URL
+    carries them. The claims agents' access filter reads a `/member-guidance/`
+    folder in that URL.
+  - **Publishing is a script.** `hack/publish-document.sh` stands in for an
+    editor adding a document to the company's store: it uploads one file to a
+    folder and starts an ingest run. The file is not in the repo, so the next
+    `make azure-memory` removes it, and the next ingest run forgets it.
   - **Ingestion is hourly, not live.** A change in the source reaches memory
     on the next run; `make azure-memory` starts one at once.
   - **An empty container forgets everything.** The connector's list of what
