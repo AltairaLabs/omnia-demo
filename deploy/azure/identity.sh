@@ -45,6 +45,25 @@ have="$("${AZ[@]}" identity federated-credential list -g "$rg" --identity-name "
 # succeeds and is empty is real, and prunes all of them.
 agents="$("${KUBECTL[@]}" -n "$tenant" get agentruntime -o jsonpath='{range .items[*]}{.metadata.name}-facade{" "}{end}')"
 
+# Prune first: an agent's credential outlives the agent (dev agents, deleted
+# projects), and an identity holds at most 20 federated credentials, so stale
+# ones must go before new ones are created or a full identity could never
+# recover. Remove each *-facade subject in this tenant's namespace whose
+# AgentRuntime is gone; the fixed SAs below, and subjects of any other
+# namespace, are never touched.
+sa_prefix="system:serviceaccount:$tenant:"
+for subject in $have; do
+  case "$subject" in "$sa_prefix"*) ;; *) continue ;; esac
+  sa="${subject#"$sa_prefix"}"
+  case "$sa" in *-facade) ;; *) continue ;; esac
+  case " $agents " in *" $sa "*) continue ;; esac
+  name="$("${AZ[@]}" identity federated-credential list -g "$rg" --identity-name "$mi" \
+    --query "[?subject=='$subject'].name | [0]" -o tsv)"
+  echo "==> pruning $subject (no AgentRuntime ${sa%-facade})"
+  run "${AZ[@]}" identity federated-credential delete -g "$rg" --identity-name "$mi" \
+    --name "$name" --yes --output none
+done
+
 # eval-worker: the SA the eval worker of a tenant runs as, so an llm_judge
 # reaches Foundry keylessly. A credential for an SA that is not there is inert.
 # omnia-identity-foundry: the Workspace cloud identity (Omnia #4052); the
@@ -59,21 +78,6 @@ for sa in arena-worker eval-worker "memory-$tenant-default" "privacy-$tenant" om
   run "${AZ[@]}" identity federated-credential create -g "$rg" --identity-name "$mi" \
     --name "$tenant-$sa" --issuer "$issuer" --subject "$subject" \
     --audience api://AzureADTokenExchange --output none
-done
-
-# Prune: an agent's credential outlives the agent (dev agents, deleted
-# projects), and an identity holds at most 20 federated credentials. Remove
-# each *-facade subject whose AgentRuntime is gone; the fixed SAs above are
-# never touched.
-for subject in $have; do
-  sa="${subject##*:}"
-  case "$sa" in *-facade) ;; *) continue ;; esac
-  case " $agents " in *" $sa "*) continue ;; esac
-  name="$("${AZ[@]}" identity federated-credential list -g "$rg" --identity-name "$mi" \
-    --query "[?subject=='$subject'].name | [0]" -o tsv)"
-  echo "==> pruning $subject (no AgentRuntime ${sa%-facade})"
-  run "${AZ[@]}" identity federated-credential delete -g "$rg" --identity-name "$mi" \
-    --name "$name" --yes --output none
 done
 
 # memory-api is not an agent: its operator-made SA needs the annotation. No SA

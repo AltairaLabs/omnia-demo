@@ -83,6 +83,38 @@ func TestIdentityPrunesOnlyGoneFacades(t *testing.T) {
 	}
 }
 
+func TestIdentityPrunesBeforeCreating(t *testing.T) {
+	log, out, err := runScript(t, identityScript, identityEnv(nil),
+		identityFixtures(subjects("gone-facade"), "a-facade ", "cid-1"))
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	del, firstCreate := -1, -1
+	for i, l := range log {
+		if del < 0 && strings.Contains(l, "federated-credential delete") {
+			del = i
+		}
+		if firstCreate < 0 && strings.Contains(l, "federated-credential create") {
+			firstCreate = i
+		}
+	}
+	if del < 0 || firstCreate < 0 || del > firstCreate {
+		t.Errorf("delete (%d) must precede the first create (%d): %v", del, firstCreate, log)
+	}
+}
+
+func TestIdentityPruneIgnoresForeignAndNonFacadeSubjects(t *testing.T) {
+	have := "system:serviceaccount:other-ns:x-facade\n" + subjects("foo-bar")
+	log, out, err := runScript(t, identityScript, identityEnv(nil),
+		identityFixtures(have, "", "cid-1"))
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "federated-credential delete") != 0 {
+		t.Errorf("deleted a subject it does not own: %v", log)
+	}
+}
+
 func TestIdentityEmptyAgentListPrunesFacades(t *testing.T) {
 	// A successful, empty list is real: every *-facade credential goes.
 	log, out, err := runScript(t, identityScript, identityEnv(nil),
