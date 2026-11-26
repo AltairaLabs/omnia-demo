@@ -1,0 +1,150 @@
+# Describes YOUR Omnia-on-AKS install. Copy to site.yaml (gitignored) and fill
+# in. Everything here is a placeholder; commit no real tenant values.
+
+# Azure subscription holding the identities and the AKS cluster.
+subscription: 00000000-0000-0000-0000-000000000000
+# Azure region for the identities.
+location: westeurope
+# Resource group the per-tenant managed identities are created in.
+identityResourceGroup: rg-omnia-identities
+# Identities are named <prefix>-<tenant>, e.g. mi-omnia-demo-larkmere-mutual.
+identityNamePrefix: mi-omnia-demo
+
+aks:
+  # Resource group of the AKS cluster.
+  resourceGroup: rg-omnia
+  # AKS cluster name (its OIDC issuer is read from it).
+  name: aks-omnia
+  # kubeconfig context for the cluster; every kubectl/helm call names it.
+  kubeContext: aks-omnia
+
+postgres:
+  # Postgres server host the tenants' databases live on.
+  host: omnia-pg.postgres.database.azure.com
+  # Admin login used to create databases and roles.
+  adminLogin: pgadmin
+  # Admin password: either an External Secrets store and key ...
+  adminPassword:
+    externalSecret:
+      clusterSecretStore: azure-keyvault
+      key: postgres-admin-password
+    # ... or a plain Secret (use one form, not both).
+    # secret:
+    #   namespace: omnia
+    #   name: postgres-admin
+    #   key: password
+
+foundry:
+  # Azure AI Foundry (OpenAI) endpoint.
+  endpoint: https://example-foundry.openai.azure.com
+  # Resource ID of the Foundry account, for the role assignment.
+  accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/example-foundry
+  # Region of the account.
+  region: swedencentral
+  # Providers to create in every tenant.
+  providers:
+    - name: gpt-4o
+      role: chat
+      model: gpt-4o
+      default: true
+
+# Optional: remove the whole block when the demos need no voice.
+voice:
+  # Speech endpoint.
+  endpoint: https://example-voice.cognitiveservices.azure.com
+  # Resource ID of the speech account.
+  accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/example-voice
+  # Region of the account.
+  region: swedencentral
+  # Voice Providers to create in every tenant.
+  providers:
+    - name: voice
+      role: tts
+      model: neural
+
+# Optional: remove the whole block when tenants need no shared content volume.
+nfs:
+  # Storage account holding the NFS share.
+  storageAccount: stomniademo
+  # Name of the NFS share.
+  shareName: content
+  # StorageClass the PV uses.
+  storageClass: azurefile-nfs
+  # Size requested for the volume.
+  size: 10Gi
+  # Name of the root claim each tenant mounts.
+  rootClaim: content-root
+
+dns:
+  # Subscription of the DNS zone (may differ from the main one).
+  subscription: 00000000-0000-0000-0000-000000000000
+  # Resource group of the DNS zone.
+  resourceGroup: rg-dns
+  # The demo domain; Poppy and portal hosts are built from it.
+  zone: demo.example.com
+  # Public IP of the gateway, as an address ...
+  gatewayIP: 203.0.113.10
+  # ... or the name of a public IP resource to read it from (use one form).
+  # gatewayPublicIP:
+  #   resourceGroup: rg-omnia
+  #   name: pip-gateway
+
+gateway:
+  # Gateway the demo's HTTPRoutes attach to.
+  name: omnia
+  # Namespace of that Gateway.
+  namespace: omnia
+  # Listener (sectionName) on that Gateway.
+  sectionName: https
+
+# Host the Omnia dashboard is served on; the catalogue is served beside it.
+dashboardHost: dashboard.demo.example.com
+
+omnia:
+  # Namespace Omnia is installed in.
+  namespace: omnia
+  # Where Omnia's values sit in your install: "" for Omnia's chart itself,
+  # or e.g. "omnia" for an umbrella chart.
+  valuesRoot: ""
+
+keyVault:
+  # Key Vault holding the Poppy account tools' key.
+  name: kv-omnia-demo
+  # Resource group of that vault.
+  resourceGroup: rg-omnia
+
+# Entra group IDs bound `owner` on every tenant Workspace.
+ownerGroups:
+  - 00000000-0000-0000-0000-000000000001
+
+poppy:
+  upstream:
+    # OpenID Connect issuer of the upstream sign-in provider.
+    issuer: https://idp.example.com/
+  companies:
+    larkmere-mutual:
+      # OAuth client ID registered with the upstream for this Company.
+      clientID: placeholder-client-id
+      # Name of the Secret holding that client's secret.
+      clientSecretName: larkmere-mutual-upstream
+    wrenmoor-energy:
+      clientID: placeholder-client-id
+      clientSecretName: wrenmoor-energy-upstream
+
+# Optional: needed only for `make images`.
+images:
+  # Registry name to build into (you bring it; omnia-demo never creates one).
+  registry: exampleregistry
+  # Registry login server.
+  loginServer: exampleregistry.azurecr.io
+  # Subscription the registry lives in.
+  subscription: 00000000-0000-0000-0000-000000000000
+
+# Optional: needed only for `make builder`.
+builder:
+  # Helm chart source for omnia-arena-builder.
+  chart: oci://registry.example.com/charts/omnia-arena-builder
+  # Chart version to install.
+  version: 0.0.0
+  # Optional sandbox image override.
+  sandboxImage: ""

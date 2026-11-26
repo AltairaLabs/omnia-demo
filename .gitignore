@@ -33,5 +33,8 @@ notes/
 # Compiled PromptPack JSON from markdown sources (generated during Helm chart build)
 **/*.compiled.json
 
+# Your Omnia install's inputs (deploy/azure/site.example.yaml is the template)
+deploy/azure/site.yaml
+
 # The last `make images` dev build (Makefile)
 .images.env
