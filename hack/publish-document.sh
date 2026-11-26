@@ -40,25 +40,31 @@ if [ -n "$ctx" ]; then
   KUBECTL=(kubectl --context "$ctx")
 fi
 
-# The folder becomes part of a blob name, so it is checked before anything runs:
-# slashes at either end are dropped; then every segment must be non-empty, not
-# . or .., and made only of letters, digits, dot, underscore and hyphen.
+# Everything below becomes part of a container, namespace or blob name, so it
+# is checked, as whole strings, before anything runs. Slashes at either end of
+# the folder are dropped; each folder segment is letters, digits, dot,
+# underscore or hyphen, and is not . or ..; the tenant is lowercase letters,
+# digits and hyphens; the file's name is the same characters as a segment and
+# does not start with a dot.
 while [ "${folder#/}" != "$folder" ]; do folder="${folder#/}"; done
 while [ "${folder%/}" != "$folder" ]; do folder="${folder%/}"; done
-bad=0
-[ -n "$folder" ] || bad=1
-IFS=/ read -r -a segments <<<"$folder"
-if [ "$folder" != "${folder//\/\//}" ]; then bad=1; fi
-for seg in ${segments[@]+"${segments[@]}"}; do
-  case "$seg" in
-    "" | . | .. | *[!A-Za-z0-9._-]*) bad=1 ;;
-  esac
-done
-if [ "$bad" = 1 ]; then
+base="$(basename "$file")"
+seg_re='^[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*$'
+tenant_re='^[a-z0-9-]+$'
+base_re='^[A-Za-z0-9_-][A-Za-z0-9._-]*$'
+if ! [[ $folder =~ $seg_re ]] || [[ /$folder/ == */./* || /$folder/ == */../* ]]; then
   echo "invalid folder '${3}': use segments of letters, digits, '.', '_' and '-' separated by single '/', with no '.' or '..' segment" >&2
   exit 1
 fi
-name="$folder/$(basename "$file")"
+if ! [[ $tenant =~ $tenant_re ]]; then
+  echo "invalid tenant '$tenant': use lowercase letters, digits and '-'" >&2
+  exit 1
+fi
+if ! [[ $base =~ $base_re ]]; then
+  echo "invalid file name '$base': use letters, digits, '.', '_' and '-', not starting with '.'" >&2
+  exit 1
+fi
+name="$folder/$base"
 want="$(openssl dgst -md5 -binary "$file" | base64)"
 
 echo "==> publishing $file as $tenant-documents/$name"

@@ -596,3 +596,38 @@ func TestPublishDocumentAcceptsANestedFolder(t *testing.T) {
 		}
 	}
 }
+
+const publishArgsScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ../../hack/publish-document.sh "$DOC" "$TENANT" "$FOLDER"
+`
+
+func TestPublishDocumentRejectsUnsafeArguments(t *testing.T) {
+	named := func(name string) string {
+		p := filepath.Join(t.TempDir(), name)
+		if err := os.WriteFile(p, []byte("x\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return p
+	}
+	cases := map[string]struct{ doc, tenant, folder string }{
+		"newline folder":         {named("ok.md"), "mem-a", "a\n../b"},
+		"newline then ok folder": {named("ok.md"), "mem-a", "ok\nok"},
+		"tenant with slash":      {named("ok.md"), "mem-a/x", "f"},
+		"tenant uppercase":       {named("ok.md"), "Mem-A", "f"},
+		"empty tenant chars":     {named("ok.md"), "mem_a", "f"},
+		"basename with space":    {named("a b.md"), "mem-a", "f"},
+		"basename with newline":  {named("a\nb.md"), "mem-a", "f"},
+		"dot basename":           {named(".hidden.md"), "mem-a", "f"},
+	}
+	for name, c := range cases {
+		t.Run(name, func(t *testing.T) {
+			log, out, err := runScript(t, publishArgsScript, map[string]string{
+				"SITEFILE": "site-full.yaml", "DOC": c.doc, "TENANT": c.tenant, "FOLDER": c.folder}, nil)
+			if exitCode(err) != 1 {
+				t.Fatalf("want exit 1, got %v (%s)", err, out)
+			}
+			if len(log) != 0 {
+				t.Errorf("want zero calls, got %v", log)
+			}
+		})
+	}
+}
