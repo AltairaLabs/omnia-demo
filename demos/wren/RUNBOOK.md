@@ -13,7 +13,7 @@ click.
 Forward the site and open the customer portal:
 
 ```bash
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
 # http://localhost:8894/ui_kits/portal/
 ```
 
@@ -48,7 +48,7 @@ switched her she stays on Moor Flex, and the next take's "cheaper tariff?"
 answers differently. Put her back on Moor Steady:
 
 ```bash
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy rollout restart deploy/wren-account
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy rollout restart deploy/wren-account
 ```
 
 ## Gotchas

@@ -28,7 +28,7 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
 
 1. Show the budget, $0.005 a day, `block`. The dashboard shows it on the
    workspace in Topology, not on Costs; or show the Workspace:
-   `kubectl --context "$KUBE_CONTEXT" get workspace halvern-research -o jsonpath='{.spec.costControls}'`.
+   `kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace halvern-research -o jsonpath='{.spec.costControls}'`.
 2. Start the research run, the function on a schedule (ScheduledFunction
    `research-run`, every 30 seconds):
    ```bash

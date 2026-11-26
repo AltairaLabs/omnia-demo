@@ -47,7 +47,7 @@ history is card support's); the portal calls it the member assistant.
   card tools still act on the member the portal asserts: see Gotchas.
 - The portal, forwarded:
   ```bash
-  kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
+  kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
   ```
   and the dashboard at `https://<dashboardHost>` (your `site.yaml`).
 
@@ -275,7 +275,7 @@ What's in place:
   (PromptPack changes allowed, $2 per run, $10 per week).
 
 Before the first take on a new build, check the permit is there and fire a
-night (step 2): `kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get
+night (step 2): `kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual get
 toolpolicy dreaming-default-tools-permit`. The compiler
 (`deploy/dreaming-default-compiler`) should log no `Invalid schema for
 response_format`, and the night should compile scenarios (Dreams page).
@@ -286,7 +286,7 @@ On stage:
    session's eval is failed.
 2. Fire a night instead of waiting:
    ```
-   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual annotate scheduledfunction \
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual annotate scheduledfunction \
      dreaming-default omnia.altairalabs.ai/trigger-now="$(date -u +%FT%TZ)" --overwrite
    ```
 3. Knowledge → Dreams: the sessions studied (ids only), the scenarios
@@ -302,7 +302,7 @@ Checked live 2026-11-17:
 
 - **Raise its own budget.** As the arena controller:
   ```
-  kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual patch envelope larkmere-dreaming \
+  kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual patch envelope larkmere-dreaming \
     --type merge -p '{"spec":{"budget":{"perRunUSD":"500.00"}}}' \
     --as=system:serviceaccount:omnia:omnia-arena-controller --dry-run=server
   ```
@@ -350,9 +350,9 @@ card is still frozen. Unfreeze it afterwards, as under Before each take.
 
 **Find the session and the facade's log** (nothing here changes the cluster):
 ```bash
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get agentruntime card-line
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep -iE "session|disclosure"
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep "voice ai disclosure not delivered"
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual get agentruntime card-line
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep -iE "session|disclosure"
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/card-line --all-containers --since=15m | grep "voice ai disclosure not delivered"
 ```
 If the last line matches, the disclosure did not play: the call went ahead
 without it, so don't show the call. A tool refused with 401 means the call
@@ -409,7 +409,7 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
   2. memory-api's `memory write suppressed` log line, with the reason and
      category but never the content:
      ```bash
-     kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs -l app.kubernetes.io/component=memory-api --tail=-1 --since=30m | grep "memory write suppressed"
+     kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs -l app.kubernetes.io/component=memory-api --tail=-1 --since=30m | grep "memory write suppressed"
      ```
      `--tail=-1` matters: with `-l`, kubectl returns only the last 10 lines of
      each pod.

@@ -42,7 +42,7 @@ already has the demos you can skip what's done.
    ```bash
    make omnia-values
    make azure-poppy
-   kubectl --context "$KUBE_CONTEXT" -n omnia get certificate omnia-dashboard-tls
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n omnia get certificate omnia-dashboard-tls
    ```
    Substitute your certificate's name and namespace in the last command. It
    must be `READY True` and list all five names as SANs: `larkmere`,
@@ -128,15 +128,15 @@ these is a routing or certificate problem, not an agent one.
 
 ```bash
 # The Workspaces publish their Companies: True, PoppyDiscoveryPublished.
-kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
-kubectl --context "$KUBE_CONTEXT" get workspace wrenmoor-energy -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace wrenmoor-energy -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
 
 # Each Company Agent serves: True.
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get agentruntime wrenmoor-outages -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy get agentruntime wrenmoor-outages -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
 
 # The assistant's side is up.
-kubectl --context "$KUBE_CONTEXT" -n ellens-assistant get pods
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant get pods
 ```
 
 In `ellens-assistant` you should see `assistant`, `personal-agent` and
@@ -157,14 +157,14 @@ Two checks, each a few seconds:
 # Wrenmoor's outage route, from inside wrenmoor-energy. A 404 means the wren
 # image (pinned in profiles/azure/common.yaml) predates /wren/outage-status:
 # wrenmoor-outages would have no outage to report.
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy run outage-check --rm -i --restart=Never \
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy run outage-check --rm -i --restart=Never \
   --image=curlimages/curl:8.11.1 -- curl -sS -X POST -H 'Content-Type: application/json' \
   -d '{"postcode":"HX7 6QA"}' -w '\n%{http_code}\n' http://wren-account.wrenmoor-energy:8080/wren/outage-status
 
 # After the Reset: the assistant's store is empty. personal-agent's
 # NetworkPolicy admits only the assistant and its page, so go through a
 # port-forward, which it does not filter.
-kubectl --context "$KUBE_CONTEXT" -n ellens-assistant port-forward deploy/personal-agent 18080:8080 &
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant port-forward deploy/personal-agent 18080:8080 &
 curl -s http://localhost:18080/api/conversations   # []
 kill %1
 ```
@@ -279,7 +279,7 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    ```bash
    dig +short auth.larkmere.<zone>
    dig +short auth.wrenmoor.<zone>
-   kubectl --context "$KUBE_CONTEXT" -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
    ```
    Both names must resolve to the omnia-external gateway's address and appear
    in `dnsNames`, and the certificate must be `READY True`. If either is
@@ -300,7 +300,7 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    presenter keeps. Each application's secret goes in a Secret in its
    Company's namespace, under `clientSecret`, never in a values file:
    ```bash
-   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual create secret generic larkmere-gateway-upstream \
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual create secret generic larkmere-gateway-upstream \
      --from-literal=clientSecret=<the Auth0 application's client secret>
    ```
    Do the same in `wrenmoor-energy` (`wrenmoor-gateway-upstream`).
@@ -313,9 +313,9 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `clientSecret`, with the label privacy-api requires:
    ```bash
    openssl rand -base64 48 > /tmp/larkmere-exchange-secret
-   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual create secret generic larkmere-exchange-client \
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual create secret generic larkmere-exchange-client \
      --from-file=clientSecret=/tmp/larkmere-exchange-secret
-   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual label secret larkmere-exchange-client \
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual label secret larkmere-exchange-client \
      omnia.altairalabs.ai/token-exchange-client-secret=true
    rm /tmp/larkmere-exchange-secret
    ```
@@ -341,7 +341,7 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `personal-agent-token-key`. It is made in milestone 1 Setup step 4; check
    it exists:
    ```bash
-   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant get secret personal-agent-token-key
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant get secret personal-agent-token-key
    ```
 7. **Turn sign-in on.** Set `poppy.auth.enabled: true` and
    `poppy.auth.gateway.enabled: true` in `profiles/azure/larkmere-mutual.yaml`
@@ -355,22 +355,22 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `wrenmoor-energy`, `wrenmoor-outages`, `wrenmoor.<zone>`):
    ```bash
    # The gateway is configured and its upstream answers: True, PoppyIssuerGatewayReady.
-   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuerGateway")]}'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuerGateway")]}'
 
    # The gateway's metadata, through the issuer route.
    curl -s https://auth.larkmere.<zone>/.well-known/oauth-authorization-server
 
    # The gateway is the issuer and verified: True, PoppyIssuerVerified.
-   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuer")]}'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuer")]}'
 
    # The issuer switch has published.
-   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.poppy.companies[*].switch.phase}'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace larkmere-mutual -o jsonpath='{.status.poppy.companies[*].switch.phase}'
 
    # The resource metadata names the gateway.
    curl -s https://larkmere.<zone>/.well-known/oauth-protected-resource
 
    # The facade is not refusing on-behalf-of tools (not PoppyOnBehalfNeedsEnterprise).
-   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
    ```
    The phase should reach `Published`, and the metadata should name
    `https://auth.larkmere.<zone>`.
@@ -406,10 +406,10 @@ Check, after a take:
 
 ```bash
 # Larkmere acted as Ellen: status=200 and her email.
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/claims-systems | grep 'tool=claim_add_item'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/claims-systems | grep 'tool=claim_add_item'
 
 # No token anywhere in the logs: this prints nothing.
-kubectl --context "$KUBE_CONTEXT" -n ellens-assistant logs deploy/personal-agent | grep -i -E 'bearer|eyJ'
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant logs deploy/personal-agent | grep -i -E 'bearer|eyJ'
 ```
 
 On the dashboard, Larkmere's session carries a `poppy-account:` tag, and the
@@ -462,7 +462,7 @@ Between takes, close the conversations and clear the assistant's store.
 2. **Clear the assistant's keys in the shared Redis** (`pa:*`: its
    conversations, events and User IDs):
    ```bash
-   kubectl --context "$KUBE_CONTEXT" -n omnia exec deploy/demo-redis -- sh -c "redis-cli --scan --pattern 'pa:*' | xargs -r redis-cli del"
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n omnia exec deploy/demo-redis -- sh -c "redis-cli --scan --pattern 'pa:*' | xargs -r redis-cli del"
    ```
    Clearing the User IDs is safe: the assistant makes new ones, and each
    company then sees a new User. It leaves the companies' own keys
@@ -470,8 +470,8 @@ Between takes, close the conversations and clear the assistant's store.
 3. **Restart personal-agent**, so no Reader is still following a conversation
    you deleted, and the page starts empty:
    ```bash
-   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant rollout restart deploy/personal-agent
-   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant rollout status deploy/personal-agent
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant rollout restart deploy/personal-agent
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant rollout status deploy/personal-agent
    ```
    Also restart it after replacing the keys (`--force`), after a clock
    correction, or when the strip shows a conversation that isn't there. On
@@ -490,8 +490,8 @@ Setup). Redis here is not persistent: if `demo-redis` itself restarts, every
 First look at the company's facade, which says why it refused:
 
 ```bash
-kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/larkmere-claims-desk -c facade --since=10m
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/wrenmoor-outages -c facade --since=10m
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/larkmere-claims-desk -c facade --since=10m
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy logs deploy/wrenmoor-outages -c facade --since=10m
 ```
 
 After a good take, `| grep -i 'refus\|invalid_session'` on either prints
@@ -519,7 +519,7 @@ nothing.
     key id.
 - **`PoppyDiscovery` is False on a Workspace.** Read the reason and message:
   ```bash
-  kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+  kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
   ```
   - `PoppyNothingToPublish`: no Company Agent has a ready poppy facade yet.
     Check `PoppyFacade` on the agent (below). A Workspace with the Company
@@ -549,7 +549,7 @@ nothing.
   for instance when the company asked for something the assistant can't do
   (sign-in when it is off, or after a refused refresh). The conversation's record says why:
   ```bash
-  kubectl --context "$KUBE_CONTEXT" -n ellens-assistant logs deploy/personal-agent --since=10m
+  kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n ellens-assistant logs deploy/personal-agent --since=10m
   ```
   A stopped conversation isn't resumed. Ask the assistant to start a new one
   with that company, or reset and take again.

@@ -27,9 +27,9 @@ The agent is an internal tool, so drive it from the dashboard console
    undone, and a human engineer must carry it out.
 3. Show the refusal was the policy's:
    ```bash
-   kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/incident-agent --all-containers --since=10m | grep broker_tool_decision
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy logs deploy/incident-agent --all-containers --since=10m | grep broker_tool_decision
    # delete_namespace allowed=false deniedBy=deny-irreversible-without-human
-   kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/wrenmoor-ops --since=10m | grep 'tool request'
+   kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy logs deploy/wrenmoor-ops --since=10m | grep 'tool request'
    # get_alerts, get_deploy_history, get_logs, rollback_deploy; no delete_namespace
    ```
 

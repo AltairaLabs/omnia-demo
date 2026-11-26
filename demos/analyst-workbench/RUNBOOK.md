@@ -51,12 +51,12 @@ minutes; the handler's timeout is 8m), the image pull and the VM boot. Then:
 
 ```bash
 # The sandbox pod: on a Kata node, out of the mesh.
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get pods \
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy get pods \
   -l app.kubernetes.io/component=sandbox,app.kubernetes.io/part-of=analyst-workbench \
   -o wide --show-labels
-kubectl --context "$KUBE_CONTEXT" get runtimeclass kata-vm-isolation
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get runtimeclass kata-vm-isolation
 # The class: Ready, the runtime family it resolved, NetworkPolicy proven.
-kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get sandboxclass analyst-sandbox -o yaml
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy get sandboxclass analyst-sandbox -o yaml
 ```
 
 Check:

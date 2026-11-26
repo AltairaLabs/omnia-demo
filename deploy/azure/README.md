@@ -38,10 +38,10 @@ ServiceAccounts they name and each AgentRuntime's `<name>-facade`.
 
 | Step | Azure calls | Right |
 | --- | --- | --- |
-| `azure-tenant` | `az identity create` in `identityResourceGroup`; `az role assignment create` of `Cognitive Services OpenAI User` on the Foundry (and speech) account | Managed Identity Contributor on the resource group; User Access Administrator (or Owner) on the Foundry and speech accounts |
+| `azure-tenant` | `az identity create` in `identityResourceGroup`; `az role assignment create` of `Cognitive Services OpenAI User` on the Foundry (and speech) account | Managed Identity Contributor on the resource group; Role Based Access Control Administrator on the Foundry and speech accounts (conditioned to assign only `Cognitive Services OpenAI User` if you like) |
 | `azure-identity` | `az aks show` (reads the OIDC issuer); `az identity federated-credential list/create/delete` | Reader on the cluster; Managed Identity Contributor on the identity resource group |
-| `azure-poppy` | `az network dns record-set a show/add-record/delete` in the zone (its subscription is `dns.subscription`); `az network public-ip show` if you name a public IP; `az keyvault show`; `az rest --method put` of the Key Vault key `omnia-connections` through ARM; `az role assignment create` of `Key Vault Crypto User` on that key | DNS Zone Contributor on the zone; Reader on the vault and public IP; Key Vault Contributor on the vault; User Access Administrator on the key |
-| `images` | `az acr build` | Contributor (or ACR Tasks rights) on the registry |
+| `azure-poppy` | `az network dns record-set a show/add-record/delete` in the zone (its subscription is `dns.subscription`); `az network public-ip show` if you name a public IP; `az keyvault show`; `az rest --method put` of the Key Vault key `omnia-connections` through ARM; `az role assignment create` of `Key Vault Crypto User` on that key | DNS Zone Contributor on the zone; Reader on the vault, the public IP and the identity resource group (it reads each tenant identity's principal); Key Vault Contributor on the vault; Role Based Access Control Administrator on the key (conditioned to assign only `Key Vault Crypto User` if you like) |
+| `images` | `az acr build` | Container Registry Tasks Contributor on the registry |
 
 In the cluster, `azure-tenant` and `make demos` run `helm upgrade --install`,
 which creates namespaces and the chart's Workspace, ServiceAccounts, Roles and

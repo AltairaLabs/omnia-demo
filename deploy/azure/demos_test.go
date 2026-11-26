@@ -2,11 +2,16 @@ package azure
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 var demoTenants = []string{"larkmere-mutual", "wrenmoor-energy", "ellens-assistant", "halvern-partners", "halvern-research"}
@@ -196,30 +201,61 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			}
 			want := renderTenant(t, baseDir, tenant, "")
 			got := renderTenant(t, root, tenant, f)
-			// Comment-only lines render from the templates, and several were
-			// reworded to stop naming one deployment. Compare without them.
-			got, want = withoutComments(got), withoutComments(want)
+			// Compare parsed documents: several template comments were
+			// reworded to stop naming one deployment, and comments do not
+			// survive parsing.
+			diff := firstYAMLDiff(t, want, got)
+			if diff == "" {
+				return
+			}
 			if got != want {
 				gf, wf := filepath.Join(t.TempDir(), "got"), filepath.Join(t.TempDir(), "want")
 				_ = os.WriteFile(gf, []byte(got), 0o644)
 				_ = os.WriteFile(wf, []byte(want), 0o644)
 				d, _ := exec.Command("diff", "-u", wf, gf).CombinedOutput()
-				t.Errorf("render differs from %s:\n%s", base, d)
+				t.Errorf("render differs from %s: %s\n%s", base, diff, d)
 			}
 		})
 	}
 }
 
-// withoutComments drops the lines of a rendered manifest that are only a YAML
-// comment.
-func withoutComments(s string) string {
-	var keep []string
-	for _, l := range strings.Split(s, "\n") {
-		if !strings.HasPrefix(strings.TrimSpace(l), "#") {
-			keep = append(keep, l)
+// firstYAMLDiff decodes two renders as multi-document YAML and returns a
+// description of the first document that differs, or "". Parsing drops YAML
+// comments and keeps block-scalar content, so a "#" line inside an embedded
+// script or fixture still counts.
+func firstYAMLDiff(t *testing.T, want, got string) string {
+	t.Helper()
+	decode := func(s string) []map[string]any {
+		var docs []map[string]any
+		dec := yaml.NewDecoder(strings.NewReader(s))
+		for {
+			var d map[string]any
+			err := dec.Decode(&d)
+			if err == io.EOF {
+				return docs
+			}
+			if err != nil {
+				t.Fatalf("render is not YAML: %v", err)
+			}
+			if d != nil {
+				docs = append(docs, d)
+			}
 		}
 	}
-	return strings.Join(keep, "\n")
+	w, g := decode(want), decode(got)
+	id := func(d map[string]any) string {
+		md, _ := d["metadata"].(map[string]any)
+		return fmt.Sprintf("%v/%v", d["kind"], md["name"])
+	}
+	for i := 0; i < len(w) && i < len(g); i++ {
+		if !reflect.DeepEqual(w[i], g[i]) {
+			return "document " + id(w[i]) + " differs"
+		}
+	}
+	if len(w) != len(g) {
+		return fmt.Sprintf("%d documents, want %d", len(g), len(w))
+	}
+	return ""
 }
 
 const builderScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ./builder.sh larkmere-mutual azure-gpt
