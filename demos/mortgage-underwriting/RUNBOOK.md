@@ -121,7 +121,7 @@ narration drift past it.
 (`charts/omnia-demo/files/arena/mortgage-underwriting-pack.json`):
 
 ```bash
-PACKC=/path/to/packc hack/build-packs.sh mortgage-underwriting
+PROMPTARENA=/path/to/promptarena hack/build-packs.sh mortgage-underwriting
 ```
 
 Commit the arena source first, then rebuild and commit the pack — the observed

@@ -2,16 +2,21 @@
 set -euo pipefail
 
 # Compile the public Arena projects into the packs the chart ships
-# (charts/omnia-demo/files/arena/<demo>-pack.json), then merge in what packc
-# cannot carry.
+# (charts/omnia-demo/files/arena/<demo>-pack.json), then merge in what the
+# compiler cannot carry.
 #
 # Usage: hack/build-packs.sh [demo ...]   (default: every demo)
-# Needs: packc, jq, yq (mikefarah v4), git.
+# Needs: promptarena, jq, yq (mikefarah v4), git.
 #
-# packc drops three things the demos depend on, so they are merged after
+# promptarena validates each arena first (its schemas, its cross-references,
+# and every check packc compile and packc validate run, on the pack built in
+# memory), then compiles it with `promptarena export`, which is packc's
+# compiler.
+#
+# The compiler drops three things the demos depend on, so they are merged after
 # compiling. Omnia's promptpack schema leaves `metadata` open and defines
 # Tool.action_scope, so Omnia accepts the merged pack; packc's own schema does
-# not define action_scope, which is why packc validates the pack before the
+# not define action_scope, which is why the pack is validated before the
 # merge rather than after.
 #
 #   arena/governance-declarations.yaml -> metadata.governance (RFC 0013)
@@ -33,7 +38,7 @@ set -euo pipefail
 # signed.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PACKC="${PACKC:-packc}"
+PROMPTARENA="${PROMPTARENA:-promptarena}"
 OUT="${OUT:-${ROOT}/charts/omnia-demo/files/arena}"
 mkdir -p "${OUT}"
 
@@ -88,16 +93,17 @@ for demo in "${demos[@]}"; do
   compiled="${TMP}/${demo}.compiled.json"
   out="${OUT}/${demo}-pack.json"
 
-  echo "==> ${demo}: compiling"
-  "${PACKC}" compile \
-    --config "${config}" \
-    --output "${compiled}" \
-    --id "${demo%-signin}"
   # Validated BEFORE the merge: packc's schema closes Tool to
   # name/description/parameters, so it rejects action_scope. Omnia's own
   # promptpack schema defines it ($defs.Tool.action_scope, RFC 0013) and reads
   # it at runtime.
-  "${PACKC}" validate "${compiled}"
+  echo "==> ${demo}: validating"
+  "${PROMPTARENA}" validate "${config}"
+  echo "==> ${demo}: compiling"
+  "${PROMPTARENA}" export \
+    --config "${config}" \
+    --output "${compiled}" \
+    --id "${demo%-signin}"
 
   governance='null'
   if [[ -f "${arena}/governance-declarations${v}.yaml" ]]; then
