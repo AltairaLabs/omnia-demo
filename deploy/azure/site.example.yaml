@@ -6,21 +6,21 @@ subscription: 00000000-0000-0000-0000-000000000000
 # Azure region for the identities.
 location: westeurope
 # Resource group the per-tenant managed identities are created in.
-identityResourceGroup: rg-omnia-identities
-# Identities are named <prefix>-<tenant>, e.g. mi-omnia-demo-larkmere-mutual.
-identityNamePrefix: mi-omnia-demo
+identityResourceGroup: rg-example-identities
+# Identities are named <prefix>-<tenant>, e.g. mi-example-larkmere-mutual.
+identityNamePrefix: mi-example
 
 aks:
   # Resource group of the AKS cluster.
-  resourceGroup: rg-omnia
+  resourceGroup: rg-example
   # AKS cluster name (its OIDC issuer is read from it).
-  name: aks-omnia
+  name: aks-example
   # kubeconfig context for the cluster; every kubectl/helm call names it.
-  kubeContext: aks-omnia
+  kubeContext: aks-example
 
 postgres:
   # Postgres server host the tenants' databases live on.
-  host: omnia-pg.postgres.database.azure.com
+  host: example-pg.postgres.database.azure.com
   # Admin login used to create databases and roles.
   adminLogin: pgadmin
   # Admin password: either an External Secrets store and key ...
@@ -65,7 +65,7 @@ voice:
 # Optional: remove the whole block when tenants need no shared content volume.
 nfs:
   # Storage account holding the NFS share.
-  storageAccount: stomniademo
+  storageAccount: stexample
   # Name of the NFS share.
   shareName: content
   # StorageClass the PV uses.
@@ -86,7 +86,7 @@ dns:
   gatewayIP: 203.0.113.10
   # ... or the name of a public IP resource to read it from (use one form).
   # gatewayPublicIP:
-  #   resourceGroup: rg-omnia
+  #   resourceGroup: rg-example
   #   name: pip-gateway
 
 gateway:
@@ -109,9 +109,9 @@ omnia:
 
 keyVault:
   # Key Vault holding the Poppy account tools' key.
-  name: kv-omnia-demo
+  name: kv-example
   # Resource group of that vault.
-  resourceGroup: rg-omnia
+  resourceGroup: rg-example
 
 # Entra group IDs bound `owner` on every tenant Workspace.
 ownerGroups:

@@ -10,7 +10,16 @@
 tool="$1"
 shift
 line="$tool $*"
-[ -n "${FAKE_LOG:-}" ] && printf '%s\n' "$line" >>"$FAKE_LOG"
+if [ -n "${FAKE_LOG:-}" ]; then
+  printf '%s\n' "$line" >>"$FAKE_LOG"
+  # Piped stdin (e.g. `kubectl apply -f -`) goes to <log>.stdin.<n>, n being
+  # the call's 1-based line number in the log.
+  if [ ! -t 0 ]; then
+    n="$(wc -l <"$FAKE_LOG" | tr -d ' ')"
+    cat >"$FAKE_LOG.stdin.$n"
+    [ -s "$FAKE_LOG.stdin.$n" ] || rm -f "$FAKE_LOG.stdin.$n"
+  fi
+fi
 
 if [ -n "${FAKE_FAIL:-}" ]; then
   # shellcheck disable=SC2254
