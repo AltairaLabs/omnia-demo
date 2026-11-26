@@ -12,7 +12,7 @@
 # First install, in this order (the keys need the namespace, and the
 # Deployment cannot start without the keys, so helm --wait would hang):
 #   make azure-tenant WS=ellens-assistant
-#   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+#   hack/personal-agent-keys.sh
 #   make images        # no published personal-agent image is pinned yet
 #   make demos TENANTS=ellens-assistant
 # Without `make images` (.images.env) the personal-agent pod sits in

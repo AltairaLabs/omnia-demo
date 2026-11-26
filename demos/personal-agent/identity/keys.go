@@ -37,7 +37,7 @@ type Identity struct {
 
 // Load reads es256.pem (P-256) and ps384.pem (RSA, at least 2048 bits), both
 // PKCS#8, from dir. base is the HTTPS origin the agent is served from, such
-// as https://assistant.azure.altairalabs.ai.
+// as https://assistant.example.com.
 func Load(dir, base string) (*Identity, error) {
 	u, err := url.Parse(base)
 	if err != nil || u.Scheme != "https" || u.Host == "" {

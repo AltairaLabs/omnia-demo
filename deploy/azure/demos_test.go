@@ -173,6 +173,17 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// The catalogue page is chart content, and it was rewritten after BASE_REF
+	// to stop naming one deployment (its cluster, its start command). That is
+	// an intended render change, so compare both renders on the current page
+	// and let every other byte of the chart be held to BASE_REF.
+	page, err := os.ReadFile(filepath.Join(root, "charts/omnia-demo/files/catalogue/index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(baseDir, "charts/omnia-demo/files/catalogue/index.html"), page, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, tenant := range demoTenants {
 		t.Run(tenant, func(t *testing.T) {
 			ov, err := siteValues(t, "testdata/site-ours.yaml", tenant)
@@ -185,6 +196,9 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			}
 			want := renderTenant(t, baseDir, tenant, "")
 			got := renderTenant(t, root, tenant, f)
+			// Comment-only lines render from the templates, and several were
+			// reworded to stop naming one deployment. Compare without them.
+			got, want = withoutComments(got), withoutComments(want)
 			if got != want {
 				gf, wf := filepath.Join(t.TempDir(), "got"), filepath.Join(t.TempDir(), "want")
 				_ = os.WriteFile(gf, []byte(got), 0o644)
@@ -194,6 +208,18 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withoutComments drops the lines of a rendered manifest that are only a YAML
+// comment.
+func withoutComments(s string) string {
+	var keep []string
+	for _, l := range strings.Split(s, "\n") {
+		if !strings.HasPrefix(strings.TrimSpace(l), "#") {
+			keep = append(keep, l)
+		}
+	}
+	return strings.Join(keep, "\n")
 }
 
 const builderScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ./builder.sh larkmere-mutual azure-gpt

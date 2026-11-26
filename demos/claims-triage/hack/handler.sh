@@ -11,7 +11,14 @@
 # port-forwards to it for the one call.
 set -euo pipefail
 
-CONTEXT=${CONTEXT:-aks-omnia-demo}
+# The kube context: CONTEXT (or KUBE_CONTEXT) if set, else aks.kubeContext in
+# the site file (SITE, default deploy/azure/site.yaml). No default.
+CONTEXT=${CONTEXT:-${KUBE_CONTEXT:-}}
+site=${SITE:-deploy/azure/site.yaml}
+if [[ -z $CONTEXT && -f $site ]]; then
+	CONTEXT=$(yq e '.aks.kubeContext | select(. != null)' "$site")
+fi
+[[ -n $CONTEXT ]] || { echo "no kube context: set CONTEXT, or aks.kubeContext in $site" >&2; exit 2; }
 NS=${NS:-larkmere-mutual}
 GROUP=${GROUP:-default}
 PORT=${PORT:-8907}

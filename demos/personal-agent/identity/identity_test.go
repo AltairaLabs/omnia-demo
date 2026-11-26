@@ -21,7 +21,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const testBase = "https://assistant.azure.altairalabs.ai"
+const testBase = "https://assistant.example.com"
 
 // writeTestKeys generates the two identity keys in-process and writes them
 // as PKCS#8 PEMs to a temporary directory, as Load expects to find them.

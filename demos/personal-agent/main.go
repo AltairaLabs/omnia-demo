@@ -58,7 +58,7 @@ import (
 
 func main() {
 	identityDir := flag.String("identity-dir", "/var/run/personal-agent/identity", "directory holding es256.pem and ps384.pem (PKCS#8)")
-	baseURL := flag.String("base-url", "https://assistant.azure.altairalabs.ai", "the https origin agent.json and jwks.json are served from")
+	baseURL := flag.String("base-url", "https://assistant.example.com", "the https origin agent.json and jwks.json are served from")
 	redisURL := flag.String("redis-url", "", "Redis for User IDs, conversations and events (redis:// or rediss://); empty keeps them in memory, lost on restart")
 	addr := flag.String("addr", ":8080", "listen address")
 	testIdentityDir := flag.String("test-identity-dir", "", "if set, serve this directory's files at /poppy-test/ (the PAP validator's test identity)")

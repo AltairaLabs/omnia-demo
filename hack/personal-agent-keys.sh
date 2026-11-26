@@ -7,10 +7,13 @@ set -euo pipefail
 # (its identity keys) and personal-agent-token-key (the key its sign-in tokens
 # are sealed under in Redis).
 #
-#   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh           once
-#   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh --force   new keys
+#   hack/personal-agent-keys.sh           once
+#   hack/personal-agent-keys.sh --force   new keys
 #
-# Order on a new install: make -C ../omnia-azure workspace WS=ellens-assistant
+# The kube context is CONTEXT (or KUBE_CONTEXT) if set, else aks.kubeContext in
+# deploy/azure/site.yaml (SITE overrides the path).
+#
+# Order on a new install: make azure-tenant WS=ellens-assistant
 # (makes the namespace), then this script, then make demos. The Deployment
 # mounts both Secrets, so on an existing cluster that has only
 # personal-agent-identity, run this again before the next make demos: it
@@ -34,14 +37,14 @@ set -euo pipefail
 # clear them, use the Reset in demos/personal-agent/RUNBOOK.md. Restart the
 # Deployment after --force so it signs with the new keys.
 #
-# CONTEXT is required and every kubectl names it: the current context is
-# shared by every terminal on the machine and can change under you.
+# Every kubectl names the context: the current context is shared by every
+# terminal on the machine and can change under you.
 #
-# Env: CONTEXT (required), NAMESPACE (default ellens-assistant),
+# Env: CONTEXT or KUBE_CONTEXT (else site.yaml), NAMESPACE (default ellens-assistant),
 #      SECRET (default personal-agent-identity),
 #      TOKEN_SECRET (default personal-agent-token-key).
 
-CONTEXT="${CONTEXT:-}"
+CONTEXT="${CONTEXT:-${KUBE_CONTEXT:-}}"
 NAMESPACE="${NAMESPACE:-ellens-assistant}"
 SECRET="${SECRET:-personal-agent-identity}"
 TOKEN_SECRET="${TOKEN_SECRET:-personal-agent-token-key}"
@@ -50,26 +53,30 @@ force=false
 for arg in "$@"; do
   case "${arg}" in
     --force) force=true ;;
-    -h|--help) sed -n '4,42p' "$0"; exit 0 ;;
+    -h|--help) sed -n '4,45p' "$0"; exit 0 ;;
     *) echo "unknown argument: ${arg}" >&2; exit 2 ;;
   esac
 done
 
+SITE_FILE="${SITE:-deploy/azure/site.yaml}"
+if [[ -z "${CONTEXT}" && -f "${SITE_FILE}" ]]; then
+  CONTEXT="$(yq e '.aks.kubeContext | select(. != null)' "${SITE_FILE}")"
+fi
 if [[ -z "${CONTEXT}" ]]; then
-  echo "CONTEXT is not set: name the kube context, e.g. CONTEXT=aks-omnia-demo $0" >&2
+  echo "no kube context: set CONTEXT, or aks.kubeContext in ${SITE_FILE}" >&2
   exit 2
 fi
 command -v openssl >/dev/null || { echo "openssl is required" >&2; exit 1; }
 
 kc() { kubectl --context "${CONTEXT}" "$@"; }
 
-# The namespace is made by omnia-azure's `make workspace WS=ellens-assistant`,
+# The namespace is made by `make azure-tenant WS=ellens-assistant`,
 # before this script and before `make demos` (profiles/azure/ellens-assistant.yaml).
 # Assigned, not tested inline: set -e stops on a failed assignment, but not on
 # a failed substitution inside [[ ]].
 ns="$(kc get namespace "${NAMESPACE}" --ignore-not-found -o name)"
 if [[ -z "${ns}" ]]; then
-  echo "namespace ${NAMESPACE} does not exist on ${CONTEXT}: run make -C ../omnia-azure workspace WS=${NAMESPACE} first" >&2
+  echo "namespace ${NAMESPACE} does not exist on ${CONTEXT}: run make azure-tenant WS=${NAMESPACE} first" >&2
   exit 1
 fi
 

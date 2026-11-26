@@ -19,12 +19,18 @@ set -euo pipefail
 # the old version back). The ingestion service's manifest sees the changed
 # file and replaces its memories.
 #
-# Needs: kubectl (context KUBE_CONTEXT, default aks-omnia-demo), jq.
+# Needs: kubectl, jq, and a kube context: KUBE_CONTEXT if set, else
+# aks.kubeContext in deploy/azure/site.yaml (SITE overrides the path), via yq.
 
 file=${1:?usage: hack/reingest-manual.sh <file> [namespace]}
 ns=${2:-wrenmoor-energy}
 folder=${3:+${3%/}/}
-ctx=${KUBE_CONTEXT:-aks-omnia-demo}
+ctx=${KUBE_CONTEXT:-}
+site=${SITE:-deploy/azure/site.yaml}
+if [[ -z "${ctx}" && -f "${site}" ]]; then
+  ctx=$(yq e '.aks.kubeContext | select(. != null)' "${site}")
+fi
+[[ -n "${ctx}" ]] || { echo "no kube context: set KUBE_CONTEXT, or aks.kubeContext in ${site}" >&2; exit 2; }
 k() { kubectl --context "${ctx}" -n "${ns}" "$@"; }
 
 [[ -f "${file}" ]] || { echo "no such file: ${file}" >&2; exit 2; }
