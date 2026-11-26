@@ -28,6 +28,7 @@ dns_sub="$(site_req dns.subscription)"
 dns_rg="$(site_req dns.resourceGroup)"
 zone="$(site_req dns.zone)"
 kv_name="$(site_req keyVault.name)"
+kv_rg="$(site_req keyVault.resourceGroup)"
 prefix="$(site_req identityNamePrefix)"
 id_rg="$(site_req identityResourceGroup)"
 
@@ -49,7 +50,7 @@ if [ -z "$gateway_ip" ]; then
   exit 1
 fi
 
-vault_id="$("${AZ[@]}" keyvault show --name "$kv_name" --query id -o tsv)"
+vault_id="$("${AZ[@]}" keyvault show -g "$kv_rg" --name "$kv_name" --query id -o tsv)"
 if [ -z "$vault_id" ]; then
   echo "key vault $kv_name not found" >&2
   exit 1
@@ -81,9 +82,22 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
 done
 
 # DNS: point each host at the gateway. A record set is replaced, not edited:
-# delete it (it may not exist yet) and add the address.
+# if it exists, delete it, then add the address. Whether it exists is asked,
+# not guessed: a delete that failed quietly (no rights, throttling, the wrong
+# zone) would leave the old address beside the new one. Only a not-found answer
+# means "nothing to delete"; any other failure stops the script.
 for h in $(poppy_dns_names); do
-  run "${DNS_AZ[@]}" network dns record-set a delete -g "$dns_rg" -z "$zone" -n "$h" --yes 2>/dev/null || true
+  if shown="$("${DNS_AZ[@]}" network dns record-set a show -g "$dns_rg" -z "$zone" -n "$h" -o none 2>&1)"; then
+    run "${DNS_AZ[@]}" network dns record-set a delete -g "$dns_rg" -z "$zone" -n "$h" --yes
+  else
+    case "$(printf '%s' "$shown" | tr '[:upper:]' '[:lower:]')" in
+      *resourcenotfound* | *"not found"* | *"not exist"*) ;;
+      *)
+        echo "looking up $h.$zone failed: $shown" >&2
+        exit 1
+        ;;
+    esac
+  fi
   run "${DNS_AZ[@]}" network dns record-set a add-record -g "$dns_rg" -z "$zone" -n "$h" \
     -a "$gateway_ip" --ttl 300 --output none
   echo "==> $h.$zone -> $gateway_ip"

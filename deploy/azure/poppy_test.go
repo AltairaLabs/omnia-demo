@@ -67,15 +67,64 @@ func TestPoppyDNS(t *testing.T) {
 	}
 }
 
-func TestPoppyDNSToleratesMissingRecord(t *testing.T) {
+func TestPoppyDNSAddsWhenRecordSetIsNotFound(t *testing.T) {
 	log, out, err := runScript(t, poppyScript, map[string]string{
-		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a delete*",
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a show*",
+		"FAKE_FAIL_MSG": "(ResourceNotFound) The Resource 'Microsoft.Network/dnszones/x/A/larkmere' was not found.",
 	}, poppyFixtures())
 	if err != nil {
 		t.Fatal(err, out)
 	}
+	assertContexts(t, log, testCtx, testSub, poppyDNSSub)
+	if count(log, "record-set a delete") != 0 {
+		t.Errorf("nothing to delete: %v", log)
+	}
 	if n := count(log, "record-set a add-record"); n != 5 {
-		t.Errorf("want 5 adds after failed deletes, got %d", n)
+		t.Errorf("want 5 adds, got %d", n)
+	}
+}
+
+func TestPoppyDNSStopsOnOtherShowFailure(t *testing.T) {
+	log, out, err := runScript(t, poppyScript, map[string]string{
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a show*",
+		"FAKE_FAIL_MSG": "(AuthorizationFailed) The client does not have authorization.",
+	}, poppyFixtures())
+	if err == nil {
+		t.Fatalf("want a failure, got success: %s", out)
+	}
+	if !strings.Contains(out, "AuthorizationFailed") {
+		t.Errorf("the error must be shown: %q", out)
+	}
+	if count(log, "add-record") != 0 || count(log, "record-set a delete") != 0 {
+		t.Errorf("must not write after a failed lookup: %v", log)
+	}
+}
+
+func TestPoppyDNSDeletesExistingBeforeAdd(t *testing.T) {
+	log, out, err := runScript(t, poppyScript, siteEnv("site-poppy-pip.yaml"), poppyFixtures())
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	for _, h := range []string{"larkmere", "wrenmoor", "auth.larkmere", "auth.wrenmoor", "assistant"} {
+		if count(log, "--subscription "+poppyDNSSub, "record-set a show", "-g rg-dns", "-z demo.example.com", "-n "+h+" ") != 1 {
+			t.Errorf("no show for %s: %v", h, log)
+		}
+	}
+	if n := count(log, "record-set a delete"); n != 5 {
+		t.Errorf("want 5 deletes, got %d", n)
+	}
+}
+
+func TestPoppyDeleteFailureStops(t *testing.T) {
+	log, out, err := runScript(t, poppyScript, map[string]string{
+		"SITEFILE": "site-poppy-pip.yaml", "FAKE_FAIL": "az * record-set a delete*",
+		"FAKE_FAIL_MSG": "throttled",
+	}, poppyFixtures())
+	if err == nil {
+		t.Fatalf("a failed delete must stop the script: %s", out)
+	}
+	if count(log, "add-record") != 0 {
+		t.Errorf("added after a failed delete: %v", log)
 	}
 }
 
@@ -117,7 +166,7 @@ func TestPoppyKeyOnlyWhenMissing(t *testing.T) {
 		`"keySize":3072`, `"keyOps":["wrapKey","unwrapKey"]`, `"kty":"RSA"`) != 1 {
 		t.Errorf("put request: %v", log)
 	}
-	if count(log, "keyvault show", "--name kv-demo") != 1 || count(log, "resource show", "--ids "+keyScope) != 1 {
+	if count(log, "keyvault show", "-g rg-kv", "--name kv-demo") != 1 || count(log, "resource show", "--ids "+keyScope) != 1 {
 		t.Errorf("vault/key lookups: %v", log)
 	}
 
