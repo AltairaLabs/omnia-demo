@@ -369,12 +369,31 @@ what sits behind and beside it.
     MemoryPolicy's per-category default, because the user save route has no
     expiry field.
 
+### The object store and fixture uploader (`object-store.yaml`, `ingest.yaml`, `files/upload-fixtures.sh`)
+
+- **Fakes:** a company's document store. An in-cluster S3 gateway holds the
+  fixture documents, and the ingest Job's init container uploads them from a
+  ConfigMap on every install and upgrade.
+- **Real system:** a store (SharePoint, S3, a file share) where a document's
+  modified time changes only when someone edits it.
+- **Downstream:** the ingestion connector sends each object's last-modified
+  time as the document's `modified_at`, and memory-api skips a document only
+  when its whole fingerprint, `modified_at` included, matches. An uploader
+  that rewrote unchanged files would bump every `modified_at` and re-embed
+  every document on each upgrade, which costs money. So the uploader preserves
+  modified time for unchanged documents: it compares each fixture's MD5 with
+  the stored object's ETag and uploads only on a difference (`aws s3 sync`
+  compares mtime, and a freshly mounted ConfigMap has a new mtime every run).
+  It still removes stored documents whose fixture is gone. The comparison
+  relies on single-part uploads, whose ETag is the content MD5; anything else
+  is uploaded, so the failure direction is a needless re-embed, never a stale
+  document.
+
 ## Not yet audited
 
 The following stand-ins exist but have not been documented here yet. Document
 one before relying on its behaviour:
 
 - the SharePoint sample documents;
-- the object store and S3 ingestion fixtures (`object-store.yaml`,
-  `fixtures.yaml`, `ingest.yaml`);
+- the fixture ConfigMap (`fixtures.yaml`) and the documents' content;
 - the data analyst's schedule.

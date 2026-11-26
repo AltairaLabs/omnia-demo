@@ -248,6 +248,8 @@ func firstYAMLDiff(t *testing.T, want, got string) string {
 		return fmt.Sprintf("%v/%v", d["kind"], md["name"])
 	}
 	for i := 0; i < len(w) && i < len(g); i++ {
+		dropUploadFixtures(w[i])
+		dropUploadFixtures(g[i])
 		if !reflect.DeepEqual(w[i], g[i]) {
 			return "document " + id(w[i]) + " differs"
 		}
@@ -256,6 +258,35 @@ func firstYAMLDiff(t *testing.T, want, got string) string {
 		return fmt.Sprintf("%d documents, want %d", len(g), len(w))
 	}
 	return ""
+}
+
+// dropUploadFixtures removes the ingest Job's upload-fixtures init container
+// from a parsed document, and nothing else. That container changed on purpose
+// (reingest fix): it used to `aws s3 sync`, which re-uploads every fixture on
+// each upgrade and so bumps each document's modified_at, and memory-api then
+// re-embeds it. It now uploads only fixtures whose content changed (see
+// charts/omnia-demo/files/upload-fixtures.sh, tested in uploadfixtures_test.go).
+// Every other field of the Job, and every other document, is still compared.
+func dropUploadFixtures(d map[string]any) {
+	md, _ := d["metadata"].(map[string]any)
+	if d["kind"] != "Job" || md["name"] != "omnia-demo-memory-ingest" {
+		return
+	}
+	spec, _ := d["spec"].(map[string]any)
+	tpl, _ := spec["template"].(map[string]any)
+	ps, _ := tpl["spec"].(map[string]any)
+	ics, _ := ps["initContainers"].([]any)
+	var keep []any
+	for _, ic := range ics {
+		if c, _ := ic.(map[string]any); c["name"] != "upload-fixtures" {
+			keep = append(keep, ic)
+		}
+	}
+	if keep == nil {
+		delete(ps, "initContainers")
+	} else {
+		ps["initContainers"] = keep
+	}
 }
 
 const builderScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ./builder.sh larkmere-mutual azure-gpt
