@@ -57,7 +57,7 @@ IMAGES := \
   omnia-demo-sites,.,demos/demo-sites/Dockerfile \
   omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
 
-.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy
+.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy omnia-values
 
 # A tenant's Azure side on your own Omnia install, described by
 # deploy/azure/site.yaml (see site.example.yaml). DRY_RUN=1 prints every write.
@@ -85,6 +85,12 @@ azure-identity:
 # tenant whose profile uses it. Prints the vault URL for the profiles.
 azure-poppy:
 	@deploy/azure/poppy.sh
+
+# The Omnia Helm values the demo needs on your install (trusted issuers, default
+# exposure), from deploy/azure/site.yaml into out/omnia-values.yaml. Prints the
+# hosts your install's certificate must cover.
+omnia-values:
+	@deploy/azure/omnia-values.sh
 
 demos:
 	@set -euo pipefail; \
