@@ -41,7 +41,7 @@ workspace:
   # the Workspace declares the identity runtimeIdentity names (its client and
   # tenant ids) as `name`, every agent's default, and spec.runtime drops native
   # identity. The cloud side federates system:serviceaccount:<ns>:omnia-identity-<name>
-  # once (omnia-azure `make workspace-identity`). Covers agents made at run
+  # once (`make azure-identity`). Covers agents made at run
   # time, which per-agent federation cannot (Dreaming replays). Non-agent pods
   # (eval worker, memory-api) keep native identity.
   cloudIdentity:
@@ -216,7 +216,7 @@ mortgageUnderwriting:
 # ToolRegistry, ToolPolicy and privacy policy as pii-chat, so the call is held
 # to exactly the same controls as the chat. Needs piiChat (its tools, policy
 # and portal) and a Provider whose model streams audio (duplex), such as
-# omnia-azure's azure-foundry-gpt-realtime.
+# the install's azure-foundry-gpt-realtime.
 # ---------------------------------------------------------------------------
 cardLine:
   enabled: false
@@ -462,13 +462,13 @@ piiChat:
       count: 3
       interval: 3m
     # The eval worker runs as this ServiceAccount, with the runtime identity's
-    # annotations, so the judge can reach a keyless Provider. omnia-azure's
-    # `make workspace-identity` federates it.
+    # annotations, so the judge can reach a keyless Provider.
+    # `make azure-identity` federates it.
     evalWorkerServiceAccount: eval-worker
     # Scripted callers (demos/card-callers, in the sites image). Scaled to 0
     # until `make canary` starts them.
     # Stand-in for live traffic: enough for the gate to judge, and no more
-    # than gpt-4o's quota takes (150K TPM, omnia-azure), which the agent
+    # than gpt-4o's quota takes (150K TPM on the demo deployment), which the agent
     # shares with the judge unless judgeProviderRef names another deployment.
     # A judge error (a 429, say) is recorded as an error, not a score
     # (Omnia #4086): the gate averages the scored results and holds, rather

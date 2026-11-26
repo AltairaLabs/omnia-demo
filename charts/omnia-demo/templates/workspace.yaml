@@ -106,7 +106,7 @@ spec:
     # Keyless Key Vault for privacy-api (Omnia #4466): it seals the account
     # tools' exchanged tokens. Its pod runs as privacy-<workspace>, with the
     # workspace identity's annotations copied from privacy-identity; the cloud
-    # trusts that subject (omnia-azure `make workspace-identity`).
+    # trusts that subject (`make azure-identity`).
     podOverrides:
       serviceAccountName: privacy-identity
       labels:

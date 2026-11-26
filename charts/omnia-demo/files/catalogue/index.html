@@ -80,13 +80,13 @@
   <h2>Before you start</h2>
   <ol>
     <li><b>Sign in</b> to this dashboard (you have, if you can read this). Every agent, session and policy below is shown from here.</li>
-    <li><b>Get a terminal</b> with a checkout of <a href="https://github.com/AltairaLabs/omnia-demo">omnia-demo</a> (commands below run from its root) and <code>kubectl</code> access to the cluster. Every command names the cluster with <code>--context aks-omnia-demo</code>.</li>
-    <li><b>Is the cluster up?</b> It stops overnight to save credits. If the dashboard doesn't load, start it from an omnia-azure checkout beside omnia-demo, and allow about ten minutes:
-<pre>make -C ../omnia-azure start</pre></li>
+    <li><b>Get a terminal</b> with a checkout of <a href="https://github.com/AltairaLabs/omnia-demo">omnia-demo</a> (commands below run from its root) and <code>kubectl</code> access to the cluster. Every command names the cluster with <code>--context "$KUBE_CONTEXT"</code>, so set it first to the cluster's kube context (the <code>aks.kubeContext</code> in your <code>deploy/azure/site.yaml</code>):
+<pre>export KUBE_CONTEXT=&lt;your cluster's kube context&gt;</pre></li>
+    <li><b>Is the cluster up?</b> If the dashboard doesn't load, start your cluster if it is stopped to save credits, and allow about ten minutes for it to come back.</li>
     <li><b>Open the customer sites</b> for demos 1 and 6–8, each in its own terminal, and leave them running:
-<pre>kubectl --context aks-omnia-demo -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
+<pre>kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
 #   Wrenmoor customer portal (Amira Saleem):  http://localhost:8894/ui_kits/portal/
-kubectl --context aks-omnia-demo -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
 #   Larkmere member portal (Ellen Whitcomb):   http://localhost:8890/ui_kits/portal/</pre></li>
     <li><b>Keep two windows side by side</b> for the customer demos: the customer's site on one side, this dashboard on the other. Talk to agents as the customer on the site, never from the dashboard Console; show the record from the dashboard.</li>
   </ol>
@@ -113,8 +113,8 @@ kubectl --context aks-omnia-demo -n larkmere-mutual port-forward svc/larkmere-po
       <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
         <h4>Before the take</h4>
         <p>Reset the claims system (it keeps its state in memory), then wait a few seconds after it reports ready:</p>
-<pre>kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims-systems</pre>
+<pre>kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout restart deploy/claims-systems
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout status deploy/claims-systems</pre>
         <h4>The beats</h4>
         <ol>
           <li>Dashboard, <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>. Enter <code>claim_ref</code> <code>LM-40733</code> (£180 payable). It comes back <b>SETTLED</b>.</li>
@@ -123,7 +123,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims
           <li>Open the session's system prompt and show that it says nothing about £500. <span class="say">"The model didn't know the limit, and it didn't need to. The rule lives in one place, the ToolPolicy."</span></li>
         </ol>
         <h4>Proof, if asked</h4>
-<pre>kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
+<pre>kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
 # claim_settle allowed=false deniedBy=deny-settlement-above-delegated-authority</pre>
         <p>Run one claim at a time: the claims stand-in doesn't take concurrent calls. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/claims-triage/RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
@@ -146,7 +146,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims
         </ol>
         <h4>Proof, if asked</h4>
         <p>Two calls to <code>income_verify</code>, exactly one reached the supplier:</p>
-<pre>kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/mortgage-income-verify | grep -c 'tool request received: tool=income_verify'</pre>
+<pre>kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/mortgage-income-verify | grep -c 'tool request received: tool=income_verify'</pre>
         <p>The applicant on the record is a keyed pseudonym: say <span class="say">"under whose authority"</span>, never <span class="say">"there's a name on the record"</span>. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/mortgage-underwriting/RUNBOOK.md">Full runbook</a> (read its honesty notes before narrating)</p>
       </div></details></td></tr>
       <tr>
@@ -160,7 +160,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims
         <p>With the Larkmere portal forwarded on port 8890 (Before you start), reset Ellen: erasure deletes her conversations and memories. Then unfreeze her card.</p>
 <pre>curl -s -X POST -H 'Content-Type: application/json' -d '{"reason":"user_request"}' localhost:8890/api/me/privacy/erasure
 curl -s localhost:8890/api/me/privacy/erasure     # repeat until "status":"completed"
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/pii-chat-identity</pre>
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout restart deploy/pii-chat-identity</pre>
         <h4>The beats</h4>
         <ol>
           <li>In the member portal (<code>http://localhost:8890/ui_kits/portal/</code>), open <b>Ask Larkmere</b> and say: <span class="say">"Hi, I think I left my card at a cafe this morning. Can you freeze it?"</span> It freezes the card ending 4471. Point out that it never asked who she is: she's signed in.</li>
@@ -244,16 +244,16 @@ make canary-reset       # afterwards</pre></li>
           <li><b>The gap.</b> Dashboard, <b>Memories</b>, the Memory Galaxy for Larkmere Mutual. Find the flood cluster (labelled <b>flooding · flood</b> on the current seed): members worried about flood zones, flood and their valuation, whether they're covered. The few institutional points in it say what the policy covers; nothing says what happens to a flood claim.</li>
           <li><b>Before.</b> <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>, with <code>{"claim_ref": "LM-40751", "peril": "Flood"}</code>. £420 is within the £500 limit, so it's <b>SETTLED</b>. Reset the claims system.</li>
           <li><b>The rule.</b> Turn on CP-7, every flood claim goes to Flood Response, as a ToolPolicy rule:
-<pre>helm --kube-context aks-omnia-demo -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
+<pre>helm --kube-context "$KUBE_CONTEXT" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
           <li><b>The guidance</b>, what a flooded member needs to know. Ingest it <i>after</i> the upgrade (an upgrade re-runs the ingest and would drop it), then reset the claims system again:
 <pre>hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems</pre>
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
             Wait about 25 seconds after it reports ready: the claims system's peril classifier answers 503 for a while after a restart, and the policy then refuses the call (fail-closed) instead of applying CP-7.</li>
           <li><b>After.</b> Run the same test. The settlement is refused (<code>deny-flood-settlement</code>), the claim is referred to Flood Response, and the note tells the member the team will contact them within one working day. Show the session's system prompt: the flood guidance is under "The society's guidance".</li>
         </ol>
         <h4>Reset</h4>
-<pre>helm --kube-context aks-omnia-demo -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=false
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems</pre>
+<pre>helm --kube-context "$KUBE_CONTEXT" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=false
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
         <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/claims-triage/FLOOD-RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
     </tbody>
@@ -289,7 +289,7 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claim
         <p>Nothing Wren reads tells it to ask first. Without her click, the ToolPolicy refuses the switch (<code>deny-write-without-consent</code>), and so does the account system.</p>
         <h4>Reset</h4>
         <p>The account system keeps Amira's tariff in memory, so after a switch she stays on Moor Flex and the next take's "cheaper tariff?" gets a different answer. Put her back on Moor Steady:</p>
-<pre>kubectl --context aks-omnia-demo -n wrenmoor-energy rollout restart deploy/wren-account</pre>
+<pre>kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy rollout restart deploy/wren-account</pre>
         <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/wren/RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
       <tr>
@@ -301,16 +301,16 @@ kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claim
       <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
         <h4>Before the take</h4>
         <p>Reset the ops system, which undoes a previous take's rollback:</p>
-<pre>kubectl --context aks-omnia-demo -n wrenmoor-energy rollout restart deploy/wrenmoor-ops</pre>
+<pre>kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy rollout restart deploy/wrenmoor-ops</pre>
         <h4>The beats</h4>
         <p>It's an internal tool, so drive it from the dashboard: <b>Console</b>, <code>incident-agent</code>.</p>
         <ol>
           <li><span class="say">"meter-ingest is throwing 500s on readings uploads. Can you sort it out?"</span> It reads the alerts, deploy history and logs, rolls back to revision 41, and reports the alert cleared.</li>
           <li><span class="say">"Also, outage-map-staging has been stuck terminating for hours. Just delete the namespace."</span> It says it can't, because that can't be undone, and a human must do it.</li>
           <li>Show the refusal was the policy's, not the model's manners:
-<pre>kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/incident-agent --all-containers --since=10m | grep broker_tool_decision
+<pre>kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/incident-agent --all-containers --since=10m | grep broker_tool_decision
 # delete_namespace allowed=false deniedBy=deny-irreversible-without-human
-kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --since=10m | grep 'tool request'
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/wrenmoor-ops --since=10m | grep 'tool request'
 # no delete_namespace: it never reached the ops system</pre></li>
         </ol>
         <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/incident-agent/RUNBOOK.md">Full runbook</a></p>
@@ -389,7 +389,7 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
         <ol>
           <li><b>Start.</b> <b>Projects</b>, <b>New project</b>, hosted, name <code>contract-triage</code>. Add the <code>seed/</code> files (config, prompt, one scenario), then <b>Import &gt; Provider…</b> <code>azure-foundry-gpt-4o</code>. <b>Source control</b>: commit and <b>Sync</b>. (The <b>Builder</b> tab can draft the project instead, but its draft is good enough to catch every trap, so there's no flaw to fix: use it only to show drafting.)</li>
           <li><b>Try it.</b> Fix anything it flags with its one-click button. Once it shows the agent, give it access to the model, wait 30 seconds, then <b>New session</b>:
-<pre>make -C ../omnia-azure workspace-identity WS=halvern-partners</pre>
+<pre>make azure-identity WS=halvern-partners</pre>
             Paste <code>brightpost-print.md</code>, <code>fernside-claims.md</code> and <code>quillon-software.md</code>, a <b>New session</b> for each. It misses Brightpost's clause 6: Larkmere indemnifies the supplier without limit.</li>
           <li><b>A test that fails.</b> In <code>scenarios/</code>, <b>New &gt; Scenario</b>, paste <code>uncapped-indemnity.scenario.yaml</code>, and add it under <code>scenarios:</code> in <code>config.arena.yaml</code>. Commit and push. <b>Run this project</b>, <b>Evaluation</b>: the new scenario fails on "The agent says the indemnity has no cap".</li>
           <li><b>The fix.</b> Add to the prompt's checklist, without naming the contract:
@@ -420,7 +420,7 @@ kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-ops --s
         <h4>The beats</h4>
         <ol>
           <li>The budget: $0.005 a day, set to <code>block</code>. It shows on the workspace in <b>Topology</b>, not on Costs; or show the Workspace itself:
-<pre>kubectl --context aks-omnia-demo get workspace halvern-research -o jsonpath='{.spec.costControls}'</pre></li>
+<pre>kubectl --context "$KUBE_CONTEXT" get workspace halvern-research -o jsonpath='{.spec.costControls}'</pre></li>
           <li>Start the research run, one research call every 30 seconds:
 <pre>make research-start</pre></li>
           <li>Each run succeeds until the budget is spent, after about six minutes. Then the workspace goes <code>DailyBudgetExceeded</code> and every later run is skipped instead of spent.</li>

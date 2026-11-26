@@ -194,7 +194,7 @@ spec:
 #   - kubelet probes, which Istio ambient rewrites to come from
 #     169.254.7.127.
 #
-# Istio ambient (omnia-azure enrols each workspace namespace, with a
+# Istio ambient (the install enrols each workspace namespace, with a
 # waypoint): mesh traffic arrives as HBONE on :15008, from the WAYPOINT for
 # calls through the Service, so a podSelector on the caller never matches it.
 # :15008 is admitted from the waypoint and the Gateway, or every tool call
