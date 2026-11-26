@@ -57,7 +57,7 @@ IMAGES := \
   omnia-demo-sites,.,demos/demo-sites/Dockerfile \
   omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
 
-.PHONY: demos builder lint images azure-tenant azure-tenant-remove
+.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity
 
 # A tenant's Azure side on your own Omnia install, described by
 # deploy/azure/site.yaml (see site.example.yaml). DRY_RUN=1 prints every write.
@@ -73,6 +73,12 @@ azure-tenant:
 azure-tenant-remove:
 	@test -n "$(WS)" || { echo "usage: make azure-tenant-remove WS=<tenant>" >&2; exit 1; }
 	@deploy/azure/tenant.sh --remove $(WS)
+
+# Federate the tenant's agents and workers to its identity; run it again after
+# adding agents. Prunes credentials of agents that are gone.
+azure-identity:
+	@test -n "$(WS)" || { echo "usage: make azure-identity WS=<tenant>" >&2; exit 1; }
+	@deploy/azure/identity.sh $(WS)
 
 demos:
 	@set -euo pipefail; \
