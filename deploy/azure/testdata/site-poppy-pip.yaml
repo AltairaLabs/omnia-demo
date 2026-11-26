@@ -1,0 +1,16 @@
+# Minimal site for poppy.sh: DNS in its own subscription, gateway IP from a public IP resource.
+subscription: 00000000-0000-0000-0000-000000000000
+identityResourceGroup: rg-identities
+identityNamePrefix: mi-demo
+aks:
+  kubeContext: kind-demo
+dns:
+  subscription: 11111111-1111-1111-1111-111111111111
+  resourceGroup: rg-dns
+  zone: demo.example.com
+  gatewayPublicIP:
+    resourceGroup: rg-net
+    name: pip-gw
+keyVault:
+  name: kv-demo
+  resourceGroup: rg-kv

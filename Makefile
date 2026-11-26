@@ -57,7 +57,7 @@ IMAGES := \
   omnia-demo-sites,.,demos/demo-sites/Dockerfile \
   omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
 
-.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity
+.PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy
 
 # A tenant's Azure side on your own Omnia install, described by
 # deploy/azure/site.yaml (see site.example.yaml). DRY_RUN=1 prints every write.
@@ -79,6 +79,12 @@ azure-tenant-remove:
 azure-identity:
 	@test -n "$(WS)" || { echo "usage: make azure-identity WS=<tenant>" >&2; exit 1; }
 	@deploy/azure/identity.sh $(WS)
+
+# The Poppy demo's Azure side: DNS records for its hosts, the Key Vault key the
+# account tools seal tokens with, and Key Vault Crypto User on it for each
+# tenant whose profile uses it. Prints the vault URL for the profiles.
+azure-poppy:
+	@deploy/azure/poppy.sh
 
 demos:
 	@set -euo pipefail; \
