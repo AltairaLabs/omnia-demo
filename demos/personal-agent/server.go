@@ -1114,8 +1114,30 @@ func (s *server) signInTool(ctx context.Context, req toolRequest) (any, *toolErr
 	if err != nil {
 		return nil, fail(http.StatusInternalServerError, "reading the User ID: %v", err)
 	}
+	// Ask only for scopes the Company offers (§4.7). The model guesses names
+	// ("claim.report" where the Company offers "claims"); refusing the whole
+	// sign-in for a guess leaves Ellen with no button. An unoffered scope is
+	// dropped, and with none left this falls back as if none was given. The
+	// Company's consent page shows Ellen what is asked for either way.
+	if len(scopes) > 0 {
+		offered, err := s.signIn.Offered(ctx, co)
+		if err != nil {
+			log.Printf("sign_in: domain=%s: %v", domain, err)
+			return nil, fail(http.StatusBadGateway, "couldn't start a sign-in at %s: %s", co.Name, strings.TrimPrefix(err.Error(), "signin: "))
+		}
+		kept := scopes[:0]
+		for _, sc := range scopes {
+			if slices.Contains(offered, sc) {
+				kept = append(kept, sc)
+			} else {
+				log.Printf("sign_in: domain=%s: dropping scope %q, which %s does not offer (offers %s)", domain, sc, co.Name, strings.Join(offered, ", "))
+			}
+		}
+		scopes = kept
+	}
 	if len(scopes) == 0 {
-		// A 401 or an authorization event that named no scope.
+		// A 401 or an authorization event that named no scope, or only
+		// scopes the Company does not offer.
 		if scopes = s.fallbackScopes(co, userID); len(scopes) == 0 {
 			return nil, fail(http.StatusBadRequest, "%s named no scopes to sign in for, and none is known; pass scopes, space-separated", co.Name)
 		}

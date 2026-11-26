@@ -1440,6 +1440,29 @@ func TestSignInFallbackScopes(t *testing.T) {
 	}
 }
 
+// The model guesses scope names ("claim.report" for a Company that offers
+// "claims"). sign_in asks only for scopes the Company offers: an unoffered one
+// is dropped, and when none is left it falls back as if none was given. The
+// Company's consent page shows Ellen what is asked for either way.
+func TestSignInDropsScopesTheCompanyDoesNotOffer(t *testing.T) {
+	co := newCompany(t, "Larkmere Mutual")
+	co.mu.Lock()
+	co.authScopes = map[string]string{"claims": "See and report your claims"}
+	co.mu.Unlock()
+	h := newSignInHarness(t, co)
+	if status, _, raw := h.call(t, "/tools/start_conversation", map[string]string{"domain": co.domain, "message": "my claim?"}); status != 200 {
+		t.Fatalf("start = %d %s", status, raw)
+	}
+	status, body, raw := h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claim.report"})
+	if status != 200 || body["scopes"] != "claims" {
+		t.Errorf("sign_in with only an unoffered scope = %d %s, want 200 asking for claims", status, raw)
+	}
+	status, body, raw = h.call(t, "/tools/sign_in", map[string]string{"domain": co.domain, "scopes": "claims power_cut.details"})
+	if status != 200 || body["scopes"] != "claims" {
+		t.Errorf("sign_in with one offered, one not = %d %s, want 200 asking for claims", status, raw)
+	}
+}
+
 func checkPageHeaders(t *testing.T, hdr http.Header) {
 	t.Helper()
 	if ct := hdr.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {

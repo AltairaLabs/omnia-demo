@@ -115,6 +115,23 @@ func (f *Flow) now() time.Time {
 	return f.Now()
 }
 
+// Offered is the scopes co offers (§4.7): those in either scopes_supported
+// list (discovery's and the issuer's metadata, §3.2) or described in
+// poppy.json auth.scopes, sorted.
+func (f *Flow) Offered(ctx context.Context, co *discovery.Company) ([]string, error) {
+	md, err := FetchMetadata(ctx, f.HTTP, co.Issuer, co.Domain)
+	if err != nil {
+		return nil, err
+	}
+	return offeredScopes(co, md), nil
+}
+
+func offeredScopes(co *discovery.Company, md *Metadata) []string {
+	offered := slices.Concat(co.ScopesSupported, md.ScopesSupported, slices.Collect(maps.Keys(co.Scopes)))
+	slices.Sort(offered)
+	return slices.Compact(offered)
+}
+
 // Begin starts a sign-in for userID at co and returns the authorization URL
 // to open in the User's browser. It checks the issuer's metadata (§3.2)
 // first, and asks for the scopes given plus those already granted to this
@@ -130,12 +147,7 @@ func (f *Flow) Begin(ctx context.Context, co *discovery.Company, userID string, 
 	if err != nil {
 		return "", err
 	}
-
-	// §4.7: the scopes in either scopes_supported list, or described in
-	// poppy.json auth.scopes.
-	offered := slices.Concat(co.ScopesSupported, md.ScopesSupported, slices.Collect(maps.Keys(co.Scopes)))
-	slices.Sort(offered)
-	offered = slices.Compact(offered)
+	offered := offeredScopes(co, md)
 	for _, s := range scopes {
 		if !slices.Contains(offered, s) {
 			return "", fmt.Errorf("signin: %s does not offer the scope %q; it offers %s", co.Name, s, strings.Join(offered, ", "))
