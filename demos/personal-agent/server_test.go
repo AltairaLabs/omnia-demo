@@ -730,56 +730,6 @@ func TestSlowSubscriberDoesNotBlockPublish(t *testing.T) {
 	}
 }
 
-// callResult is one tool call made off the test goroutine.
-type callResult struct {
-	status  int
-	body    map[string]any
-	raw     string
-	elapsed time.Duration
-	err     error
-}
-
-// callAsync posts body to path in the background; t.Fatal can't be called
-// off the test goroutine, so failures come back in the result.
-func (h *harness) callAsync(path string, body any) <-chan callResult {
-	out := make(chan callResult, 1)
-	go func() {
-		start := time.Now()
-		b, _ := json.Marshal(body)
-		resp, err := http.Post(h.http.URL+path, "application/json", bytes.NewReader(b))
-		if err != nil {
-			out <- callResult{err: err}
-			return
-		}
-		defer resp.Body.Close()
-		raw, _ := io.ReadAll(resp.Body)
-		r := callResult{status: resp.StatusCode, raw: string(raw), elapsed: time.Since(start)}
-		r.err = json.Unmarshal(raw, &r.body)
-		out <- r
-	}()
-	return out
-}
-
-// subscribed waits until the hub has n subscribers: a waiting
-// read_conversation subscribes before it reads, so after this nothing it
-// should see can be missed.
-func subscribed(t *testing.T, hb *hub, n int) {
-	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
-	for {
-		hb.mu.Lock()
-		got := len(hb.subs)
-		hb.mu.Unlock()
-		if got >= n {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("%d subscribers after 5s, want %d", got, n)
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 // arrive stores an event as the conversation's Reader would, and publishes it.
 func (h *harness) arrive(t *testing.T, conv conversation.Conversation, ev map[string]any) {
 	t.Helper()
@@ -799,145 +749,74 @@ func (h *harness) arrive(t *testing.T, conv conversation.Conversation, ev map[st
 	h.srv.publish(conv, e)
 }
 
-func TestReadConversationWaitReturnsReplyThatArrives(t *testing.T) {
-	h := newHarness(t, nil)
-	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
-	other := conversation.Conversation{ID: "cnv_x", Company: "larkmere.example", Name: "Larkmere Mutual"}
-	for _, c := range []conversation.Conversation{conv, other} {
-		if err := h.store.SaveConversation(c); err != nil {
-			t.Fatal(err)
-		}
-	}
-	if err := h.store.SetWorking("cnv_w", true); err != nil {
+// unreadOf is conversation id's unread in /api/conversations.
+func unreadOf(t *testing.T, h *harness, id string) bool {
+	t.Helper()
+	resp, err := http.Get(h.http.URL + "/api/conversations")
+	if err != nil {
 		t.Fatal(err)
 	}
-	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15})
-	subscribed(t, &h.srv.hub, 1)
-
-	// Another conversation's reply, and our own side's message, don't end it.
-	h.arrive(t, other, msgEvent("x1", "Your cover includes flood."))
-	user := msgEvent("w0", "Is there a power cut at HX7 6QA?")
-	user["message"].(map[string]any)["role"] = "user"
-	h.arrive(t, conv, user)
-	select {
-	case r := <-res:
-		t.Fatalf("read_conversation returned before the company replied: %d %s", r.status, r.raw)
-	case <-time.After(200 * time.Millisecond):
+	defer resp.Body.Close()
+	var got []struct {
+		ConversationID string `json:"conversation_id"`
+		Unread         *bool  `json:"unread"`
 	}
-
-	h.arrive(t, conv, msgEvent("w1", "Yes, the power is off in HX7."))
-	select {
-	case r := <-res:
-		if r.err != nil || r.status != 200 {
-			t.Fatalf("read_conversation = %d %s (%v)", r.status, r.raw, r.err)
-		}
-		msgs, _ := r.body["messages"].([]any)
-		if len(msgs) != 2 || r.body["company"] != "Wrenmoor Energy" || r.body["handoff"] != "none" || r.body["closed"] != false {
-			t.Fatalf("read_conversation = %s", r.raw)
-		}
-		if m, _ := msgs[1].(map[string]any); m["role"] != "company" || m["text"] != "Yes, the power is off in HX7." {
-			t.Errorf("reply = %v", msgs[1])
-		}
-		if r.elapsed > 5*time.Second {
-			t.Errorf("returned after %v, want as soon as the reply arrived", r.elapsed)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("read_conversation did not return when the reply arrived")
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
 	}
+	for _, c := range got {
+		if c.ConversationID == id {
+			if c.Unread == nil {
+				t.Fatalf("%s has no unread", id)
+			}
+			return *c.Unread
+		}
+	}
+	t.Fatalf("%s is not in the snapshot", id)
+	return false
 }
 
-// After send_message, the Store can still end with the company's previous
-// reply until the stream echoes the new message. A waiting read must not
-// take that old reply as the answer: it waits for a company message newer
-// than the send. (Wrenmoor's compensation reply was missed this way: the read
-// returned at once with "she needs to sign in", and the turn ended.)
-func TestReadConversationWaitIgnoresTheReplyBeforeASend(t *testing.T) {
+// A conversation is unread from the company's first reply until the
+// assistant reads it, and unread again with each new reply. The assistant's
+// own message, echoed by the stream, is nothing new to it.
+func TestSnapshotUnreadUntilTheAssistantReads(t *testing.T) {
 	h := newHarness(t, nil)
 	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
 	if err := h.store.SaveConversation(conv); err != nil {
 		t.Fatal(err)
 	}
-	h.arrive(t, conv, msgEvent("w1", "She needs to sign in for compensation."))
-	h.srv.markSent(conv)
-
-	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15})
-	subscribed(t, &h.srv.hub, 1)
-	select {
-	case r := <-res:
-		t.Fatalf("read_conversation answered with the reply from before the send: %d %s", r.status, r.raw)
-	case <-time.After(200 * time.Millisecond):
-	}
-	user := msgEvent("w2", "She has signed in. Please check her compensation.")
-	user["message"].(map[string]any)["role"] = "user"
-	h.arrive(t, conv, user)
-	h.arrive(t, conv, msgEvent("w3", "Ellen is owed £95."))
-	select {
-	case r := <-res:
-		msgs, _ := r.body["messages"].([]any)
-		if m, _ := msgs[len(msgs)-1].(map[string]any); m["text"] != "Ellen is owed £95." {
-			t.Errorf("read_conversation = %s, want the new reply", r.raw)
+	read := func() {
+		t.Helper()
+		if status, _, raw := h.call(t, "/tools/read_conversation", map[string]string{"conversation_id": "cnv_w"}); status != 200 {
+			t.Fatalf("read_conversation = %d %s", status, raw)
 		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("read_conversation did not return when the new reply arrived")
 	}
-	// Once that reply is in, a read answers at once again.
-	start := time.Now()
-	if status, _, raw := h.call(t, "/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15}); status != 200 || time.Since(start) > 2*time.Second {
-		t.Errorf("read after the reply = %d %s in %v, want at once", status, raw, time.Since(start))
+	h.arrive(t, conv, map[string]any{"id": "e1", "type": "message", "message": map[string]any{"role": "user", "author": map[string]any{"type": "agent"}, "text": "Is the power off at HX7 6QA?"}})
+	if unreadOf(t, h, "cnv_w") {
+		t.Error("unread with only the assistant's own message")
 	}
-}
-
-func TestReadConversationWaitReturnsWhenWorkingEnds(t *testing.T) {
-	h := newHarness(t, nil)
-	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
-	if err := h.store.SaveConversation(conv); err != nil {
+	h.arrive(t, conv, msgEvent("e2", "Yes, supply is off in HX7."))
+	if !unreadOf(t, h, "cnv_w") {
+		t.Error("not unread after the company replied")
+	}
+	read()
+	if unreadOf(t, h, "cnv_w") {
+		t.Error("still unread after the assistant read it")
+	}
+	h.arrive(t, conv, map[string]any{"id": "e3", "type": "message", "message": map[string]any{"role": "user", "author": map[string]any{"type": "agent"}, "text": "When will it be back?"}})
+	if unreadOf(t, h, "cnv_w") {
+		t.Error("unread after only the assistant's own send")
+	}
+	h.arrive(t, conv, msgEvent("e4", "By 6pm."))
+	if !unreadOf(t, h, "cnv_w") {
+		t.Error("not unread after the company's second reply")
+	}
+	if err := h.store.SetStopped("cnv_w", "unauthorized (HTTP 401)"); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.store.SetWorking("cnv_w", true); err != nil {
-		t.Fatal(err)
-	}
-	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15})
-	subscribed(t, &h.srv.hub, 1)
-	if err := h.store.SetWorking("cnv_w", false); err != nil {
-		t.Fatal(err)
-	}
-	f := false
-	h.srv.publish(conv, conversation.Event{Type: "working", Working: &f})
-	select {
-	case r := <-res:
-		if r.status != 200 || r.body["working"] != false {
-			t.Fatalf("read_conversation = %d %s", r.status, r.raw)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("read_conversation did not return when working ended")
-	}
-}
-
-func TestReadConversationWaitReturnsAtTimeout(t *testing.T) {
-	h := newHarness(t, nil)
-	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
-	if err := h.store.SaveConversation(conv); err != nil {
-		t.Fatal(err)
-	}
-	if err := h.store.SetWorking("cnv_w", true); err != nil {
-		t.Fatal(err)
-	}
-	r := <-h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 1})
-	if r.err != nil || r.status != 200 {
-		t.Fatalf("read_conversation = %d %s (%v)", r.status, r.raw, r.err)
-	}
-	if r.elapsed < time.Second || r.elapsed > 4*time.Second {
-		t.Errorf("returned after %v, want at the 1s timeout", r.elapsed)
-	}
-	msgs, ok := r.body["messages"].([]any)
-	if !ok || len(msgs) != 0 || r.body["working"] != true || r.body["company"] != "Wrenmoor Energy" {
-		t.Errorf("read_conversation = %s, want the same shape, still working", r.raw)
-	}
-
-	// No wait, or none asked for, answers at once.
-	start := time.Now()
-	if status, _, raw := h.call(t, "/tools/read_conversation", map[string]any{"conversation_id": "cnv_w"}); status != 200 || time.Since(start) > 500*time.Millisecond {
-		t.Errorf("read_conversation with no wait = %d %s after %v", status, raw, time.Since(start))
+	read()
+	if unreadOf(t, h, "cnv_w") {
+		t.Error("unread after reading the stopped conversation")
 	}
 }
 
@@ -1036,28 +915,6 @@ func TestCloseConversationAlreadyClosedIsRecorded(t *testing.T) {
 		t.Errorf("send_message after close = %d %s, want 409", status, raw)
 	}
 }
-
-// A reply already there when the wait starts is the answer: waiting for a
-// further change would hold the stage for up to 20s.
-func TestReadConversationWaitAnswersAtOnceWhenAlreadyReplied(t *testing.T) {
-	h := newHarness(t, nil)
-	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
-	if err := h.store.SaveConversation(conv); err != nil {
-		t.Fatal(err)
-	}
-	h.arrive(t, conv, msgEvent("w1", "Yes, the power is off in HX7."))
-	r := <-h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 20})
-	if r.err != nil || r.status != 200 {
-		t.Fatalf("read_conversation = %d %s (%v)", r.status, r.raw, r.err)
-	}
-	if r.elapsed > time.Second {
-		t.Errorf("returned after %v, want at once: the company has already replied", r.elapsed)
-	}
-	if msgs, _ := r.body["messages"].([]any); len(msgs) != 1 {
-		t.Errorf("read_conversation = %s, want the reply", r.raw)
-	}
-}
-
 func authEvent(id, scope string) map[string]any {
 	return map[string]any{
 		"id": id, "type": "authorization", "created_at": "2026-11-23T10:01:00Z",
@@ -1169,21 +1026,14 @@ func TestAuthorizationEventNeedsSignIn(t *testing.T) {
 		t.Errorf("read_conversation = %s, want no sign_in", raw)
 	}
 
-	// A waiting read wakes when one arrives.
-	if err := h.store.SetWorking("cnv_p", true); err != nil {
-		t.Fatal(err)
+	// Reading it is what clears unread; a new authorization makes it unread
+	// again, so the page wakes the assistant for it.
+	if unreadOf(t, h, "cnv_p") {
+		t.Error("cnv_p is unread with nothing from the company")
 	}
-	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_p", "wait_seconds": 15})
-	subscribed(t, &h.srv.hub, 2)
 	h.arrive(t, plain, authEvent("p1", "claims:read"))
-	select {
-	case r := <-res:
-		si, _ := r.body["sign_in"].(map[string]any)
-		if r.status != 200 || si["needed"] != true || si["scopes"] != "claims:read" {
-			t.Errorf("read_conversation = %d %s, want sign_in needed for claims:read", r.status, r.raw)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("read_conversation did not return when sign-in became needed")
+	if !unreadOf(t, h, "cnv_p") {
+		t.Error("cnv_p is not unread after the company asked for sign-in")
 	}
 }
 

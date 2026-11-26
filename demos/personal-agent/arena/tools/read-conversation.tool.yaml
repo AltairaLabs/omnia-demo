@@ -2,9 +2,8 @@
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/read_conversation
 # (demos/personal-agent/server.go): what the conversation's background Reader
-# has stored. It never calls the company itself. wait_seconds waits on the
-# Readers' updates for a change, up to 20s, so timeout_ms (and the
-# ToolRegistry's timeout) stays above that.
+# has stored. It never calls the company itself, and never waits: a reply
+# that arrives later wakes the assistant through Ellen's page.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool
 metadata:
@@ -22,24 +21,12 @@ spec:
     while the company wants Ellen signed in or a sign-in with it has begun or
     ended (needed; scopes, space-separated; status needed, pending, signed_in
     or declined). Changes nothing.
-    With wait_seconds it first waits, up to that many seconds, for something
-    to change: a new reply from the company, the company no longer working,
-    a person taking over, the conversation closing or stopping. It answers as
-    soon as one does, or when the time is up, the same way either way.
   input_schema:
     type: object
     properties:
       conversation_id:
         type: string
         description: The conversation_id start_conversation returned
-      wait_seconds:
-        type: integer
-        minimum: 0
-        maximum: 20
-        description: >-
-          How long to wait for the company to reply or the conversation to
-          change before answering, 0 to 20 seconds. 0 (the default) answers
-          at once.
     required: [conversation_id]
   output_schema:
     type: object
@@ -65,7 +52,7 @@ spec:
             text: { type: string }
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
   mode: mock
-  timeout_ms: 35000
+  timeout_ms: 10000
   mock_result:
     company: Wrenmoor Energy
     working: false

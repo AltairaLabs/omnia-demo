@@ -31,9 +31,6 @@ const (
 	maxRequestBody   = 1 << 20
 	companyTimeout   = 30 * time.Second
 	updatesPing      = 25 * time.Second
-	// maxReadWait is the longest read_conversation waits for a change. The
-	// ToolRegistry's timeout for it must stay above this.
-	maxReadWait = 20 * time.Second
 	// signInPendingFor is how long a begun sign-in reads as pending: as long
 	// as the Flow keeps its state (10 minutes). After that its redirect is
 	// refused anyway.
@@ -85,10 +82,10 @@ type server struct {
 	signins map[string]signInState // the latest sign-in begun, by domain
 	// asked is the scopes the latest sign-in asked for, by domain.
 	asked map[string][]string
-	// sentAt is, by conversation, how many company messages the Store held
-	// when the assistant last sent one (markSent). A company message at or
-	// before that count is not the answer to it.
-	sentAt map[string]int
+	// lastRead is, by conversation, what read_conversation last showed the
+	// assistant. A conversation that has moved on from it is unread in
+	// /api/conversations.
+	lastRead map[string]readOut
 	// signedIn counts completed sign-ins by domain. A Reader that stops
 	// asking for sign-in after the count moved since it began raced a
 	// sign-in, and runs again.
@@ -100,21 +97,21 @@ type server struct {
 
 func newServer(ctx context.Context, cfg config) *server {
 	s := &server{
-		ctx:     ctx,
-		id:      cfg.Identity,
-		store:   cfg.Store,
-		client:  conversation.NewClient(cfg.HTTP, cfg.Store),
-		testDir: cfg.TestIdentityDir,
-		backoff: cfg.ReaderBackoff,
-		signIn:  cfg.SignIn,
-		allowed: map[string]bool{},
-		names:   map[string]string{},
-		ids:     map[string]string{},
-		readers: map[string]bool{},
-		again:   map[string]bool{},
-		signins: map[string]signInState{},
-		sentAt:  map[string]int{},
-		asked:   map[string][]string{},
+		ctx:      ctx,
+		id:       cfg.Identity,
+		store:    cfg.Store,
+		client:   conversation.NewClient(cfg.HTTP, cfg.Store),
+		testDir:  cfg.TestIdentityDir,
+		backoff:  cfg.ReaderBackoff,
+		signIn:   cfg.SignIn,
+		allowed:  map[string]bool{},
+		names:    map[string]string{},
+		ids:      map[string]string{},
+		readers:  map[string]bool{},
+		again:    map[string]bool{},
+		signins:  map[string]signInState{},
+		lastRead: map[string]readOut{},
+		asked:    map[string][]string{},
 
 		signedIn: map[string]int{},
 	}
@@ -379,9 +376,6 @@ type toolRequest struct {
 	Message        string `json:"message"`
 	ConversationID string `json:"conversation_id"`
 	Text           string `json:"text"`
-	// WaitSeconds is how long read_conversation may wait for a change,
-	// 0 to 20.
-	WaitSeconds int `json:"wait_seconds"`
 	// Scopes are the scopes sign_in asks for, space-separated.
 	Scopes string `json:"scopes"`
 }
@@ -594,33 +588,7 @@ func (s *server) sendMessage(ctx context.Context, req toolRequest) (any, *toolEr
 	if err := s.client.Send(ctx, c, req.Text); err != nil {
 		return nil, companyError(c.Company, err)
 	}
-	s.markSent(c)
 	return map[string]any{"conversation_id": c.ID, "sent": true}, nil
-}
-
-// markSent records that the assistant has just sent c a message: until a
-// company message newer than those stored now arrives, a waiting
-// read_conversation does not take the last one as the reply. The Store gets
-// the sent message only when the stream echoes it, so without this a read
-// right after a send sees the company's previous reply last and answers at
-// once with it.
-func (s *server) markSent(c conversation.Conversation) {
-	now, terr := s.read(c)
-	if terr != nil {
-		return
-	}
-	s.mu.Lock()
-	s.sentAt[c.ID] = companyMessages(now)
-	s.mu.Unlock()
-}
-
-// awaitingReply reports whether r is still short of a company message newer
-// than the assistant's last send.
-func (s *server) awaitingReply(id string, r readOut) bool {
-	s.mu.Lock()
-	n, ok := s.sentAt[id]
-	s.mu.Unlock()
-	return ok && companyMessages(r) <= n
 }
 
 type messageOut struct {
@@ -655,65 +623,41 @@ type signInOut struct {
 
 // readConversation answers from the Store alone: what the conversation's
 // Reader has stored. It never reads from the Company itself, which would
-// race the Reader for the same events.
-//
-// With wait_seconds (0 to 20; more is taken as 20) it first waits for a
-// change: a new message from the company, working going false, a handoff,
-// the conversation closing or its Reader stopping. It wakes on the Readers'
-// updates (the hub), never by polling, and answers as soon as one of them
-// changes the conversation, or at the timeout, with the same shape either
-// way. A conversation already closed, stopped or replied to (the company's
-// message last, not working) is answered at once.
-func (s *server) readConversation(ctx context.Context, req toolRequest) (any, *toolError) {
+// race the Reader for the same events. It never waits either: the Company
+// answers in its own time (PAP §8.5, §8.6), the Reader takes the answer off
+// the stream, and the page wakes the assistant for it (unread in
+// /api/conversations says whether there is anything it has not read).
+func (s *server) readConversation(_ context.Context, req toolRequest) (any, *toolError) {
 	c, terr := s.lookup(req.ConversationID)
 	if terr != nil {
 		return nil, terr
 	}
-	wait := min(time.Duration(max(req.WaitSeconds, 0))*time.Second, maxReadWait)
-	if wait == 0 {
-		return s.read(c)
+	out, terr := s.read(c)
+	if terr != nil {
+		return nil, terr
 	}
-	// Subscribe before reading, so no update between the two is missed.
-	ch, stop := s.hub.subscribe()
-	defer stop()
-	before, terr := s.read(c)
-	if terr != nil || before.Closed || before.Stopped != "" || (replied(before) && !s.awaitingReply(c.ID, before)) {
-		return before, terr
-	}
-	timer := time.NewTimer(wait)
-	defer timer.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return s.read(c)
-		case <-s.ctx.Done():
-			return s.read(c)
-		case <-timer.C:
-			return s.read(c)
-		case b := <-ch:
-			var u struct {
-				ConversationID string `json:"conversation_id"`
-			}
-			if json.Unmarshal(b, &u) != nil || u.ConversationID != c.ID {
-				continue
-			}
-			now, terr := s.read(c)
-			if terr != nil || changed(before, now) {
-				return now, terr
-			}
-		}
-	}
+	s.mu.Lock()
+	s.lastRead[c.ID] = out
+	s.mu.Unlock()
+	return out, nil
 }
 
-// changed reports whether now is worth waking a waiting read for: the
-// company said something new, stopped working, handed off, or the
-// conversation ended.
-func changed(before, now readOut) bool {
-	return companyMessages(now) > companyMessages(before) ||
-		(before.Working && !now.Working) ||
-		now.Handoff != before.Handoff ||
-		now.Closed || now.Stopped != "" ||
-		!sameSignIn(before.SignIn, now.SignIn)
+// unread reports whether c has moved on since the assistant last read it:
+// the company said something new, a sign-in changed, a person took over,
+// or the conversation stopped. A close is not news: the assistant closes
+// conversations itself. Never read, it is unread once the company has said
+// or asked anything.
+func (s *server) unread(id string, now readOut) bool {
+	s.mu.Lock()
+	last, ok := s.lastRead[id]
+	s.mu.Unlock()
+	if !ok {
+		last = readOut{Handoff: "none"}
+	}
+	return companyMessages(now) > companyMessages(last) ||
+		now.Handoff != last.Handoff ||
+		now.Stopped != last.Stopped ||
+		!sameSignIn(last.SignIn, now.SignIn)
 }
 
 func sameSignIn(a, b *signInOut) bool {
@@ -721,14 +665,6 @@ func sameSignIn(a, b *signInOut) bool {
 		return a == b
 	}
 	return *a == *b
-}
-
-// replied reports whether the company has already answered: its message is
-// the last one and it is not working on more. A wait then has nothing to
-// wait for, so the reply is answered at once.
-func replied(r readOut) bool {
-	n := len(r.Messages)
-	return n > 0 && r.Messages[n-1].Role == "company" && !r.Working
 }
 
 func companyMessages(r readOut) int {
@@ -775,6 +711,9 @@ func (s *server) read(c conversation.Conversation) (readOut, *toolError) {
 type snapshotOut struct {
 	ConversationID       string `json:"conversation_id"`
 	ParentConversationID string `json:"parent_conversation_id,omitempty"`
+	// Unread is whether the conversation has moved on since the assistant
+	// last read it, so the page knows whether to wake it.
+	Unread bool `json:"unread"`
 	readOut
 }
 
@@ -795,7 +734,7 @@ func (s *server) conversations(w http.ResponseWriter, _ *http.Request) {
 			writeJSON(w, terr.status, map[string]string{"error": terr.msg})
 			return
 		}
-		out = append(out, snapshotOut{ConversationID: c.ID, ParentConversationID: c.ParentID, readOut: r})
+		out = append(out, snapshotOut{ConversationID: c.ID, ParentConversationID: c.ParentID, Unread: s.unread(c.ID, r), readOut: r})
 	}
 	writeJSON(w, http.StatusOK, out)
 }

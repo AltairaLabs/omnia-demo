@@ -88,6 +88,21 @@ function snapshotSignIns(list, seen, initial) {
 const signedInLine = (company) => "I've signed in to " + company + ".";
 const declinedLine = (company) => "I didn't sign in to " + company + ".";
 
+// updateLine wakes the assistant for conversations that changed while it was
+// not reading them. It is the page speaking, not Ellen, so it is not shown.
+const updateLine = (news) =>
+  "Update: " + news.map((n) => n.company + " (conversation " + n.id + ")").join("; ") + ".";
+
+// isNews: an update the assistant needs to hear about, in one of its own
+// conversations (not a Direct Conversation, which is Ellen's): the company
+// said something, asked for Ellen to sign in, or stopped talking.
+function isNews(u) {
+  const ev = u.event || {};
+  if (u.parent_conversation_id) return false;
+  if (ev.type === "message") return !!ev.message && ev.message.role === "company";
+  return ev.type === "authorization" || ev.type === "stopped";
+}
+
 // ---------------------------------------------------------------------------
 // Conversations: what the strip knows, by conversation id.
 //
@@ -263,13 +278,16 @@ function rows(convs, order) {
 // "signin" update as it arrives on the stream, once per conversation it was
 // published on. onSnapshot(list, initial) hears each snapshot loaded, initial
 // for the first, so what changed while the stream was down can be told.
-function useConversations(onSignIn, onSnapshot) {
+// onNews(id, company, eventId) hears each update isNews picks out.
+function useConversations(onSignIn, onSnapshot, onNews) {
   const [convs, setConvs] = useState({});
   const [order, setOrder] = useState([]);
   const signInRef = useRef(onSignIn);
   signInRef.current = onSignIn;
   const snapshotRef = useRef(onSnapshot);
   snapshotRef.current = onSnapshot;
+  const newsRef = useRef(onNews);
+  newsRef.current = onNews;
 
   useEffect(() => {
     let buffer = null; // updates that arrive while a snapshot is loading
@@ -318,6 +336,7 @@ function useConversations(onSignIn, onSnapshot) {
       try { u = JSON.parse(ev.data); } catch (e) { return; }
       if (!u || !u.conversation_id) return;
       if (u.event && u.event.type === "signin" && u.company) signInRef.current(String(u.company), String(u.event.status || ""));
+      if (isNews(u)) newsRef.current(String(u.conversation_id), String(u.company || ""), String(u.event.id || ""));
       if (buffer) { buffer.push(u); return; }
       setConvs((cur) => apply(cur, u, false));
       remember(u.conversation_id);
@@ -493,15 +512,31 @@ function App() {
   // the stream was down is said, once, as if its update had arrived.
   const onSnapshot = (list, initial) => {
     for (const [company, st] of snapshotSignIns(list, signInsRef.current, initial)) onSignIn(company, st);
+    // After a reconnect, what changed while the stream was down. Not on the
+    // first load: the assistant's session is new then, and knows none of it.
+    if (!initial) for (const c of list) if (c.unread && !c.parent_conversation_id) news(c.conversation_id, c.company);
   };
-  const { convs, order } = useConversations(onSignIn, onSnapshot);
+  // A company's reply arrives on the stream whenever the company sends it
+  // (PAP §8.6): it wakes the assistant, after the turn that is running.
+  const newsSeenRef = useRef({});
+  const onNews = (id, company, eventId) => {
+    if (eventId) {
+      if (newsSeenRef.current[eventId]) return;
+      newsSeenRef.current[eventId] = true;
+    }
+    news(id, company);
+  };
+  const { convs, order } = useConversations(onSignIn, onSnapshot, onNews);
   const [thread, setThread] = useState([
     { from: "it", text: "Hi Ellen. Tell me what you need and I'll get in touch with the companies you deal with. I'll tell you what each one says, and I'll ask you before agreeing to anything." },
   ]);
   const [draft, setDraft] = useState("");
   const [busy, setBusyState] = useState(false);
   const busyRef = useRef(false);
-  const queueRef = useRef([]); // Ellen's sign-in lines, held while a turn runs
+  // What waits for the running turn to end: { text } for Ellen's sign-in
+  // lines, { news: { id, company } } for conversations to wake it for.
+  const queueRef = useRef([]);
+  const flushingRef = useRef(false);
   const setBusy = (b) => { busyRef.current = b; setBusyState(b); };
   const [offline, setOffline] = useState(false);
   const [open, setOpen] = useState(null); // conversation id of the sheet's row
@@ -563,10 +598,11 @@ function App() {
     if (box) box.scrollTop = box.scrollHeight;
   }, [thread, busy]);
 
-  // sendLine sends Ellen's line to the assistant as a turn. It reads refs
-  // only, so the socket's handlers may call it from their first render.
-  function sendLine(text) {
-    setThread((t) => [...t, { from: "me", text }]);
+  // sendLine sends Ellen's line to the assistant as a turn; quiet, it is
+  // the page's and not shown. It reads refs only, so the socket's handlers
+  // may call it from their first render.
+  function sendLine(text, quiet) {
+    if (!quiet) setThread((t) => [...t, { from: "me", text }]);
     const sock = sockRef.current;
     if (!sock || sock.readyState !== WebSocket.OPEN) {
       setThread((t) => [...t, { from: "note", text: "Not connected. Reload the page to try again." }]);
@@ -580,13 +616,52 @@ function App() {
 
   // say sends a line for Ellen now, or after the turn that is running.
   function say(text) {
-    if (busyRef.current) queueRef.current.push(text);
+    if (busyRef.current || flushingRef.current) queueRef.current.push({ text });
     else sendLine(text);
   }
 
-  function flush() {
-    const next = queueRef.current.shift();
-    if (next) sendLine(next);
+  // news wakes the assistant for a changed conversation, once no turn runs.
+  function news(id, company) {
+    queueRef.current.push({ news: { id, company } });
+    flush();
+  }
+
+  // flush sends what waits, one turn at a time: Ellen's lines in order, and
+  // all waiting news as one update. News the assistant has read meanwhile
+  // (personal-agent's unread) is dropped, so it is not told twice.
+  async function flush() {
+    if (busyRef.current || flushingRef.current) return;
+    const q = queueRef.current;
+    if (q.length === 0) return;
+    if (q[0].text) {
+      sendLine(q.shift().text);
+      return;
+    }
+    const waiting = q.filter((x) => x.news).map((x) => x.news);
+    queueRef.current = q.filter((x) => !x.news);
+    flushingRef.current = true;
+    let fresh = waiting;
+    try {
+      const res = await fetch(url("conversations"), { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error(String(res.status));
+      const unread = {};
+      for (const c of await res.json()) if (c.unread) unread[c.conversation_id] = true;
+      fresh = waiting.filter((n) => unread[n.id]);
+    } catch (e) {
+      // No snapshot: wake it anyway. Told twice beats never told.
+    } finally {
+      flushingRef.current = false;
+    }
+    const byId = {};
+    for (const n of fresh) byId[n.id] = n;
+    fresh = Object.values(byId);
+    if (busyRef.current) {
+      // Ellen spoke meanwhile: after her turn.
+      queueRef.current = [...fresh.map((n) => ({ news: n })), ...queueRef.current];
+      return;
+    }
+    if (fresh.length > 0) sendLine(updateLine(fresh), true);
+    else flush();
   }
 
   const ask = (q) => {

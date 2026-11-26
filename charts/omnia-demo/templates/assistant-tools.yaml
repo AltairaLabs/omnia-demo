@@ -85,17 +85,15 @@ spec:
         contentType: application/json
     - name: read-conversation-handler
       type: http
-      # Reads the service's store only, never the Company. wait_seconds
-      # holds it up to 20s (maxReadWait in server.go), so this stays above.
-      timeout: 35s
+      # Reads the service's store only, never the Company, and never waits.
+      timeout: 10s
       tool:
         name: read_conversation
-        description: "Read a conversation with a company so far: every message (role \"user\" is what was sent for Ellen, role \"company\" is the company's reply; author \"agent\" or \"human\" says whether a person at the company wrote it), whether the company is still working on a reply (working), whether a person at the company is taking it over (handoff \"pending\", else \"none\"), whether it is closed, and, if the assistant can no longer follow it, why (stopped, for example when the company asks for Ellen to sign in), and sign_in, present while the company wants Ellen signed in or a sign-in with it has begun or ended (needed; scopes, space-separated; status needed, pending, signed_in or declined). Changes nothing. With wait_seconds it first waits, up to that many seconds, for something to change: a new reply from the company, the company no longer working, a person taking over, the conversation closing or stopping. It answers as soon as one does, or when the time is up, the same way either way."
+        description: "Read a conversation with a company so far: every message (role \"user\" is what was sent for Ellen, role \"company\" is the company's reply; author \"agent\" or \"human\" says whether a person at the company wrote it), whether the company is still working on a reply (working), whether a person at the company is taking it over (handoff \"pending\", else \"none\"), whether it is closed, and, if the assistant can no longer follow it, why (stopped, for example when the company asks for Ellen to sign in), and sign_in, present while the company wants Ellen signed in or a sign-in with it has begun or ended (needed; scopes, space-separated; status needed, pending, signed_in or declined). Changes nothing."
         inputSchema:
           type: object
           properties:
             conversation_id: { type: string, description: "The conversation_id start_conversation returned" }
-            wait_seconds: { type: integer, minimum: 0, maximum: 20, description: "How long to wait for the company to reply or the conversation to change before answering, 0 to 20 seconds. 0 (the default) answers at once." }
           required: ["conversation_id"]
       httpConfig:
         endpoint: {{ $pa }}/read_conversation

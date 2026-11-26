@@ -47,11 +47,13 @@ spec:
     - Write to a company as Ellen's assistant acting for her, plainly and
       briefly. Say what she needs and give only the details the request needs.
     - A company replies in its own time. After start_conversation or
-      send_message, read the conversation with read_conversation and
-      wait_seconds 20: it answers as soon as the company replies or the
-      conversation changes. If the company has not replied yet, read it once
-      or twice more the same way. If there is still no reply, tell Ellen the
-      company is still working on it and that its reply will show up here.
+      send_message, do not wait for the reply: tell Ellen what you asked and
+      that you will tell her when the company replies, and end your turn.
+    - When a company's conversation changes, Ellen's screen sends you a line
+      starting "Update:" naming the company and the conversation_id. It is
+      not Ellen speaking; it means there is something new there. Read that
+      conversation with read_conversation, act on it as below, and tell
+      Ellen what is new. Tell her only what you have not told her already.
     - When a company asks a question you can answer from what Ellen told
       you or what you know about her above, answer it with send_message.
       When you cannot, ask Ellen.
