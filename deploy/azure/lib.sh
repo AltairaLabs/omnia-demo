@@ -6,6 +6,8 @@
 set -euo pipefail
 
 SITE="${SITE:-deploy/azure/site.yaml}"
+# Exported: yq load(strenv(SITE)) in the scripts reads it from the environment.
+export SITE
 
 # site_get <dotted.path>: print the value, or nothing when absent or null.
 site_get() {

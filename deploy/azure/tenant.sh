@@ -42,40 +42,43 @@ release="workspace-$tenant"
 values_file() {
   local f
   f="$(mktemp)"
-  yq -n '{}' > "$f"
-  set_val() { K="$1" V="$2" yq -i 'eval(strenv(K)) = strenv(V)' "$f"; }
+  yq -n '{}' > "$f" || exit 1
+  # Called inside $(...), where errexit is off: every step exits explicitly, and
+  # the caller does `|| exit 1`, so a missing field never reaches helm.
+  set_val() { K="$1" V="$2" yq -i 'eval(strenv(K)) = strenv(V)' "$f" || exit 1; }
+  set_req() { local v; v="$(site_req "$2")" || exit 1; set_val "$1" "$v"; }
   set_val .name "$tenant"
-  set_val .postgres.host "$(site_req postgres.host)"
-  set_val .postgres.adminLogin "$(site_req postgres.adminLogin)"
+  set_req .postgres.host postgres.host
+  set_req .postgres.adminLogin postgres.adminLogin
   # The admin password: an External Secrets store, or a plain Secret.
   if site_has postgres.adminPassword.externalSecret; then
-    set_val .postgres.password.externalSecret.store "$(site_req postgres.adminPassword.externalSecret.clusterSecretStore)"
-    set_val .postgres.password.externalSecret.key "$(site_req postgres.adminPassword.externalSecret.key)"
+    set_req .postgres.password.externalSecret.store postgres.adminPassword.externalSecret.clusterSecretStore
+    set_req .postgres.password.externalSecret.key postgres.adminPassword.externalSecret.key
   elif site_has postgres.adminPassword.secret; then
-    set_val .postgres.password.secretRef.name "$(site_req postgres.adminPassword.secret.name)"
-    set_val .postgres.password.secretRef.key "$(site_req postgres.adminPassword.secret.key)"
+    set_req .postgres.password.secretRef.name postgres.adminPassword.secret.name
+    set_req .postgres.password.secretRef.key postgres.adminPassword.secret.key
   fi
-  set_val .foundry.endpoint "$(site_req foundry.endpoint)"
-  set_val .foundry.region "$(site_req foundry.region)"
+  set_req .foundry.endpoint foundry.endpoint
+  set_req .foundry.region foundry.region
   if site_has foundry.providers; then
-    yq -i '.foundry.providers = load(strenv(SITE)).foundry.providers' "$f"
+    yq -i '.foundry.providers = load(strenv(SITE)).foundry.providers' "$f" || exit 1
   fi
   if site_has voice; then
-    set_val .voice.endpoint "$(site_req voice.endpoint)"
-    set_val .voice.region "$(site_req voice.region)"
+    set_req .voice.endpoint voice.endpoint
+    set_req .voice.region voice.region
     if site_has voice.providers; then
-      yq -i '.voice.providers = load(strenv(SITE)).voice.providers' "$f"
+      yq -i '.voice.providers = load(strenv(SITE)).voice.providers' "$f" || exit 1
     fi
   fi
   # The chart's volume is on by default; without an nfs block there is none.
   if site_has nfs; then
-    yq -i '.nfs.enabled = true' "$f"
-    set_val .nfs.storageAccount "$(site_req nfs.storageAccount)"
+    yq -i '.nfs.enabled = true' "$f" || exit 1
+    set_req .nfs.storageAccount nfs.storageAccount
     for k in shareName storageClass size rootClaim; do
-      if site_has "nfs.$k"; then set_val ".nfs.$k" "$(site_get "nfs.$k")"; fi
+      if site_has "nfs.$k"; then set_req ".nfs.$k" "nfs.$k"; fi
     done
   else
-    yq -i '.nfs.enabled = false' "$f"
+    yq -i '.nfs.enabled = false' "$f" || exit 1
   fi
   set_val .identity.clientId "$1"
   set_val .identity.tenantId "$2"
@@ -85,7 +88,7 @@ values_file() {
 if [ "$mode" = "values" ]; then
   # A seam for tests and for diffing against another install: print the values
   # for <tenant> <clientId> <tenantId>.
-  f="$(values_file "${2:?clientId}" "${3:?tenantId}")"
+  f="$(values_file "${2:?clientId}" "${3:?tenantId}")" || exit 1
   cat "$f"
   rm -f "$f"
   exit 0
@@ -100,6 +103,12 @@ rg="$(site_req identityResourceGroup)"
 location="$(site_req location)"
 mi="$(site_req identityNamePrefix)-$tenant"
 foundry_id="$(site_req foundry.accountId)"
+voice_id=""
+if site_has voice; then voice_id="$(site_req voice.accountId)"; fi
+# Fail on a missing field before anything is created: the values are built
+# only after the identity exists, so check them now (the file is discarded).
+probe="$(values_file placeholder placeholder)" || exit 1
+rm -f "$probe"
 
 echo "==> tenant $tenant: identity $mi"
 ids_query='{clientId:clientId,principalId:principalId}'
@@ -126,12 +135,12 @@ grant() {
   fi
 }
 grant "$foundry_id"
-if site_has voice; then
-  grant "$(site_req voice.accountId)"
+if [ -n "$voice_id" ]; then
+  grant "$voice_id"
 fi
 
 echo "==> tenant $tenant: namespace, databases, Providers, volume"
-vals="$(values_file "$client_id" "$tenant_id")"
+vals="$(values_file "$client_id" "$tenant_id")" || exit 1
 trap 'rm -f "$vals"' EXIT
 run "${HELM[@]}" upgrade --install "$release" "$here/../../charts/omnia-workspace" \
   -n "$omnia_ns" -f "$vals" --wait --timeout 5m

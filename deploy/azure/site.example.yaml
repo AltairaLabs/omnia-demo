@@ -44,7 +44,7 @@ foundry:
   # Providers to create in every tenant.
   providers:
     - name: gpt-4o
-      role: chat
+      role: llm
       model: gpt-4o
       default: true
 

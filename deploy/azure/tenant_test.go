@@ -204,3 +204,28 @@ func TestTenantMissingFieldNamed(t *testing.T) {
 		t.Errorf("got %v %q", err, out)
 	}
 }
+
+func TestTenantMissingValueStopsBeforeAnyCall(t *testing.T) {
+	log, out, err := runScript(t, `d="$(mktemp -d)"; yq e 'del(.postgres.host)' "$PWD/testdata/site-full.yaml" > "$d/site.yaml"
+export SITE="$d/site.yaml"; bash ./tenant.sh larkmere-mutual`, nil, tenantNewFixtures)
+	if exitCode(err) != 1 || !strings.Contains(out, "site.yaml: postgres.host is required") {
+		t.Errorf("want exit 1 naming the field, got %v %q", err, out)
+	}
+	if len(log) != 0 {
+		t.Errorf("calls made before the check: %v", log)
+	}
+}
+
+func TestTenantValuesWithSiteNotExported(t *testing.T) {
+	// SITE only takes lib.sh's default (relative to the repo root), as under
+	// `make azure-tenant`; providers are loaded from it with yq.
+	r := runScriptFull(t, `orig="$PWD"; d="$(mktemp -d)"; mkdir -p "$d/deploy/azure"
+cp testdata/site-full.yaml "$d/deploy/azure/site.yaml"
+cd "$d"; bash "$orig/tenant.sh" --values larkmere-mutual cid-1 tenant-1`, nil, nil)
+	if r.Err != nil {
+		t.Fatal(r.Err, r.Out)
+	}
+	if !strings.Contains(r.Out, "model: gpt-4o") || !strings.Contains(r.Out, "role: llm") {
+		t.Errorf("providers missing:\n%s", r.Out)
+	}
+}

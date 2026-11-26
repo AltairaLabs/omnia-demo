@@ -21,7 +21,7 @@ foundry:
   region: swedencentral
   providers:
     - name: gpt
-      role: chat
+      role: llm
       model: gpt-4o
       default: true
 voice:
