@@ -40,8 +40,24 @@ if [ -n "$ctx" ]; then
   KUBECTL=(kubectl --context "$ctx")
 fi
 
-folder="${folder#/}"
-folder="${folder%/}"
+# The folder becomes part of a blob name, so it is checked before anything runs:
+# slashes at either end are dropped; then every segment must be non-empty, not
+# . or .., and made only of letters, digits, dot, underscore and hyphen.
+while [ "${folder#/}" != "$folder" ]; do folder="${folder#/}"; done
+while [ "${folder%/}" != "$folder" ]; do folder="${folder%/}"; done
+bad=0
+[ -n "$folder" ] || bad=1
+IFS=/ read -r -a segments <<<"$folder"
+if [ "$folder" != "${folder//\/\//}" ]; then bad=1; fi
+for seg in ${segments[@]+"${segments[@]}"}; do
+  case "$seg" in
+    "" | . | .. | *[!A-Za-z0-9._-]*) bad=1 ;;
+  esac
+done
+if [ "$bad" = 1 ]; then
+  echo "invalid folder '${3}': use segments of letters, digits, '.', '_' and '-' separated by single '/', with no '.' or '..' segment" >&2
+  exit 1
+fi
 name="$folder/$(basename "$file")"
 want="$(openssl dgst -md5 -binary "$file" | base64)"
 

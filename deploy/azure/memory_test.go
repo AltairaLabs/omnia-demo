@@ -561,3 +561,38 @@ func TestPublishDocumentNeedsAFile(t *testing.T) {
 		t.Errorf("want zero calls, got %v", log)
 	}
 }
+
+const publishFolderScript = `export SITE="$PWD/testdata/${SITEFILE}"; bash ../../hack/publish-document.sh "$DOC" mem-a "$FOLDER"
+`
+
+func TestPublishDocumentRejectsAnUnsafeFolder(t *testing.T) {
+	for _, folder := range []string{"../x", "a/../b", "a/./b", ".", "..", "/", "///", "a//b", "a b", "a/b c", "a/é", "a;b", "a\\b"} {
+		t.Run(folder, func(t *testing.T) {
+			log, out, err := runScript(t, publishFolderScript,
+				map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "FOLDER": folder}, nil)
+			if exitCode(err) != 1 || !strings.Contains(out, "folder") {
+				t.Fatalf("want exit 1 naming the folder, got %v (%s)", err, out)
+			}
+			if len(log) != 0 {
+				t.Errorf("want zero calls, got %v", log)
+			}
+		})
+	}
+}
+
+func TestPublishDocumentAcceptsANestedFolder(t *testing.T) {
+	for folder, blob := range map[string]string{
+		"member-guidance/2026": "member-guidance/2026/flood-claims.md",
+		"//member-guidance//":  "member-guidance/flood-claims.md",
+		"/a.b/c_d-e/":          "a.b/c_d-e/flood-claims.md",
+	} {
+		log, out, err := runScript(t, publishFolderScript,
+			map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "FOLDER": folder}, nil)
+		if err != nil {
+			t.Fatal(folder, err, out)
+		}
+		if count(log, "storage blob upload", "-n "+blob+" ") != 1 {
+			t.Errorf("folder %q: want an upload as %s: %v", folder, blob, log)
+		}
+	}
+}
