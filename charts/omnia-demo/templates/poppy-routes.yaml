@@ -12,8 +12,7 @@ metadata:
   namespace: {{ .Values.poppy.omniaNamespace }}
 spec:
   parentRefs:
-    - name: omnia-external
-      namespace: {{ .Values.poppy.gatewayNamespace }}
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
   hostnames:
     - {{ required "poppy.domain" .Values.poppy.domain | quote }}
   rules:
@@ -36,8 +35,7 @@ metadata:
   namespace: {{ .Values.poppy.omniaNamespace }}
 spec:
   parentRefs:
-    - name: omnia-external
-      namespace: {{ .Values.poppy.gatewayNamespace }}
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
   hostnames:
     - {{ include "omnia-demo.gatewayIssuer" . | trimPrefix "https://" | quote }}
   rules:

@@ -972,8 +972,12 @@ poppy:
   allow: []
   # -- The namespace of Omnia's management-api, and so of the discovery route.
   omniaNamespace: omnia
-  # -- The namespace of the `omnia-external` Gateway the route attaches to.
+  # -- The Gateway the Poppy, assistant and account-tool routes attach to: its
+  # name, namespace and, when set, the listener (sectionName). Set from
+  # site.yaml's gateway by deploy/azure/site-values.sh.
+  gatewayName: omnia-external
   gatewayNamespace: omnia
+  gatewaySectionName: ""
   # The Company Agent: an AgentRuntime with a `poppy` facade, exposed at
   # https://<domain>/poppy, that a Personal Agent holds conversations with. A
   # separate agent from the tenant's own assistants, and kept out of the

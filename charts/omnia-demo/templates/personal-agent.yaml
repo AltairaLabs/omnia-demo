@@ -169,8 +169,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 spec:
   parentRefs:
-    - name: omnia-external
-      namespace: {{ .Values.poppy.gatewayNamespace }}
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
   hostnames:
     - {{ $host | quote }}
   rules:
@@ -235,7 +234,7 @@ spec:
               kubernetes.io/metadata.name: {{ .Values.poppy.gatewayNamespace }}
           podSelector:
             matchLabels:
-              gateway.networking.k8s.io/gateway-name: omnia-external
+              gateway.networking.k8s.io/gateway-name: {{ .Values.poppy.gatewayName }}
       ports:
         - port: 8080
           protocol: TCP

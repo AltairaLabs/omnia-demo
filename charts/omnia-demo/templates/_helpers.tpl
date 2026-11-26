@@ -191,13 +191,31 @@ true
 
 {{/*
 The host of one Company among personalAgent.knownCompanies, by the first label
-of its name: call with (list . "larkmere"). Empty when none matches. The
+of its name: call with (list . "larkmere"). The render fails when none matches. The
 assistant's pack and tool descriptions name the Companies by this host, so no
 host of any one install is in the chart.
 */}}
 {{- define "omnia-demo.companyHost" -}}
 {{- $prefix := printf "%s." (index . 1) -}}
+{{- $host := "" -}}
 {{- range (index . 0).Values.personalAgent.knownCompanies -}}
-{{- if hasPrefix $prefix . -}}{{- . -}}{{- end -}}
+{{- if and (not $host) (hasPrefix $prefix .) -}}{{- $host = . -}}{{- end -}}
 {{- end -}}
+{{- if not $host -}}
+{{- fail (printf "personalAgent.knownCompanies has no %s host: the assistant's pack and tools name its Companies by it (set it from site.yaml with deploy/azure/site-values.sh)" $prefix) -}}
+{{- end -}}
+{{- $host -}}
+{{- end -}}
+
+{{/*
+One parentRef to the Gateway the Poppy routes attach to (poppy.gatewayName,
+gatewayNamespace and, when set, gatewaySectionName). Call with the root context,
+rendered after "- ".
+*/}}
+{{- define "omnia-demo.gatewayParentRef" -}}
+name: {{ .Values.poppy.gatewayName }}
+namespace: {{ .Values.poppy.gatewayNamespace }}
+{{- with .Values.poppy.gatewaySectionName }}
+sectionName: {{ . }}
+{{- end }}
 {{- end -}}

@@ -48,6 +48,9 @@ func TestSiteValuesLarkmere(t *testing.T) {
 		"https://larkmere.demo.example.com",
 		"audience: https://larkmere.demo.example.com/api",
 		"vaultURL: https://kv-demo.vault.azure.net/",
+		"gatewayName: omnia",
+		"gatewayNamespace: omnia",
+		"gatewaySectionName: https",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("overlay lacks %q:\n%s", want, out)
@@ -348,5 +351,17 @@ func TestImagesNeedsRegistry(t *testing.T) {
 	}
 	if len(log) != 0 {
 		t.Errorf("no build without a registry: %v", log)
+	}
+}
+
+// With personalAgent on, the chart names the Companies by their hosts in
+// knownCompanies and refuses to render without them.
+func TestAssistantNeedsKnownCompanies(t *testing.T) {
+	root, _ := filepath.Abs("../..")
+	out, err := exec.Command("helm", "template", "x", filepath.Join(root, "charts/omnia-demo"),
+		"--set", "namespace=x", "--set", "personalAgent.enabled=true", "--set", "personalAgent.host=a.example.com",
+		"--set", "personalAgent.knownCompanies={other.example.com}").CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "personalAgent.knownCompanies has no larkmere. host") {
+		t.Errorf("want a render failure naming knownCompanies, got %v\n%s", err, out)
 	}
 }

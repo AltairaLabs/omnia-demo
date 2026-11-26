@@ -182,8 +182,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 spec:
   parentRefs:
-    - name: omnia-external
-      namespace: {{ .Values.poppy.gatewayNamespace }}
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
   hostnames:
     - {{ $domain | quote }}
   rules:

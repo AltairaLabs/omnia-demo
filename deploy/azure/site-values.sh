@@ -50,9 +50,16 @@ case "$tenant" in
     vault="$(site_req keyVault.name)"
     ;;
   halvern-partners)
+    dashboard="$(site_req dashboardHost)"
+    ;;
+esac
+# The Gateway every public route attaches to. sectionName is optional.
+gw_name="" gw_ns="" gw_section=""
+case "$tenant" in
+  larkmere-mutual | wrenmoor-energy | ellens-assistant | halvern-partners)
     gw_name="$(site_req gateway.name)"
     gw_ns="$(site_req gateway.namespace)"
-    dashboard="$(site_req dashboardHost)"
+    gw_section="$(site_get gateway.sectionName)"
     ;;
 esac
 
@@ -62,7 +69,7 @@ case "$tenant" in
   larkmere-mutual | wrenmoor-energy)
     DOMAIN="$company.$zone" ASSISTANT="https://assistant.$zone/agent.json" \
       ISSUER="https://auth.$company.$zone" UPSTREAM="$upstream_issuer" CLIENT_ID="$client_id" \
-      VAULT="https://$vault.vault.azure.net/" \
+      VAULT="https://$vault.vault.azure.net/" GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" \
       yq e -n '
         .poppy.domain = strenv(DOMAIN) |
         .poppy.allow = [strenv(ASSISTANT)] |
@@ -71,18 +78,26 @@ case "$tenant" in
         .poppy.auth.gateway.upstream.clientID = strenv(CLIENT_ID) |
         .poppy.auth.accessTokens.audiences = ["https://" + strenv(DOMAIN)] |
         .poppy.account.audience = "https://" + strenv(DOMAIN) + "/api" |
-        .poppy.account.encryption.vaultURL = strenv(VAULT)'
+        .poppy.account.encryption.vaultURL = strenv(VAULT) |
+        .poppy.gatewayName = strenv(GW_NAME) |
+        .poppy.gatewayNamespace = strenv(GW_NS) |
+        (select(strenv(GW_SECTION) != "") | .poppy.gatewaySectionName) = strenv(GW_SECTION)'
     ;;
   ellens-assistant)
     HOST="assistant.$zone" LARKMERE="larkmere.$zone" WRENMOOR="wrenmoor.$zone" \
+      GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" \
       yq e -n '
         .personalAgent.host = strenv(HOST) |
-        .personalAgent.knownCompanies = [strenv(LARKMERE), strenv(WRENMOOR)]'
+        .personalAgent.knownCompanies = [strenv(LARKMERE), strenv(WRENMOOR)] |
+        .poppy.gatewayName = strenv(GW_NAME) |
+        .poppy.gatewayNamespace = strenv(GW_NS) |
+        (select(strenv(GW_SECTION) != "") | .poppy.gatewaySectionName) = strenv(GW_SECTION)'
     ;;
   halvern-partners)
-    GW_NAME="$gw_name" GW_NS="$gw_ns" DASHBOARD="$dashboard" \
+    GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" DASHBOARD="$dashboard" \
       yq e -n '
         .catalogue.route.parentRefs = [{"name": strenv(GW_NAME), "namespace": strenv(GW_NS)}] |
+        (select(strenv(GW_SECTION) != "") | .catalogue.route.parentRefs[0].sectionName) = strenv(GW_SECTION) |
         .catalogue.route.hostnames = [strenv(DASHBOARD)]'
     ;;
 esac

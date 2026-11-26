@@ -237,5 +237,6 @@ lint:
 	  deploy/azure/site-values.sh "$$t" > "$(LINT_VALUES)"; \
 	  helm template "$$t" $(CHART) -f $(PROFILE_DIR)/common.yaml -f "$(PROFILE_DIR)/$$t.yaml" -f "$(LINT_VALUES)" --set namespace="$$t" \
 	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/client-id=lint" \
-	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/tenant-id=lint" >/dev/null && echo "$$t renders"; \
+	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/tenant-id=lint" >/dev/null; \
+	  echo "$$t renders"; \
 	done
