@@ -82,7 +82,10 @@ with placeholders and a comment per field. `site.yaml` is gitignored. Fields:
   `rootClaim`.
 - `dns`: `subscription`, `resourceGroup`, `zone` (the demo domain), and the
   gateway's public IP (as an address, or a public IP resource to read it from).
-- `tls`: the cert-manager issuer that signs the Poppy hosts' certificates.
+- `gateway`: the Gateway (`name`, `namespace`, `sectionName`) the demo's routes
+  attach to, and `dashboardHost` (the catalogue is served beside the dashboard).
+- `omnia.valuesRoot`: where Omnia's values sit in the user's install, `""` for
+  Omnia's chart itself or e.g. `omnia` for an umbrella chart.
 - `keyVault`: name and resource group, for the Poppy account tools' key.
 - `ownerGroups`: the Entra group IDs bound `owner` on every tenant Workspace.
 - `images` (optional): a registry to build into for `make images`.
@@ -101,16 +104,15 @@ A missing required field fails the target with the field's name.
   arena-worker, eval-worker, `memory-<t>-default`, `privacy-<t>`,
   `omnia-identity-foundry` and every `<agent>-facade`; prunes `*-facade`
   credentials whose AgentRuntime is gone; annotates memory-api's SA.
-- `make azure-poppy`: the Poppy hosts' DNS A records, their cert-manager
-  Certificates, the `omnia-connections` key (through ARM, as now) and
-  `Key Vault Crypto User` on it for the two Company identities.
+- `make azure-poppy`: the Poppy hosts' DNS A records, the `omnia-connections`
+  key (through ARM, as now) and `Key Vault Crypto User` on it for the Company
+  identities.
 - `make omnia-values`: renders `out/omnia-values.yaml` from `site.yaml`, the
   values the user adds to their Omnia install:
   - `operator.delegationAPI.trustedIssuers` for the four stand-in edges
     (larkmere-portal, card-callers, wrenmoor-site, assistant-page);
-  - `managementApi.poppy.hosts[]` (#4475) for the four Company and issuer hosts,
-    with their TLS Secrets, on the chart's external Gateway;
-  - exposure for the Company agents and the assistant host.
+  - `operator.defaultExposure` for the Company agents, on `site.yaml`'s gateway;
+  - and it prints the hosts the install's TLS certificate must cover.
 - `make demos`: as now, but calls `azure-tenant` and `azure-identity`, takes
   the identity from the tenant's ConfigMap, and layers values derived from
   `site.yaml` (owner groups, vault URL, domain-based hosts) over the profile.
@@ -127,7 +129,8 @@ and goes in `site.yaml` under `poppy`.
 
 ### omnia-azure afterwards
 
-Removed: `poppyHosts` and its certificate SANs, `poppy-dns`, `poppy-kms`,
+Renamed: `poppyHosts` to a generic `TLS_EXTRA_HOSTS` on `make install`.
+Removed: `poppy-dns`, `poppy-kms`,
 `POPPY_*`, the demo trusted issuers, the Poppy exposure comments, `workspace`,
 `workspace-identity`, `workspace-remove`, the `omnia-workspace` chart, the
 ambient waypoint manifest (if only workspaces used it), `demo-content` and its
@@ -170,12 +173,15 @@ renders the same trusted issuers as omnia-azure sets today.
   so it never runs implicitly.
 - **Images.** The user brings their own registry (name, login server and
   subscription in `site.yaml`). omnia-demo never creates one.
-- **Poppy certificates.** One cert-manager `Certificate` per Poppy host, issued
-  by the `ClusterIssuer` (or `Issuer`, by kind) that `site.yaml` names, into the
-  namespace Omnia is installed in, as the TLS Secrets `managementApi.poppy.hosts[]`
-  references. This replaces today's extra SANs on omnia-azure's dashboard
-  certificate and our hand-made gateway route. It is the one intended change in
-  routing; verify every host's metadata again afterwards.
+- **Poppy routing and TLS stay as they work today** (revised while planning).
+  Omnia's chart gateway has one HTTPS listener with one certificate, and
+  #4475's per-host listeners cover only issuer and Company hosts, not the
+  assistant or catalogue hosts. So omnia-demo keeps its own HTTPRoutes, which
+  attach to the gateway `site.yaml` names, and states which hosts the install's
+  certificate must cover. `make omnia-values` prints that list. omnia-azure
+  takes it through a generic `TLS_EXTRA_HOSTS` (today's `poppyHosts`, renamed).
+  There are no new Certificates and no `managementApi.poppy.hosts`, and nothing
+  changes in routing.
 - **Migration diff.** The ported chart keeps the name `omnia-workspace`. A small
   diff we can explain (chart version, labels) is acceptable; any change to a
   resource's spec is not.
