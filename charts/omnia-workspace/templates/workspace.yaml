@@ -23,6 +23,9 @@
 {{- if $ref }}
 {{- $refName = required "postgres.password.secretRef.name is required" $ref.name }}
 {{- $refKey = required "postgres.password.secretRef.key is required" $ref.key }}
+{{- if not (regexMatch "^[-._a-zA-Z0-9]+$" (toString $refKey)) }}
+{{- fail "postgres.password.secretRef.key must be a Kubernetes Secret key (letters, digits, '-', '_', '.')" }}
+{{- end }}
 {{- end }}
 {{- $slug := replace "-" "_" $ws }}
 {{- $dbs := list (dict "secret" "omnia-postgres" "db" (printf "omnia_sessions_%s" $slug)) (dict "secret" "omnia-postgres-memory" "db" (printf "omnia_memory_%s" $slug)) (dict "secret" "omnia-postgres-privacy" "db" (printf "omnia_consent_%s" $slug)) }}
@@ -86,20 +89,23 @@ spec:
 {{- if $ref }}
 ---
 # secretRef mode: no External Secrets operator, so a Job writes the three
-# tenant Secrets from the admin Secret in the release namespace. Everything it
-# runs under is in the tenant namespace and scoped to Secrets: it may create
-# Secrets there, and read and change only the three it owns. The one thing it
-# reads outside is the named admin Secret, through a Role that names it.
+# tenant Secrets from the admin Secret in the release namespace. The Job runs
+# in the release namespace, where that Secret is, and takes the password as an
+# env var from it (a pod can only reference Secrets in its own namespace), so
+# it needs no right to read Secrets there. Its ServiceAccount's only rights
+# are a Role in the tenant namespace, limited to Secrets: create, and change
+# only the three it owns. The password is URL-encoded, since it sits inside
+# the connection URL, and travels by stdin, never in process arguments.
 #
 # The Job is a post-install/post-upgrade hook, unlike the databases' pre-hook:
 # these Secrets live in a namespace the release creates, and a pre-install
-# hook would run before that namespace (and this ServiceAccount) existed.
-# Agents start only after the release, so the Secrets still arrive in time.
+# hook would run before that namespace (and this Role) existed. Agents start
+# only after the release, so the Secrets still arrive in time.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: workspace-{{ $ws }}-secrets
-  namespace: {{ $ws }}
+  namespace: {{ .Release.Namespace }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -131,39 +137,13 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: workspace-{{ $ws }}-secrets
-    namespace: {{ $ws }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: workspace-{{ $ws }}-read-admin
-  namespace: {{ .Release.Namespace }}
-rules:
-  - apiGroups: [""]
-    resources: [secrets]
-    resourceNames:
-      - {{ $refName }}
-    verbs: [get]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: workspace-{{ $ws }}-read-admin
-  namespace: {{ .Release.Namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: workspace-{{ $ws }}-read-admin
-subjects:
-  - kind: ServiceAccount
-    name: workspace-{{ $ws }}-secrets
-    namespace: {{ $ws }}
+    namespace: {{ .Release.Namespace }}
 ---
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: workspace-{{ $ws }}-secrets
-  namespace: {{ $ws }}
+  namespace: {{ .Release.Namespace }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
@@ -177,16 +157,26 @@ spec:
       containers:
         - name: secrets
           image: {{ .Values.secretsJob.image }}
+          env:
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: {{ $refName | quote }}, key: {{ $refKey | quote }} } }
           command:
             - /bin/sh
             - -euc
             - |
-              pw=$(kubectl -n {{ .Release.Namespace }} get secret {{ $refName }} -o 'jsonpath={.data.{{ $refKey }}}' | base64 -d)
-              test -n "$pw"
+              test -n "$PGPASSWORD"
+              pw=$(printf %s "$PGPASSWORD" | jq -sRr @uri)
               {{- range $d := $dbs }}
-              kubectl -n {{ $ws }} create secret generic {{ $d.secret }} \
-                --from-literal=POSTGRES_CONN="postgres://{{ $.Values.postgres.adminLogin }}:${pw}@{{ $.Values.postgres.host }}:5432/{{ $d.db }}?sslmode=require" \
-                --dry-run=client -o yaml | kubectl apply -f -
+              kubectl apply -f - <<EOF
+              apiVersion: v1
+              kind: Secret
+              metadata:
+                name: {{ $d.secret }}
+                namespace: {{ $ws }}
+              type: Opaque
+              stringData:
+                POSTGRES_CONN: "postgres://{{ $.Values.postgres.adminLogin }}:${pw}@{{ $.Values.postgres.host }}:5432/{{ $d.db }}?sslmode=require"
+              EOF
               {{- end }}
 {{- end }}
 {{- range $p := .Values.foundry.providers }}
@@ -348,7 +338,7 @@ spec:
             - { name: PGSSLMODE, value: require }
             - { name: PGDATABASE, value: postgres }
             - name: PGPASSWORD
-              valueFrom: { secretKeyRef: { name: {{ .Values.dbBootstrap.adminSecret }}, key: PGPASSWORD } }
+              valueFrom: { secretKeyRef: { name: {{ if $ref }}{{ $refName }}{{ else }}{{ .Values.dbBootstrap.adminSecret }}{{ end }}, key: {{ if $ref }}{{ $refKey }}{{ else }}PGPASSWORD{{ end }} } }
           command:
             - /bin/sh
             - -euc

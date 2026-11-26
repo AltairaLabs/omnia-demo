@@ -130,16 +130,46 @@ func TestWorkspaceChartPasswordModes(t *testing.T) {
 			t.Errorf("secrets Job lacks %q:\n%s", want, job)
 		}
 	}
-	// The Job's rights: its Role is in the tenant namespace and may only
-	// touch Secrets; the one read in the release namespace names the Secret.
+	if !strings.Contains(job, "namespace: omnia\n") || !strings.Contains(job, "secretKeyRef: { name: \"omnia-db-admin\", key: \"PGPASSWORD\" }") {
+		t.Errorf("secrets Job should run in the release namespace with env secretKeyRef:\n%s", job)
+	}
+	if strings.Contains(job, "--from-literal") || strings.Contains(job, "jsonpath") || strings.Contains(job, "get secret") {
+		t.Errorf("password must not travel in args or via kubectl get:\n%s", job)
+	}
+	if !strings.Contains(job, "jq -sRr @uri") || !strings.Contains(job, "${pw}@pg.example.com") {
+		t.Errorf("password must be URL-encoded into POSTGRES_CONN:\n%s", job)
+	}
+	if !strings.Contains(job, "kubectl apply -f - <<EOF") {
+		t.Errorf("Secrets should be applied from stdin:\n%s", job)
+	}
+	// Rights: a Role in the tenant namespace limited to Secrets; nothing
+	// read in the release namespace.
 	role := d["Role/workspace-larkmere-mutual-secrets"]
 	if !strings.Contains(role, "namespace: larkmere-mutual") || !strings.Contains(role, "secrets") ||
 		strings.Contains(role, "'*'") || strings.Contains(role, `"*"`) {
 		t.Errorf("tenant Role wrong:\n%s", role)
 	}
-	rd := d["Role/workspace-larkmere-mutual-read-admin"]
-	if !strings.Contains(rd, "namespace: omnia") || !strings.Contains(rd, "- omnia-db-admin") {
-		t.Errorf("admin-read Role wrong:\n%s", rd)
+	if _, ok := d["Role/workspace-larkmere-mutual-read-admin"]; ok {
+		t.Error("no Role in the release namespace is needed")
+	}
+	// The databases Job reads the same Secret and key as the tenant Secrets.
+	if db := d["Job/workspace-larkmere-mutual-db"]; !strings.Contains(db, `name: omnia-db-admin, key: PGPASSWORD`) {
+		t.Errorf("db Job should use secretRef:\n%s", db)
+	}
+	other := mustTemplate(t, "name=larkmere-mutual", "postgres.host=h", "postgres.adminLogin=a", "nfs.enabled=false",
+		"postgres.password.secretRef.name=pg-pass", "postgres.password.secretRef.key=pw.v1")
+	if db := docs(other)["Job/workspace-larkmere-mutual-db"]; !strings.Contains(db, `name: pg-pass, key: pw.v1`) || strings.Contains(db, "omnia-db-admin") {
+		t.Errorf("db Job must follow secretRef name/key:\n%s", db)
+	}
+	if db := docs(ext)["Job/workspace-larkmere-mutual-db"]; !strings.Contains(db, `name: omnia-db-admin, key: PGPASSWORD`) {
+		t.Errorf("externalSecret mode keeps dbBootstrap.adminSecret:\n%s", db)
+	}
+	for _, bad := range []string{"a b", "x;rm", "k'y", "a/b"} {
+		out, err := helmTemplate(t, "name=larkmere-mutual", "postgres.host=h", "postgres.adminLogin=a", "nfs.enabled=false",
+			"postgres.password.secretRef.name=n", "postgres.password.secretRef.key="+strings.ReplaceAll(bad, ";", "\\;"))
+		if err == nil || !strings.Contains(out, "must be a Kubernetes Secret key") {
+			t.Errorf("key %q should fail: %v\n%s", bad, err, out)
+		}
 	}
 
 	both, err := helmTemplate(t, baseSets("postgres.password.secretRef.name=x", "postgres.password.secretRef.key=k")...)

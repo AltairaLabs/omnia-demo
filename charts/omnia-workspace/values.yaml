@@ -18,9 +18,11 @@ postgres:
   #     refreshInterval: default 1h
   # secretRef: a Secret in the release namespace (Omnia's). A post-install Job
   #   reads it and writes the three tenant Secrets, so no External Secrets
-  #   operator is needed.
+  #   operator is needed. The databases Job reads the same Secret and key, in
+  #   place of dbBootstrap.adminSecret.
   #     name: the Secret's name (required)
-  #     key: the key holding the password (required; letters, digits, _ - only)
+  #     key: the key holding the password (required; a Kubernetes Secret key:
+  #       letters, digits, '-', '_', '.')
   password: {}
   # externalSecret:
   #   store: azure-kv
@@ -30,9 +32,10 @@ postgres:
   #   name: omnia-db-admin
   #   key: PGPASSWORD
 
-# The image of the secretRef-mode Job. It needs kubectl and a POSIX shell.
+# The image of the secretRef-mode Job. It needs kubectl, jq and a POSIX shell.
+# alpine/k8s carries all three; 1.31.13 is listed active on Docker Hub.
 secretsJob:
-  image: bitnami/kubectl:1.31.4
+  image: alpine/k8s:1.31.13
 
 # Creates the workspace's three databases (session, memory, consent) with the
 # admin login, from the release namespace, reusing the umbrella's

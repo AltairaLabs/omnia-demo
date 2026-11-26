@@ -23,10 +23,13 @@ render):
   from a `ClusterSecretStore`. Needs the External Secrets operator.
   `key` defaults to `omnia-postgres-admin-password`.
 - `secretRef: {name, key}`: a Secret in the release namespace. A post-install
-  Job (`workspace-<name>-secrets`) reads it and writes the three Secrets. Its
-  rights are a Role in the tenant namespace limited to Secrets, plus a Role in
-  the release namespace that can `get` only the named Secret. Set
-  `secretsJob.image` to any image with `kubectl` and `sh`.
+  Job (`workspace-<name>-secrets`, in the release namespace) takes the
+  password from it as an env var and writes the three Secrets through stdin.
+  The password is URL-encoded in `POSTGRES_CONN` (the ExternalSecret form is
+  not). Its ServiceAccount's only rights are a Role in the tenant namespace
+  limited to Secrets. The databases Job reads this same Secret and key instead
+  of `dbBootstrap.adminSecret`. `key` must be a valid Secret key. Set
+  `secretsJob.image` to any image with `kubectl`, `jq` and `sh`.
 
 ## Try it
 
