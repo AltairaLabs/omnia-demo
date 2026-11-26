@@ -85,6 +85,10 @@ type server struct {
 	signins map[string]signInState // the latest sign-in begun, by domain
 	// asked is the scopes the latest sign-in asked for, by domain.
 	asked map[string][]string
+	// sentAt is, by conversation, how many company messages the Store held
+	// when the assistant last sent one (markSent). A company message at or
+	// before that count is not the answer to it.
+	sentAt map[string]int
 	// signedIn counts completed sign-ins by domain. A Reader that stops
 	// asking for sign-in after the count moved since it began raced a
 	// sign-in, and runs again.
@@ -109,6 +113,7 @@ func newServer(ctx context.Context, cfg config) *server {
 		readers: map[string]bool{},
 		again:   map[string]bool{},
 		signins: map[string]signInState{},
+		sentAt:  map[string]int{},
 		asked:   map[string][]string{},
 
 		signedIn: map[string]int{},
@@ -589,7 +594,33 @@ func (s *server) sendMessage(ctx context.Context, req toolRequest) (any, *toolEr
 	if err := s.client.Send(ctx, c, req.Text); err != nil {
 		return nil, companyError(c.Company, err)
 	}
+	s.markSent(c)
 	return map[string]any{"conversation_id": c.ID, "sent": true}, nil
+}
+
+// markSent records that the assistant has just sent c a message: until a
+// company message newer than those stored now arrives, a waiting
+// read_conversation does not take the last one as the reply. The Store gets
+// the sent message only when the stream echoes it, so without this a read
+// right after a send sees the company's previous reply last and answers at
+// once with it.
+func (s *server) markSent(c conversation.Conversation) {
+	now, terr := s.read(c)
+	if terr != nil {
+		return
+	}
+	s.mu.Lock()
+	s.sentAt[c.ID] = companyMessages(now)
+	s.mu.Unlock()
+}
+
+// awaitingReply reports whether r is still short of a company message newer
+// than the assistant's last send.
+func (s *server) awaitingReply(id string, r readOut) bool {
+	s.mu.Lock()
+	n, ok := s.sentAt[id]
+	s.mu.Unlock()
+	return ok && companyMessages(r) <= n
 }
 
 type messageOut struct {
@@ -646,7 +677,7 @@ func (s *server) readConversation(ctx context.Context, req toolRequest) (any, *t
 	ch, stop := s.hub.subscribe()
 	defer stop()
 	before, terr := s.read(c)
-	if terr != nil || before.Closed || before.Stopped != "" || replied(before) {
+	if terr != nil || before.Closed || before.Stopped != "" || (replied(before) && !s.awaitingReply(c.ID, before)) {
 		return before, terr
 	}
 	timer := time.NewTimer(wait)

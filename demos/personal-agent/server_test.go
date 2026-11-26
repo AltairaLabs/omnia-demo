@@ -846,6 +846,47 @@ func TestReadConversationWaitReturnsReplyThatArrives(t *testing.T) {
 	}
 }
 
+// After send_message, the Store can still end with the company's previous
+// reply until the stream echoes the new message. A waiting read must not
+// take that old reply as the answer: it waits for a company message newer
+// than the send. (Wrenmoor's compensation reply was missed this way: the read
+// returned at once with "she needs to sign in", and the turn ended.)
+func TestReadConversationWaitIgnoresTheReplyBeforeASend(t *testing.T) {
+	h := newHarness(t, nil)
+	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
+	if err := h.store.SaveConversation(conv); err != nil {
+		t.Fatal(err)
+	}
+	h.arrive(t, conv, msgEvent("w1", "She needs to sign in for compensation."))
+	h.srv.markSent(conv)
+
+	res := h.callAsync("/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15})
+	subscribed(t, &h.srv.hub, 1)
+	select {
+	case r := <-res:
+		t.Fatalf("read_conversation answered with the reply from before the send: %d %s", r.status, r.raw)
+	case <-time.After(200 * time.Millisecond):
+	}
+	user := msgEvent("w2", "She has signed in. Please check her compensation.")
+	user["message"].(map[string]any)["role"] = "user"
+	h.arrive(t, conv, user)
+	h.arrive(t, conv, msgEvent("w3", "Ellen is owed £95."))
+	select {
+	case r := <-res:
+		msgs, _ := r.body["messages"].([]any)
+		if m, _ := msgs[len(msgs)-1].(map[string]any); m["text"] != "Ellen is owed £95." {
+			t.Errorf("read_conversation = %s, want the new reply", r.raw)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("read_conversation did not return when the new reply arrived")
+	}
+	// Once that reply is in, a read answers at once again.
+	start := time.Now()
+	if status, _, raw := h.call(t, "/tools/read_conversation", map[string]any{"conversation_id": "cnv_w", "wait_seconds": 15}); status != 200 || time.Since(start) > 2*time.Second {
+		t.Errorf("read after the reply = %d %s in %v, want at once", status, raw, time.Since(start))
+	}
+}
+
 func TestReadConversationWaitReturnsWhenWorkingEnds(t *testing.T) {
 	h := newHarness(t, nil)
 	conv := conversation.Conversation{ID: "cnv_w", Company: "wrenmoor.example", Name: "Wrenmoor Energy"}
