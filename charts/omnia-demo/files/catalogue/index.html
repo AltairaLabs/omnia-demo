@@ -245,8 +245,9 @@ make canary-reset       # afterwards</pre></li>
           <li><b>Before.</b> <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>, with <code>{"claim_ref": "LM-40751", "peril": "Flood"}</code>. £420 is within the £500 limit, so it's <b>SETTLED</b>. Reset the claims system.</li>
           <li><b>The rule.</b> Turn on CP-7, every flood claim goes to Flood Response, as a ToolPolicy rule:
 <pre>helm --kube-context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
-          <li><b>The guidance</b>, what a flooded member needs to know. Ingest it <i>after</i> the upgrade (an upgrade re-runs the ingest and would drop it), then reset the claims system again:
-<pre>hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
+          <li><b>The guidance</b>, what a flooded member needs to know. Add it to Larkmere's documents and seed them (this uploads the new file and starts an ingest run), then reset the claims system again:
+<pre>cp demos/claims-triage/flood-claims.md memory-documents/larkmere-mutual/
+make azure-memory
 kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
             Wait about 25 seconds after it reports ready: the claims system's peril classifier answers 503 for a while after a restart, and the policy then refuses the call (fail-closed) instead of applying CP-7.</li>
           <li><b>After.</b> Run the same test. The settlement is refused (<code>deny-flood-settlement</code>), the claim is referred to Flood Response, and the note tells the member the team will contact them within one working day. Show the session's system prompt: the flood guidance is under "The society's guidance".</li>
@@ -323,20 +324,21 @@ kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" 
       </tr>
       <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
         <h4>Before the take</h4>
-        <p>Make an edited copy of one manual: copy <code>charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/isolation-and-safety.md</code> somewhere else, and add a step after "Prove dead", for example <span class="say">"Photograph the indicator showing dead and attach the photo to the job in FieldDesk before you apply any earths."</span></p>
+        <p>Make an edited copy of one manual: edit <code>memory-documents/wrenmoor-energy/isolation-and-safety.md</code> in your working tree (leave it uncommitted), and add a step after "Prove dead", for example <span class="say">"Photograph the indicator showing dead and attach the photo to the job in FieldDesk before you apply any earths."</span></p>
         <h4>The beats</h4>
         <p>Dashboard, <b>Console</b>, <code>field-service</code>.</p>
         <ol>
           <li><span class="say">"I've opened the points of isolation on an HV ring main unit and locked them off. What exactly do I do next?"</span> The answer lists the manual's steps: caution notices, prove dead, apply earths.</li>
           <li>In the session, open the <code>memory__recall</code> row: what it searched for, and the manual section it got back, in the same words as its answer.</li>
           <li>The safety team updates the manual:
-<pre>hack/reingest-manual.sh /path/to/your/edited/isolation-and-safety.md</pre>
-            Wait a few seconds for it to embed.</li>
+<pre>make azure-memory</pre>
+            It uploads the changed manual to the tenant's Blob container and starts an ingest run. Wait a few seconds for it to embed.</li>
           <li>Start a new conversation and ask the same question. The answer now has the photo step. No redeploy, no prompt change. <b>Reload the console page</b> to start it: on the current Omnia build the console's reset button clears the screen but keeps the old conversation, so the answer would come from its history.</li>
         </ol>
         <h4>Reset</h4>
-<pre>hack/reingest-manual.sh charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/isolation-and-safety.md</pre>
-        <p>Don't run <code>make demos</code> between the edit and the question: it puts the original manuals back. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/field-service/RUNBOOK.md">Full runbook</a></p>
+<pre>git checkout memory-documents/wrenmoor-energy/isolation-and-safety.md
+make azure-memory</pre>
+        <p>An upgrade does not touch the manuals: the Blob container holds your edit until you seed again. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/field-service/RUNBOOK.md">Full runbook</a></p>
       </div></details></td></tr>
       <tr>
         <td class="name"><a href="/functions?workspace=wrenmoor-energy">Grid analyst and daily digest</a></td>

@@ -2,8 +2,7 @@
 #
 # Wrenmoor Energy's field-service copilot. Engineers in vans ask about
 # procedures; the answers come from the field manuals, ingested as
-# institutional memory (charts/omnia-demo/files/fixtures/
-# wrenmoor-field-procedures/).
+# institutional memory (memory-documents/wrenmoor-energy/).
 #
 # The copilot looks the manuals up with memory__recall, a tool call, rather
 # than having passages pasted into its prompt by ambient retrieval. The lookup

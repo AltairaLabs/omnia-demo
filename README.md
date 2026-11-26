@@ -12,11 +12,14 @@ documents its prerequisites and can be enabled or disabled through values.
   the demo cast's agents: Larkmere Mutual (mortgage underwriting, claims
   triage, card support) and Wrenmoor Energy (on-call incident agent, grid data
   analyst, field-service copilot).
-- [`memory-ingestion/`](memory-ingestion/) — a public S3-compatible source
+- [`memory-ingestion/`](memory-ingestion/) — a public Azure Blob source
   connector that sends documents to Omnia institutional memory.
+- [`memory-documents/`](memory-documents/) — each company's synthetic documents,
+  one directory per tenant. `make azure-memory` seeds them into that tenant's
+  private Blob container.
 - [`charts/omnia-demo/`](charts/omnia-demo/) — the Helm add-on that deploys the
-  demos, one release per tenant, with the memory ingestion example, local S3 gateway (Versity Gateway)
-  and synthetic fixtures.
+  demos, one release per tenant, with the memory ingestion example (a CronJob
+  that reads the tenant's Blob container).
 
 - [`profiles/`](profiles/) — per-platform values for the demo tenants (one
   Workspace per company in the cast). `profiles/azure/` targets an Omnia

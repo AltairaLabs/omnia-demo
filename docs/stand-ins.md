@@ -369,12 +369,42 @@ what sits behind and beside it.
     MemoryPolicy's per-category default, because the user save route has no
     expiry field.
 
+### The company's document store (`memory-documents/`, `deploy/azure/memory.sh`, `templates/ingest.yaml`)
+
+- **Fakes:** a company's own document store (a SharePoint site, a DMS, a file
+  share) and the people who keep it. It is a private Blob container per
+  tenant, `<tenant>-documents`, that `make azure-memory` seeds from synthetic
+  Markdown in `memory-documents/<tenant>/`, in a storage account the installer
+  brings. The connector that reads it is the repo's example
+  (`memory-ingestion/`), run by the `memory-ingest` CronJob (hourly) as the
+  tenant's workload identity.
+- **Real system:** the customer's own source, owned and edited by the
+  company, read by a connector the company runs with its own identity and
+  rights on that source.
+- **Downstream:**
+  - **The seeder is the document owner.** `make azure-memory` uploads changed
+    files and deletes blobs that have no file, so the repo, not a person, is
+    the source of truth. Editing a document means editing the file and seeding
+    again.
+  - **The grant is ours.** The tenant's identity holds `Storage Blob Data
+    Reader` on its own container only, granted by the same script. A real
+    company grants its connector read on its source. A new grant takes a few
+    minutes to apply, so the first run waits for a second `make azure-memory`.
+  - **The container is flat.** Documents are identified by blob name, with no
+    folders. Anything that filters by a path in the document's reference (the
+    claims desk's member-guidance filter) sees no folder.
+  - **Ingestion is hourly, not live.** A change in the source reaches memory
+    on the next run; `make azure-memory` starts one at once.
+  - **An empty container forgets everything.** The connector's list of what
+    the source holds is the truth, so an empty one removes every document.
+    The seeding script refuses to run from an empty directory.
+  - **No memory block, no memory.** Without `memory` in `site.yaml` there is
+    no container and memory is off for every tenant.
+
 ## Not yet audited
 
 The following stand-ins exist but have not been documented here yet. Document
 one before relying on its behaviour:
 
 - the SharePoint sample documents;
-- the object store and S3 ingestion fixtures (`object-store.yaml`,
-  `fixtures.yaml`, `ingest.yaml`);
 - the data analyst's schedule.

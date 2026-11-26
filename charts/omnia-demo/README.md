@@ -1,8 +1,12 @@
 # Omnia public memory demo
 
-This chart is an add-on for an existing Omnia installation. It deploys a
-local S3 gateway (Versity Gateway) source, uploads the synthetic fixtures, and runs the public example
-ingestion service once. It does not install or copy Omnia's private templates.
+This chart is an add-on for an existing Omnia installation. With
+`memory.enabled` it deploys a CronJob (`memory-ingest`, hourly) that runs the
+public example ingestion service against a private Azure Blob container holding
+the company's documents. It does not install or copy Omnia's private templates.
+`memory.enabled` defaults to `false`: set `memory.blob.accountURL` and
+`memory.blob.container` and turn it on (on Azure, `deploy/azure/site-values.sh`
+does that from the `memory` block of `site.yaml`).
 
 Install Omnia separately, with Enterprise institutional ingestion enabled, then
 install this chart:
@@ -100,9 +104,10 @@ Wrenmoor Energy, the wind and solar supplier, has four agents and a website:
   as `a2a__grid_analyst__site_output` (a function-mode agent cannot serve A2A
   itself).
 - `fieldService` — the field-service copilot (chat), answering from the field
-  manuals in `files/fixtures/wrenmoor-field-procedures/`. They reach it as
-  institutional memory: enable `memory` with
-  `memory.fixtures: wrenmoor-field-procedures`.
+  manuals in `memory-documents/wrenmoor-energy/`. They reach it as
+  institutional memory: `make azure-memory` seeds them into the tenant's Blob
+  container and the `memory-ingest` CronJob (enabled with `memory.enabled`)
+  reads them from there.
 
 Wren, the incident agent and the data analyst use the stub image the Larkmere
 demos use; it serves Wrenmoor Energy's `/wren`, `/ops` and `/grid` endpoints
@@ -117,7 +122,9 @@ dataAnalyst: { enabled: true }
 fieldService: { enabled: true }
 memory:
   enabled: true
-  fixtures: wrenmoor-field-procedures
+  blob:
+    accountURL: https://<account>.blob.core.windows.net
+    container: wrenmoor-energy-documents
 ```
 
 Runbooks: [mortgage underwriting](../../demos/mortgage-underwriting/RUNBOOK.md),

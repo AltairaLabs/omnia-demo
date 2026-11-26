@@ -4,8 +4,9 @@
 # that answers engineers' procedure questions from the field manuals.
 #
 # The manuals are NOT in this pack. They are documents in
-# charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/, ingested into the workspace's
-# institutional memory by the chart's memory job, and looked up by the copilot
+# memory-documents/wrenmoor-energy/, held in the tenant's Blob container and
+# ingested into the workspace's institutional memory by the chart's memory-ingest
+# CronJob, and looked up by the copilot
 # with memory__recall. Updating a procedure means updating a document, not
 # redeploying the agent.
 #

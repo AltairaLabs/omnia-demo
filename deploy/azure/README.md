@@ -24,6 +24,7 @@ Your install, ready before the first command:
 | A Key Vault | the key `omnia-connections`, which Poppy account tools seal tokens with | `keyVault.*` |
 | External Secrets, if the Postgres password lives in a vault | otherwise a plain Secret holds it | `postgres.adminPassword` |
 | NFS storage account (optional) | a shared content volume per tenant | `nfs.*` |
+| A Blob storage account (optional, you bring it) | one private container per tenant, `<tenant>-documents`, holding the company's documents for institutional memory. Without it, memory is off for every tenant | `memory.*` |
 | An ACR (optional, you bring it) | `make images` builds the demo images into it | `images.*` |
 
 On your machine: `az`, `kubectl`, `helm`, `jq` and mikefarah `yq` v4, signed in
@@ -41,7 +42,12 @@ ServiceAccounts they name and each AgentRuntime's `<name>-facade`.
 | `azure-tenant` | `az identity create` in `identityResourceGroup`; `az role assignment create` of `Cognitive Services OpenAI User` on the Foundry (and speech) account | Managed Identity Contributor on the resource group; Role Based Access Control Administrator on the Foundry and speech accounts (conditioned to assign only `Cognitive Services OpenAI User` if you like) |
 | `azure-identity` | `az aks show` (reads the OIDC issuer); `az identity federated-credential list/create/delete` | Reader on the cluster; Managed Identity Contributor on the identity resource group |
 | `azure-poppy` | `az network dns record-set a show/add-record/delete` in the zone (its subscription is `dns.subscription`); `az network public-ip show` if you name a public IP; `az keyvault show`; `az rest --method put` of the Key Vault key `omnia-connections` through ARM; `az role assignment create` of `Key Vault Crypto User` on that key | DNS Zone Contributor on the zone; Reader on the vault, the public IP and the identity resource group (it reads each tenant identity's principal); Key Vault Contributor on the vault; Role Based Access Control Administrator on the key (conditioned to assign only `Key Vault Crypto User` if you like) |
+| `azure-memory` | `az storage container/blob ...` with `--auth-mode login` (data plane); `az role assignment create` of `Storage Blob Data Reader` on one container; `az storage account show`, `az identity show` | Storage Blob Data Contributor on the storage account (a control-plane Owner or Contributor is not enough: the data plane needs its own role); Role Based Access Control Administrator on the account, conditioned to assign only `Storage Blob Data Reader`; Reader on the account and on the identity resource group |
 | `images` | `az acr build` | Container Registry Tasks Contributor on the registry |
+
+`azure-memory` uses Entra ID only: no account key, connection string or SAS, and
+no public access. The tenant's identity gets `Storage Blob Data Reader` on its
+own container, never the account.
 
 In the cluster, `azure-tenant` and `make demos` run `helm upgrade --install`,
 which creates namespaces and the chart's Workspace, ServiceAccounts, Roles and
@@ -68,6 +74,18 @@ Jobs, so the context needs rights to do that and to read AgentRuntimes.
    Nothing is published from this repository.
 6. **`make demos`** installs every tenant: its Azure side, the chart, then
    federation of its agents. `make demos TENANTS=larkmere-mutual` does one.
+
+7. **`make azure-memory`** (optional; needs the `memory` block in `site.yaml`,
+   and `make demos` first, which installs the CronJob). For each tenant whose
+   profile sets `memory.enabled`, it creates the private container
+   `<tenant>-documents` in `memory.storageAccount`, uploads
+   `memory-documents/<tenant>/` (only files whose MD5 changed, and it deletes
+   blobs with no file), grants the tenant identity `Storage Blob Data Reader`
+   on that container, and starts a first run of the `memory-ingest` CronJob when
+   it has never run. **A new grant needs a few minutes** to apply, so that
+   first run is not started then: run `make azure-memory` again. Edit a
+   document and run it again to update memory; the CronJob also reads the
+   container hourly. With no `memory` block it does nothing.
 
 `make builder` adds the Arena builder to Halvern Partners. `make lint
 SITE=deploy/azure/testdata/site-full.yaml` renders every tenant against a

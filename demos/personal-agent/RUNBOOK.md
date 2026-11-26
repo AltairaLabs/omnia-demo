@@ -98,15 +98,19 @@ already has the demos you can skip what's done.
    `make azure-identity WS=<namespace>`, for the new
    Company Agents `larkmere-mutual` and `wrenmoor-energy`, and
    `ellens-assistant` for the assistant.
-7. **Larkmere's member guidance**, so the claims desk has its procedures. An
-   upgrade re-runs the ingest and drops what `reingest-manual.sh` added, so
-   do this *after* the last `make demos`:
+7. **Larkmere's documents**, so the claims desk has its procedures. After the
+   last `make demos` (the CronJob comes from it), seed them and start the
+   first ingest run:
    ```bash
-   hack/reingest-manual.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
+   make azure-memory
    ```
-   `larkmere-claims-desk` reads only documents under `member-guidance/`.
-   The claims-handling rules in the same store are filtered out of what it
-   can read.
+   The first run for a tenant grants its identity read access, which takes a
+   few minutes to apply: run `make azure-memory` again then. To add the flood
+   guidance, copy `demos/claims-triage/flood-claims.md` into
+   `memory-documents/larkmere-mutual/` first (uncommitted).
+   `larkmere-claims-desk` is meant to read only member-guidance documents;
+   the claims-handling rules in the same store are filtered out of what it
+   can read (see the known gap in the flood runbook).
 
 ## Checks before presenting
 
@@ -481,7 +485,8 @@ Between takes, close the conversations and clear the assistant's store.
 4. **Reload the page.** It loads `/api/conversations` first, then follows
    `/api/updates`.
 
-Reset Larkmere's guidance only if you changed it (`reingest-manual.sh`, as in
+Reset Larkmere's guidance only if you changed it (remove your file from
+`memory-documents/larkmere-mutual/` and run `make azure-memory`, as in
 Setup). Redis here is not persistent: if `demo-redis` itself restarts, every
 `pa:*` key goes with it, and the strip starts empty.
 

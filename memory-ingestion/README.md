@@ -42,7 +42,7 @@ Content-Type: application/json
 ```json
 {
   "workspace_id": "wrenmoor-energy",
-  "source": "wrenmoor-field-procedures",
+  "source": "blob",
   "documents": [
     {
       "title": "isolation-and-safety.md",
@@ -124,7 +124,8 @@ The connector lists the whole container before it posts anything. A credential
 or list failure fails the run with nothing sent, so it can never send an empty
 manifest that would forget documents still in the container. A single blob that
 can't be read is skipped with a warning but kept in the manifest, so memory-api
-keeps the copy it already holds. `modified_at` is the blob's Last-Modified,
+keeps the copy it already holds. An empty listing is a valid manifest, so a container that is genuinely empty
+makes memory forget every document it held. `modified_at` is the blob's Last-Modified,
 which moves only when the blob is edited, so re-runs skip unchanged documents.
 
 To forget a source (for example after renaming `MEMORY_SOURCE`):
@@ -148,22 +149,28 @@ unreadable), each logged as `skip blob` or `skip file`.
 
 ## How the demo runs it
 
-`charts/omnia-demo` with `memory.enabled` (the Wrenmoor Energy tenant):
+`charts/omnia-demo` with `memory.enabled` (Larkmere Mutual and Wrenmoor Energy):
 
-1. `templates/object-store.yaml` runs [Versity Gateway](https://github.com/versity/versitygw),
-   an S3-compatible store, in the tenant's namespace. It stands in for the
-   customer's own bucket.
-2. `templates/ingest.yaml` is a Job that runs after every install and upgrade.
-   An init container uploads the chosen fixture set
-   (`memory.fixtures`, here `files/fixtures/wrenmoor-field-procedures/`) into
-   the bucket, then this connector reads it back out and posts it to the
-   tenant's memory-api.
-3. The field-service agent recalls those documents as institutional memory
-   when an engineer asks about a procedure.
+1. `make azure-memory` (`deploy/azure/memory.sh`) creates a private Blob
+   container, `<tenant>-documents`, in the storage account named by
+   `memory.storageAccount` in `deploy/azure/site.yaml`, and uploads the
+   tenant's `memory-documents/<tenant>/` into it: only files whose MD5 differs,
+   and it deletes blobs with no file behind them. It grants the tenant's
+   managed identity `Storage Blob Data Reader` on that one container. The
+   container stands in for the customer's own document store.
+2. `templates/ingest.yaml` renders a ServiceAccount and a CronJob, both named
+   `memory-ingest`, that run this connector hourly (`memory.schedule`) as the
+   tenant's workload identity, reading the container keylessly and posting to
+   the tenant's memory-api. An upgrade never runs it. `make azure-memory`
+   starts a run (`kubectl create job --from=cronjob/memory-ingest`) when the
+   documents changed or the CronJob has never run; right after a new grant it
+   waits instead, because the grant takes a few minutes to apply: run it again.
+3. The agents recall those documents as institutional memory.
 
-With `memory.objectStore.enabled: false` the Job skips the store and reads the
-fixtures straight from their ConfigMap (`SOURCE_DIR`): the same connector and
-contract, without S3.
+An empty container after a successful listing forgets every document of the
+source. That is the design: the manifest is the truth about what the source
+holds. `make azure-memory` therefore refuses to seed from an empty documents
+directory. A failed listing or credential error sends nothing.
 
 ## Writing your own
 
