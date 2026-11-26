@@ -31,5 +31,11 @@ for spec in "$@"; do
   run az acr build --subscription "$sub" --registry "$acr" --platform linux/amd64 \
     --image "$name:$tag" --file "$file" --no-logs --output none "$context"
 done
-printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$server" "$tag" >"$image_env"
-echo "==> Built $tag; make demos now runs it (rm $image_env to go back)"
+# A dry run built nothing, so it records nothing: the file names the tag that
+# make demos deploys next.
+if [ "${DRY_RUN:-0}" = "1" ]; then
+  echo "DRY_RUN: write $image_env (IMAGE_REGISTRY := $server, IMAGE_TAG := $tag)"
+else
+  printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$server" "$tag" >"$image_env"
+  echo "==> Built $tag; make demos now runs it (rm $image_env to go back)"
+fi

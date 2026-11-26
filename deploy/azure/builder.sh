@@ -32,8 +32,8 @@ if site_has builder.sandboxImage; then
   args+=(--set "sandbox.image.repository=$repository")
   tag="$(site_get builder.sandboxImage.tag)"
   digest="$(site_get builder.sandboxImage.digest)"
-  if [ -n "$tag" ]; then args+=(--set "sandbox.image.tag=$tag"); fi
-  if [ -n "$digest" ]; then args+=(--set "sandbox.image.digest=$digest"); fi
+  if [ -n "$tag" ]; then args+=(--set-string "sandbox.image.tag=$tag"); fi
+  if [ -n "$digest" ]; then args+=(--set-string "sandbox.image.digest=$digest"); fi
 fi
 
 echo "==> arena-builder $version -> $tenant (provider $provider)"

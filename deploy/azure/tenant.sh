@@ -54,6 +54,12 @@ values_file() {
   if site_has postgres.adminPassword.externalSecret; then
     set_req .postgres.password.externalSecret.store postgres.adminPassword.externalSecret.clusterSecretStore
     set_req .postgres.password.externalSecret.key postgres.adminPassword.externalSecret.key
+    # The databases Job still reads the admin password from a Secret in the
+    # Omnia namespace (the chart's dbBootstrap.adminSecret, key PGPASSWORD);
+    # unset, the chart's default name stands.
+    if site_has postgres.adminPassword.externalSecret.dbAdminSecret; then
+      set_req .dbBootstrap.adminSecret postgres.adminPassword.externalSecret.dbAdminSecret
+    fi
   elif site_has postgres.adminPassword.secret; then
     set_req .postgres.password.secretRef.name postgres.adminPassword.secret.name
     set_req .postgres.password.secretRef.key postgres.adminPassword.secret.key

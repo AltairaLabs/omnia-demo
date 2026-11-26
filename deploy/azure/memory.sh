@@ -88,23 +88,9 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
     echo "no documents in $docs/$t: refusing to seed (it would delete every blob in $t-documents)" >&2
     exit 1
   fi
-  p="$(azm identity show -g "$id_rg" -n "$prefix-$t" --query principalId -o tsv)"
-  if [ -z "$p" ]; then
-    echo "identity $prefix-$t not found in $id_rg (run make azure-tenant WS=$t first)" >&2
-    exit 1
-  fi
+  p="$(identity_lookup "$id_rg" "$prefix-$t" principalId "$t")" || exit 1
   principals+=("$p")
 done
-
-# is_not_found <message>: succeed when an az error says the thing is absent.
-# Only that answer means "create it"; any other failure (no rights, throttling)
-# stops the script rather than writing on a guess.
-is_not_found() {
-  case "$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" in
-    *notfound* | *"not found"* | *"does not exist"*) return 0 ;;
-    *) return 1 ;;
-  esac
-}
 
 # md5_b64 <file>: base64 of the raw MD5, the form Blob stores in contentMd5.
 # openssl is on macOS and Linux alike; md5sum and md5 are not.

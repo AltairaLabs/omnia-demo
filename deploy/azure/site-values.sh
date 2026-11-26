@@ -11,8 +11,10 @@
 #
 # Every tenant gets the owner groups. The Poppy Companies, Ellen's assistant and
 # the Halvern catalogue also get the hosts built from dns.zone and the rest of
-# what only they use. A required field that is missing stops the script before
-# it prints anything.
+# what only they use. Larkmere also gets the scope guardrail when site.yaml has a
+# `guardrail` block, and each Poppy Company the name of its upstream sign-in
+# client Secret when site.yaml gives one. A required field that is missing stops
+# the script before it prints anything.
 #
 # Assumes Azure's public cloud: the Key Vault URL is https://<name>.vault.azure.net/.
 set -euo pipefail
@@ -47,23 +49,38 @@ case "$tenant" in
   larkmere-mutual | wrenmoor-energy)
     upstream_issuer="$(site_req poppy.upstream.issuer)"
     client_id="$(site_req "poppy.companies.$tenant.clientID")"
+    # Optional: without it the profile's own Secret name stands.
+    client_secret="$(site_get "poppy.companies.$tenant.clientSecretName")"
     vault="$(site_req keyVault.name)"
     ;;
   halvern-partners)
     dashboard="$(site_req dashboardHost)"
     ;;
 esac
-# The Gateway every public route attaches to. sectionName is optional.
+# The Gateway every public route attaches to.
 gw_name="" gw_ns="" gw_section=""
 case "$tenant" in
   larkmere-mutual | wrenmoor-energy | ellens-assistant | halvern-partners)
     gw_name="$(site_req gateway.name)"
     gw_ns="$(site_req gateway.namespace)"
-    gw_section="$(site_get gateway.sectionName)"
+    gw_section="$(site_req gateway.sectionName)"
     ;;
 esac
 
+# The scope guardrail's gateway key, from the install's secret store. Without a
+# `guardrail` block the profile leaves it off, and the chart strips the validator.
+guard_store="" guard_key=""
+if [ "$tenant" = larkmere-mutual ] && site_has guardrail; then
+  guard_store="$(site_req guardrail.clusterSecretStore)"
+  guard_key="$(site_req guardrail.key)"
+fi
+
 yq e -n '.workspace.roleBindings = [{"groups": load(strenv(SITE)).ownerGroups, "role": "owner"}]'
+
+if [ -n "$guard_store" ]; then
+  STORE="$guard_store" KEY="$guard_key" \
+    yq e -n '.piiChat.guardrail.enabled = true | .piiChat.guardrail.clusterSecretStore = strenv(STORE) | .piiChat.guardrail.keyVaultSecret = strenv(KEY)'
+fi
 
 # Memory is optional. A tenant whose profile turns memory on reads its documents
 # from the Blob container <tenant>-documents in the site's memory.storageAccount;
@@ -87,18 +104,20 @@ case "$tenant" in
     DOMAIN="$company.$zone" ASSISTANT="https://assistant.$zone/agent.json" \
       ISSUER="https://auth.$company.$zone" UPSTREAM="$upstream_issuer" CLIENT_ID="$client_id" \
       VAULT="https://$vault.vault.azure.net/" GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" \
+      SECRET="$client_secret" \
       yq e -n '
         .poppy.domain = strenv(DOMAIN) |
         .poppy.allow = [strenv(ASSISTANT)] |
         .poppy.auth.issuer = strenv(ISSUER) |
         .poppy.auth.gateway.upstream.issuer = strenv(UPSTREAM) |
         .poppy.auth.gateway.upstream.clientID = strenv(CLIENT_ID) |
+        (select(strenv(SECRET) != "") | .poppy.auth.gateway.upstream.clientSecretRef) = strenv(SECRET) |
         .poppy.auth.accessTokens.audiences = ["https://" + strenv(DOMAIN)] |
         .poppy.account.audience = "https://" + strenv(DOMAIN) + "/api" |
         .poppy.account.encryption.vaultURL = strenv(VAULT) |
         .poppy.gatewayName = strenv(GW_NAME) |
         .poppy.gatewayNamespace = strenv(GW_NS) |
-        (select(strenv(GW_SECTION) != "") | .poppy.gatewaySectionName) = strenv(GW_SECTION)'
+        .poppy.gatewaySectionName = strenv(GW_SECTION)'
     ;;
   ellens-assistant)
     HOST="assistant.$zone" LARKMERE="larkmere.$zone" WRENMOOR="wrenmoor.$zone" \
@@ -108,13 +127,13 @@ case "$tenant" in
         .personalAgent.knownCompanies = [strenv(LARKMERE), strenv(WRENMOOR)] |
         .poppy.gatewayName = strenv(GW_NAME) |
         .poppy.gatewayNamespace = strenv(GW_NS) |
-        (select(strenv(GW_SECTION) != "") | .poppy.gatewaySectionName) = strenv(GW_SECTION)'
+        .poppy.gatewaySectionName = strenv(GW_SECTION)'
     ;;
   halvern-partners)
     GW_NAME="$gw_name" GW_NS="$gw_ns" GW_SECTION="$gw_section" DASHBOARD="$dashboard" \
       yq e -n '
         .catalogue.route.parentRefs = [{"name": strenv(GW_NAME), "namespace": strenv(GW_NS)}] |
-        (select(strenv(GW_SECTION) != "") | .catalogue.route.parentRefs[0].sectionName) = strenv(GW_SECTION) |
+        .catalogue.route.parentRefs[0].sectionName = strenv(GW_SECTION) |
         .catalogue.route.hostnames = [strenv(DASHBOARD)]'
     ;;
 esac

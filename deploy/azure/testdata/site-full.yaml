@@ -12,7 +12,6 @@ postgres:
   adminLogin: pgadmin
   adminPassword:
     secret:
-      namespace: omnia
       name: pg-admin
       key: password
 foundry:
@@ -66,6 +65,9 @@ poppy:
     wrenmoor-energy:
       clientID: client-wrenmoor
       clientSecretName: wrenmoor-upstream
+guardrail:
+  clusterSecretStore: store-demo
+  key: gateway-api-key
 memory:
   storageAccount: stdocs
   resourceGroup: rg-docs

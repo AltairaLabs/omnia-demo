@@ -30,14 +30,23 @@ aks_rg="$(site_req aks.resourceGroup)"
 aks_name="$(site_req aks.name)"
 mi="$(site_req identityNamePrefix)-$tenant"
 
-client_id="$(azm identity show -g "$rg" -n "$mi" --query clientId -o tsv)"
-if [ -z "$client_id" ]; then
-  echo "identity $mi not found in $rg (run make azure-tenant WS=$tenant first)" >&2
-  exit 1
-fi
+client_id="$(identity_lookup "$rg" "$mi" clientId "$tenant")" || exit 1
 tenant_id="$(azm account show --query tenantId -o tsv)"
 issuer="$(azm aks show -g "$aks_rg" -n "$aks_name" --query oidcIssuerProfile.issuerUrl -o tsv)"
 have="$(azm identity federated-credential list -g "$rg" --identity-name "$mi" --query '[].subject' -o tsv)"
+# Credentials made for another issuer (an AKS cluster that was recreated keeps
+# its identities, and its old credentials then trust a cluster that is gone).
+stale="$(azm identity federated-credential list -g "$rg" --identity-name "$mi" \
+  --query "[?issuer!='$issuer'].[name,subject]" -o tsv)"
+
+# Memory is a profile choice: only a tenant whose profile turns it on has the
+# memory-ingest ServiceAccount, so only it gets a credential for it (an identity
+# holds at most 20). common.yaml's default is off.
+profile_dir="${PROFILE_DIR:-$here/../../profiles/azure}"
+memory_on=0
+if [ -f "$profile_dir/$tenant.yaml" ] && [ "$(yq e '.memory.enabled == true' "$profile_dir/$tenant.yaml")" = "true" ]; then
+  memory_on=1
+fi
 
 # The agents, as their <name>-facade ServiceAccounts. If this fails the script
 # stops here, before anything is created or pruned: treating "could not list"
@@ -45,13 +54,29 @@ have="$(azm identity federated-credential list -g "$rg" --identity-name "$mi" --
 # succeeds and is empty is real, and prunes all of them.
 agents="$("${KUBECTL[@]}" -n "$tenant" get agentruntime -o jsonpath='{range .items[*]}{.metadata.name}-facade{" "}{end}')"
 
-# Prune first: an agent's credential outlives the agent (dev agents, deleted
+# Stale issuers first: delete this tenant's credentials made for another issuer
+# and drop them from the list, so the loop below recreates them on the current
+# one. Credentials of other namespaces are not this script's to touch.
+sa_prefix="system:serviceaccount:$tenant:"
+while IFS=$'\t' read -r cname csubject; do
+  [ -n "$cname" ] || continue
+  case "$csubject" in "$sa_prefix"*) ;; *) continue ;; esac
+  echo "==> replacing $csubject (credential $cname trusts another issuer)"
+  run azm identity federated-credential delete -g "$rg" --identity-name "$mi" \
+    --name "$cname" --yes --output none </dev/null
+  kept=""
+  for subject in $have; do
+    [ "$subject" = "$csubject" ] || kept="$kept $subject"
+  done
+  have="$kept"
+done <<<"$stale"
+
+# Prune next: an agent's credential outlives the agent (dev agents, deleted
 # projects), and an identity holds at most 20 federated credentials, so stale
 # ones must go before new ones are created or a full identity could never
 # recover. Remove each *-facade subject in this tenant's namespace whose
 # AgentRuntime is gone; the fixed SAs below, and subjects of any other
 # namespace, are never touched.
-sa_prefix="system:serviceaccount:$tenant:"
 for subject in $have; do
   case "$subject" in "$sa_prefix"*) ;; *) continue ;; esac
   sa="${subject#"$sa_prefix"}"
@@ -72,8 +97,11 @@ done
 # privacy-<tenant>: privacy-api reaches a Key Vault key keylessly (Omnia
 # #4466); only used where the install turns that on.
 # memory-ingest: the chart's ingest CronJob reads the tenant's Blob container
-# keylessly. Inert where memory is off (the chart renders no such SA).
-for sa in arena-worker eval-worker memory-ingest "memory-$tenant-default" "privacy-$tenant" omnia-identity-foundry $agents; do
+# keylessly. Only where the tenant's profile turns memory on.
+fixed=(arena-worker eval-worker)
+if [ "$memory_on" = 1 ]; then fixed+=(memory-ingest); fi
+fixed+=("memory-$tenant-default" "privacy-$tenant" omnia-identity-foundry)
+for sa in "${fixed[@]}" $agents; do
   subject="system:serviceaccount:$tenant:$sa"
   case " $(echo $have) " in *" $subject "*) continue ;; esac
   echo "==> federating $subject -> $mi"

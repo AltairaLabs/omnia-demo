@@ -15,8 +15,12 @@
 # editor adding a document. The file is not in memory-documents/, so the next
 # `make azure-memory` removes it again; that is the reset.
 #
-# The kube context is CONTEXT (or KUBE_CONTEXT) if set, else aks.kubeContext in
-# site.yaml. DRY_RUN=1 prints each write instead of running it.
+# The kube context is aks.kubeContext in site.yaml, the cluster of the install
+# whose storage account this writes to, unless CONTEXT is set explicitly. An
+# ambient KUBE_CONTEXT is ignored: a shell left pointing at another cluster
+# would start the run there. An upload whose content is already in the blob is
+# skipped, and no run is started: re-publishing identical content would bump
+# modified_at and re-embed it. DRY_RUN=1 prints each write instead of running it.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,9 +39,8 @@ if ! site_has memory; then
 fi
 acct="$(site_req memory.storageAccount)"
 
-ctx="${CONTEXT:-${KUBE_CONTEXT:-}}"
-if [ -n "$ctx" ]; then
-  KUBECTL=(kubectl --context "$ctx")
+if [ -n "${CONTEXT:-}" ]; then
+  KUBECTL=(kubectl --context "$CONTEXT")
 fi
 
 # Everything below becomes part of a container, namespace or blob name, so it
@@ -66,6 +69,25 @@ if ! [[ $base =~ $base_re ]]; then
 fi
 name="$folder/$base"
 want="$(openssl dgst -md5 -binary "$file" | base64)"
+
+
+# Identical content is not re-published. Only a not-found answer means "upload";
+# any other failure stops before a write.
+errf="$(mktemp)"
+trap 'rm -f "$errf"' EXIT
+if have="$(azm storage blob show --auth-mode login --account-name "$acct" -c "$tenant-documents" -n "$name" \
+  --query properties.contentSettings.contentMd5 -o tsv 2>"$errf")"; then
+  if [ "$have" = "$want" ]; then
+    echo "==> $tenant-documents/$name is unchanged: nothing to publish"
+    exit 0
+  fi
+else
+  err="$(cat "$errf")"
+  if ! is_not_found "$err"; then
+    echo "looking up blob $tenant-documents/$name failed: $err" >&2
+    exit 1
+  fi
+fi
 
 echo "==> publishing $file as $tenant-documents/$name"
 run azm storage blob upload --auth-mode login --account-name "$acct" -c "$tenant-documents" -n "$name" \

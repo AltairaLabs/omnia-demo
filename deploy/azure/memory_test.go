@@ -513,19 +513,68 @@ func TestPublishDocumentUploadsToTheFolderAndStartsARun(t *testing.T) {
 	if count(log, "kubectl", "-n mem-a ", "create job --from=cronjob/memory-ingest memory-ingest-publish-") != 1 {
 		t.Errorf("job create: %v", log)
 	}
-	// writesIn does not know "upload" as a write verb, so only the job counts.
-	if len(log) != 2 || len(writesIn(log)) != 1 {
-		t.Errorf("want exactly the upload and the job: %v", log)
+	// The blob is looked up first (an identical upload is skipped). writesIn does
+	// not know "upload" as a write verb, so only the job counts.
+	if len(log) != 3 || count(log[:1], "storage blob show") != 1 || len(writesIn(log)) != 1 {
+		t.Errorf("want the lookup, the upload and the job: %v", log)
 	}
 }
 
-func TestPublishDocumentHonoursKubeContext(t *testing.T) {
-	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "KUBE_CONTEXT": "other-ctx"}, nil)
+func TestPublishDocumentHonoursContext(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "CONTEXT": "other-ctx"}, nil)
 	if err != nil {
 		t.Fatal(err, out)
 	}
 	if count(log, "kubectl --context other-ctx", "create job") != 1 {
 		t.Errorf("want the override context: %v", log)
+	}
+}
+
+// An ambient KUBE_CONTEXT (a shell left pointing elsewhere) must not move the
+// job off the cluster of the site whose storage account the script writes to.
+func TestPublishDocumentIgnoresAmbientKubeContext(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t), "KUBE_CONTEXT": "other-ctx"}, nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertContexts(t, log, testCtx, testSub)
+}
+
+// Re-publishing identical content would bump modified_at and re-embed it.
+func TestPublishDocumentSkipsAnIdenticalBlob(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t)},
+		map[string]string{"*storage_blob_show*": md5b64("flood\n")})
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertContexts(t, log, testCtx, testSub)
+	if count(log, "storage blob upload") != 0 || count(log, "create job") != 0 {
+		t.Errorf("identical content: want no upload and no run: %v", log)
+	}
+	if !strings.Contains(out, "unchanged") {
+		t.Errorf("say it was skipped: %q", out)
+	}
+}
+
+func TestPublishDocumentStopsWhenTheBlobLookupIsRefused(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t),
+		"FAKE_FAIL": "az storage blob show*", "FAKE_FAIL_MSG": "(AuthorizationFailed) no rights"}, nil)
+	if exitCode(err) != 1 || !strings.Contains(out, "AuthorizationFailed") {
+		t.Fatalf("want exit 1 showing the error, got %v (%s)", err, out)
+	}
+	if count(log, "storage blob upload") != 0 || count(log, "create job") != 0 {
+		t.Errorf("wrote after a refused lookup: %v", log)
+	}
+}
+
+func TestPublishDocumentUploadsWhenTheBlobIsNew(t *testing.T) {
+	log, out, err := runScript(t, publishScript, map[string]string{"SITEFILE": "site-full.yaml", "DOC": publishDoc(t),
+		"FAKE_FAIL": "az storage blob show*", "FAKE_FAIL_MSG": "(BlobNotFound) The specified blob does not exist."}, nil)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "storage blob upload") != 1 || count(log, "create job") != 1 {
+		t.Errorf("new blob: want upload and run: %v", log)
 	}
 }
 

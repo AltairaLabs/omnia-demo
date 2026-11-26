@@ -41,11 +41,10 @@ piiChat:
     # The judge on its own Foundry deployment (omnia-workspace makes it in
     # every workspace), off the agent's gpt-4o quota.
     judgeProviderRef: azure-foundry-gpt-5-4-mini
-  # The scope guardrail on Jev. The gateway key is in the persistent Key Vault
-  # (vercel-ai-gateway-api-key).
-  guardrail:
-    enabled: true
-    clusterSecretStore: azure-kv
+  # The scope guardrail on Jev is off here. site-values.sh turns it on when
+  # site.yaml has a `guardrail` block (the install's ClusterSecretStore and the
+  # key of the AI gateway account's API key in it); without one the chart strips
+  # the validator and the assistant runs unguarded.
 
 # Dreaming on the member assistant: its failed conversations become Arena
 # scenarios each evening, and a candidate prompt goes to the canary's rollout
@@ -103,7 +102,9 @@ poppy:
       upstream:
         # The upstream sign-in provider's issuer and this Company's client at it
         # (site.yaml poppy.upstream and poppy.companies); one provider serves
-        # both Companies.
+        # both Companies. clientSecretRef is the Secret holding the client's
+        # secret; site.yaml's poppy.companies.<tenant>.clientSecretName
+        # overrides this name.
         clientSecretRef: larkmere-gateway-upstream
     scopes:
       claims: Report a home insurance claim, add items to it, and see its status

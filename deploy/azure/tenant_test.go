@@ -260,11 +260,13 @@ export SITE="$d/site.yaml"; bash ./tenant.sh larkmere-mutual`, nil, tenantNewFix
 }
 
 func TestTenantValuesWithSiteNotExported(t *testing.T) {
-	// SITE only takes lib.sh's default (relative to the repo root), as under
-	// `make azure-tenant`; providers are loaded from it with yq.
+	// SITE unset takes lib.sh's default: deploy/azure/site.yaml beside the
+	// scripts, whatever the current directory is (a copy of the scripts is run
+	// from another directory); providers are loaded from it with yq.
 	r := runScriptFull(t, `orig="$PWD"; d="$(mktemp -d)"; mkdir -p "$d/deploy/azure"
+cp lib.sh tenant.sh "$d/deploy/azure/"
 cp testdata/site-full.yaml "$d/deploy/azure/site.yaml"
-cd "$d"; bash "$orig/tenant.sh" --values larkmere-mutual cid-1 tenant-1`, nil, nil)
+cd "$(mktemp -d)"; bash "$d/deploy/azure/tenant.sh" --values larkmere-mutual cid-1 tenant-1`, nil, nil)
 	if r.Err != nil {
 		t.Fatal(r.Err, r.Out)
 	}

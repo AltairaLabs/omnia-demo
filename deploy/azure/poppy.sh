@@ -35,13 +35,15 @@ id_rg="$(site_req identityResourceGroup)"
 # DNS lives in its own subscription, which may not be the install's: its
 # calls use `az_in "$dns_sub"` rather than azm.
 
-# The gateway's address: given directly, or read from its public IP resource.
+# The gateway's address: given directly, or read from its public IP resource
+# (in dns.gatewayPublicIP.subscription, default the install's subscription).
 if site_has dns.gatewayIP; then
   gateway_ip="$(site_get dns.gatewayIP)"
 elif site_has dns.gatewayPublicIP.name; then
   pip_rg="$(site_req dns.gatewayPublicIP.resourceGroup)"
   pip_name="$(site_req dns.gatewayPublicIP.name)"
-  gateway_ip="$(azm network public-ip show -g "$pip_rg" -n "$pip_name" --query ipAddress -o tsv)"
+  pip_sub="$(site_get dns.gatewayPublicIP.subscription)"
+  gateway_ip="$(az_in "${pip_sub:-$AZ_SUB}" network public-ip show -g "$pip_rg" -n "$pip_name" --query ipAddress -o tsv)"
 else
   site_req dns.gatewayIP
 fi
@@ -73,11 +75,7 @@ principals=()
 # (${#tenants[@]} guards below: an empty array trips set -u on bash 3.2.)
 for ((i = 0; i < ${#tenants[@]}; i++)); do
   t="${tenants[$i]}"
-  p="$(azm identity show -g "$id_rg" -n "$prefix-$t" --query principalId -o tsv)"
-  if [ -z "$p" ]; then
-    echo "identity $prefix-$t not found in $id_rg (run make azure-tenant WS=$t first)" >&2
-    exit 1
-  fi
+  p="$(identity_lookup "$id_rg" "$prefix-$t" principalId "$t")" || exit 1
   principals+=("$p")
 done
 
@@ -90,13 +88,10 @@ for h in $(poppy_dns_names); do
   if shown="$(az_in "$dns_sub" network dns record-set a show -g "$dns_rg" -z "$zone" -n "$h" -o none 2>&1)"; then
     run az_in "$dns_sub" network dns record-set a delete -g "$dns_rg" -z "$zone" -n "$h" --yes
   else
-    case "$(printf '%s' "$shown" | tr '[:upper:]' '[:lower:]')" in
-      *resourcenotfound* | *"not found"* | *"not exist"*) ;;
-      *)
-        echo "looking up $h.$zone failed: $shown" >&2
-        exit 1
-        ;;
-    esac
+    if ! is_not_found "$shown"; then
+      echo "looking up $h.$zone failed: $shown" >&2
+      exit 1
+    fi
   fi
   run az_in "$dns_sub" network dns record-set a add-record -g "$dns_rg" -z "$zone" -n "$h" \
     -a "$gateway_ip" --ttl 300 --output none

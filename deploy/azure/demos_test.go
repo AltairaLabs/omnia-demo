@@ -201,6 +201,13 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 	if !strings.Contains("\n"+string(ours), "\nmemory:") {
 		ours = append(ours, []byte("\nmemory:\n  storageAccount: stplaceholder\n  resourceGroup: rg-placeholder\n")...)
 	}
+	// gateway.sectionName is required now, and BASE_REF's profiles set none. When
+	// site-ours has none, a placeholder is added and its two outputs are dropped
+	// from the overlay, so the compare still holds the render to BASE_REF.
+	sectionAbsent := !strings.Contains(string(ours), "sectionName:")
+	if sectionAbsent {
+		ours = yqEdit(t, ours, `.gateway.sectionName = "placeholder"`)
+	}
 	siteFile := filepath.Join(t.TempDir(), "site.yaml")
 	if err := os.WriteFile(siteFile, ours, 0o644); err != nil {
 		t.Fatal(err)
@@ -210,6 +217,9 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			ov, err := siteValues(t, siteFile, tenant)
 			if err != nil {
 				t.Fatal(err, ov)
+			}
+			if sectionAbsent {
+				ov = string(yqEdit(t, []byte(ov), `del(.poppy.gatewaySectionName) | del(.catalogue.route.parentRefs[].sectionName)`))
 			}
 			f := filepath.Join(t.TempDir(), "overlay.yaml")
 			if err := os.WriteFile(f, []byte(ov), 0o644); err != nil {
@@ -256,6 +266,18 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			t.Errorf("render differs from %s: %s\n%s", base, diff, d)
 		})
 	}
+}
+
+// yqEdit applies a yq expression to a YAML document.
+func yqEdit(t *testing.T, doc []byte, expr string) []byte {
+	t.Helper()
+	cmd := exec.Command("yq", "e", expr, "-")
+	cmd.Stdin = bytes.NewReader(doc)
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("yq %s: %v", expr, err)
+	}
+	return out
 }
 
 // decodeRender decodes a render as multi-document YAML, dropping empty documents.
@@ -366,7 +388,7 @@ func TestBuilderUsesSiteChart(t *testing.T) {
 	}
 	for _, s := range []string{"-n larkmere-mutual", "--set provider.name=azure-gpt",
 		"--set sandbox.image.repository=registry.example.com/sandbox",
-		"--set sandbox.image.tag=dev", "--set sandbox.image.digest=sha256:abc"} {
+		"--set-string sandbox.image.tag=dev", "--set-string sandbox.image.digest=sha256:abc"} {
 		if !strings.Contains(log[0], s) {
 			t.Errorf("helm call lacks %q: %s", s, log[0])
 		}
