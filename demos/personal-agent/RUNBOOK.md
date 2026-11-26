@@ -38,10 +38,10 @@ already has the demos you can skip what's done.
    their own, with a certificate that covers it. `make omnia-values` prints the
    hosts your install's certificate must cover (`TLS hosts: ...`) and writes
    the values to add to your Omnia install; `make azure-poppy` makes their DNS
-   records:
+   records, but it reads each Company's identity, so it runs after `make demos`
+   (step 7). The certificate must cover the hosts before then:
    ```bash
    make omnia-values
-   make azure-poppy
    kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n omnia get certificate omnia-dashboard-tls
    ```
    Substitute your certificate's name and namespace in the last command. It
@@ -98,7 +98,11 @@ already has the demos you can skip what's done.
    `make azure-identity WS=<namespace>`, for the new
    Company Agents `larkmere-mutual` and `wrenmoor-energy`, and
    `ellens-assistant` for the assistant.
-7. **Larkmere's documents**, so the claims desk has its procedures. After the
+7. **The hostnames' DNS records.** Now the Companies' identities exist:
+   ```bash
+   make azure-poppy
+   ```
+8. **Larkmere's documents**, so the claims desk has its procedures. After the
    last `make demos` (the CronJob comes from it), seed them and start the
    first ingest run:
    ```bash
@@ -281,13 +285,13 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    the email verified; the stub matches Ellen by it.
    The gateway hosts need DNS and a certificate SAN like the Company hosts.
    `make azure-poppy` and `make omnia-values` already list `auth.larkmere.` and
-   `auth.wrenmoor.`, so milestone 1 Setup step 1 made them. Check them before turning the gateway on:
+   `auth.wrenmoor.`, so milestone 1 Setup steps 1 and 7 made them. Check them before turning the gateway on:
    ```bash
    dig +short auth.larkmere.<zone>
    dig +short auth.wrenmoor.<zone>
    kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
    ```
-   Both names must resolve to the omnia-external gateway's address and appear
+   Both names must resolve to your install's gateway address and appear
    in `dnsNames`, and the certificate must be `READY True`. If either is
    missing, run `make azure-poppy` again, and check your certificate covers the
    `TLS hosts` that `make omnia-values` prints.

@@ -33,10 +33,13 @@ then:
 
 ```bash
 make omnia-values                 # values to add to your Omnia install, and its TLS hosts
-make azure-poppy                  # DNS records and the Key Vault key
+make azure-tenant WS=ellens-assistant   # the assistant's namespace ...
+hack/personal-agent-keys.sh             # ... then its keys
 make images                       # build the demo images into your registry
 make demos                        # every tenant (larkmere-mutual, wrenmoor-energy, ellens-assistant, halvern-partners, halvern-research)
 make demos TENANTS=larkmere-mutual
+make azure-poppy                  # DNS records and the Key Vault key (after demos: it reads the tenants' identities)
+make azure-memory                 # the company documents (optional; needs a memory block)
 make builder                      # the Arena builder, in Halvern Partners
 ```
 

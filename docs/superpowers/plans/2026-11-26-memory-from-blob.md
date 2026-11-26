@@ -164,7 +164,7 @@ mention fixtures or S3, and `memory-ingestion/README.md`.
 
 ### Task 6 (controller, live)
 
-1. Create a Standard_LRS StorageV2 account in `rg-omnia-demo-persistent`,
+1. Create a Standard_LRS StorageV2 account in the install's persistent resource group,
    with public blob access disabled and shared-key access disabled
    (user-approved 2026-11-26). Put it in our site.yaml.
 2. Build the connector image with `make images`, then run `make azure-memory`.

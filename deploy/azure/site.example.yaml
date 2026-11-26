@@ -28,9 +28,13 @@ postgres:
     externalSecret:
       clusterSecretStore: azure-keyvault
       key: postgres-admin-password
-    # ... or a plain Secret (use one form, not both).
+      # The databases Job still reads the password from a Secret of this name,
+      # key PGPASSWORD, in omnia.namespace, which you create (see "Secrets and
+      # accounts you create" in README.md). Optional; default omnia-db-admin.
+      # dbAdminSecret: omnia-db-admin
+    # ... or a plain Secret (use one form, not both). The Secret lives in
+    # omnia.namespace.
     # secret:
-    #   namespace: omnia
     #   name: postgres-admin
     #   key: password
 
@@ -41,12 +45,30 @@ foundry:
   accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/example-foundry
   # Region of the account.
   region: swedencentral
-  # Providers to create in every tenant.
+  # Providers to create in every tenant. Optional: leave it out and the
+  # chart's own list is used (the four below). A list given here REPLACES the
+  # chart's, and the demo profiles and `make builder` refer to these names
+  # (azure-foundry-gpt-4o, azure-foundry-gpt-4o-long, azure-foundry-gpt-5-4-mini,
+  # azure-foundry-embedding), so a list must keep all four. Set one only to
+  # change a model or a deployment; `model` is the deployment name in your
+  # Foundry account.
   providers:
-    - name: gpt-4o
-      role: llm
+    - name: azure-foundry-gpt-4o
       model: gpt-4o
-      default: true
+      role: llm
+    # Long structured answers.
+    - name: azure-foundry-gpt-4o-long
+      model: gpt-4o
+      role: llm
+      defaults:
+        maxTokens: 16384
+        streamIdleTimeout: "120s"
+    - name: azure-foundry-gpt-5-4-mini
+      model: gpt-5.4-mini
+      role: llm
+    - name: azure-foundry-embedding
+      model: text-embedding-3-small
+      role: embedding
 
 # Optional: remove the whole block when the demos need no voice.
 voice:
@@ -56,11 +78,21 @@ voice:
   accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/example-voice
   # Region of the account.
   region: swedencentral
-  # Voice Providers to create in every tenant.
+  # Voice Providers to create in every tenant. Optional: leave it out and the
+  # chart's own list is used. A list given here REPLACES the chart's, and the
+  # card line refers to azure-foundry-gpt-realtime and azure-foundry-tts; keep
+  # all three names.
   providers:
-    - name: voice
+    - name: azure-foundry-gpt-realtime
+      model: gpt-realtime
+      role: llm
+      capabilities: [text, streaming, tools, audio, duplex]
+    - name: azure-foundry-transcribe
+      model: whisper
+      role: stt
+    - name: azure-foundry-tts
+      model: gpt-4o-mini-tts
       role: tts
-      model: neural
 
 # Optional: remove the whole block when tenants need no shared content volume.
 nfs:
@@ -88,13 +120,15 @@ dns:
   # gatewayPublicIP:
   #   resourceGroup: rg-example
   #   name: pip-gateway
+  #   # Optional: the resource's subscription; default is `subscription` above.
+  #   subscription: 00000000-0000-0000-0000-000000000000
 
 gateway:
   # Gateway the demo's HTTPRoutes attach to.
   name: omnia
   # Namespace of that Gateway.
   namespace: omnia
-  # Listener (sectionName) on that Gateway.
+  # Listener (sectionName) on that Gateway. Required.
   sectionName: https
 
 # Host the Omnia dashboard is served on; the catalogue is served beside it.
@@ -125,11 +159,23 @@ poppy:
     larkmere-mutual:
       # OAuth client ID registered with the upstream for this Company.
       clientID: placeholder-client-id
-      # Name of the Secret holding that client's secret.
-      clientSecretName: larkmere-mutual-upstream
+      # Optional: name of the Secret (key clientSecret) in the tenant's
+      # namespace holding that client's secret, which you create. Default: the
+      # name in the profile, shown here.
+      clientSecretName: larkmere-gateway-upstream
     wrenmoor-energy:
       clientID: placeholder-client-id
-      clientSecretName: wrenmoor-energy-upstream
+      clientSecretName: wrenmoor-gateway-upstream
+
+# Optional: remove the whole block to run Larkmere's member assistant without
+# the scope guardrail (it then answers unguarded; the chart strips the
+# validator). The guardrail asks a classifier through an AI gateway; its API key
+# is read from your secret store by an ExternalSecret.
+guardrail:
+  # ClusterSecretStore (External Secrets) that holds the gateway's API key.
+  clusterSecretStore: example-store
+  # The key's name in that store.
+  key: example-gateway-api-key
 
 # Optional: remove the whole block to run the demos without institutional
 # memory. Larkmere's and Wrenmoor's documents live in a private Blob container

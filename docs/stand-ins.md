@@ -388,7 +388,10 @@ what sits behind and beside it.
     again.
   - **The grant is ours.** The tenant's identity holds `Storage Blob Data
     Reader` on its own container only, granted by the same script. A real
-    company grants its connector read on its source. A new grant takes a few
+    company grants its connector read on its source. That identity is shared
+    by every agent in the tenant (each agent's ServiceAccount is federated to
+    it), so any of them could read the container with its token; a real
+    connector would have an identity of its own. A new grant takes a few
     minutes to apply, so the first run waits for a second `make azure-memory`.
   - **A document's folder is part of its identity.** Subfolders of
     `memory-documents/<tenant>/` become blob folders, and the document's URL
