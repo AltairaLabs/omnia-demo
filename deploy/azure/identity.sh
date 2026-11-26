@@ -71,7 +71,9 @@ done
 # a workspace does not declare it.
 # privacy-<tenant>: privacy-api reaches a Key Vault key keylessly (Omnia
 # #4466); only used where the install turns that on.
-for sa in arena-worker eval-worker "memory-$tenant-default" "privacy-$tenant" omnia-identity-foundry $agents; do
+# memory-ingest: the chart's ingest CronJob reads the tenant's Blob container
+# keylessly. Inert where memory is off (the chart renders no such SA).
+for sa in arena-worker eval-worker memory-ingest "memory-$tenant-default" "privacy-$tenant" omnia-identity-foundry $agents; do
   subject="system:serviceaccount:$tenant:$sa"
   case " $(echo $have) " in *" $subject "*) continue ;; esac
   echo "==> federating $subject -> $mi"

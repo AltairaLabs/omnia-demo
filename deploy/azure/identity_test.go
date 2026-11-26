@@ -23,9 +23,9 @@ func identityFixtures(have, agents, annotation string) map[string]string {
 		"*account_show*":  "tenant-1",
 		"*aks_show*":      "https://oidc.example.com/",
 		"*federated-credential_list*subject_-o_tsv*": have,
-		"*federated-credential_list*gone-facade*":   "cred-gone",
-		"*get_agentruntime*":                        agents,
-		"*get_sa*":                                  annotation,
+		"*federated-credential_list*gone-facade*":    "cred-gone",
+		"*get_agentruntime*":                         agents,
+		"*get_sa*":                                   annotation,
 	}
 }
 
@@ -44,10 +44,10 @@ func TestIdentityFederatesFixedAndAgents(t *testing.T) {
 		t.Fatal(err, out)
 	}
 	assertContexts(t, log, testCtx, testSub)
-	if n := count(log, "federated-credential create"); n != 7 {
-		t.Errorf("want 7 creates, got %d: %v", n, log)
+	if n := count(log, "federated-credential create"); n != 8 {
+		t.Errorf("want 8 creates, got %d: %v", n, log)
 	}
-	for _, sa := range []string{"arena-worker", "eval-worker", "memory-larkmere-mutual-default",
+	for _, sa := range []string{"arena-worker", "eval-worker", "memory-ingest", "memory-larkmere-mutual-default",
 		"privacy-larkmere-mutual", "omnia-identity-foundry", "a-facade", "b-facade"} {
 		if count(log, "federated-credential create", "-g rg-identities", "--identity-name mi-demo-larkmere-mutual",
 			"--name larkmere-mutual-"+sa+" ", "--issuer https://oidc.example.com/",
@@ -143,7 +143,7 @@ func TestIdentityAbortsWhenAgentListFails(t *testing.T) {
 }
 
 func TestIdentityIdempotent(t *testing.T) {
-	have := subjects("arena-worker", "eval-worker", "memory-larkmere-mutual-default",
+	have := subjects("arena-worker", "eval-worker", "memory-ingest", "memory-larkmere-mutual-default",
 		"privacy-larkmere-mutual", "omnia-identity-foundry", "a-facade", "b-facade")
 	log, out, err := runScript(t, identityScript, identityEnv(nil),
 		identityFixtures(have, "a-facade b-facade ", "cid-1"))

@@ -131,6 +131,15 @@ poppy:
       clientID: placeholder-client-id
       clientSecretName: wrenmoor-energy-upstream
 
+# Optional: remove the whole block to run the demos without institutional
+# memory. Larkmere's and Wrenmoor's documents live in a private Blob container
+# per tenant, <tenant>-documents, in a storage account you bring.
+memory:
+  # Name of that storage account (Blob; public access off).
+  storageAccount: stexampledocs
+  # Resource group of that storage account.
+  resourceGroup: rg-example
+
 # Optional: needed only for `make images`.
 images:
   # Registry name to build into (you bring it; omnia-demo never creates one).

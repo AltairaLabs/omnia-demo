@@ -66,6 +66,9 @@ poppy:
     wrenmoor-energy:
       clientID: client-wrenmoor
       clientSecretName: wrenmoor-upstream
+memory:
+  storageAccount: stdocs
+  resourceGroup: rg-docs
 images:
   registry: demoreg
   loginServer: demoreg.azurecr.io

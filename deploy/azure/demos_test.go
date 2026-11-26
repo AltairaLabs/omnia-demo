@@ -8,6 +8,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -189,9 +191,23 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(baseDir, "charts/omnia-demo/files/catalogue/index.html"), page, 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The site the overlay is built from: site-ours plus a synthetic memory block
+	// when it has none, so the memory tenants render their ingest CronJob. The
+	// account name is a placeholder; only the shape of the render is compared.
+	ours, err := os.ReadFile("testdata/site-ours.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains("\n"+string(ours), "\nmemory:") {
+		ours = append(ours, []byte("\nmemory:\n  storageAccount: stplaceholder\n  resourceGroup: rg-placeholder\n")...)
+	}
+	siteFile := filepath.Join(t.TempDir(), "site.yaml")
+	if err := os.WriteFile(siteFile, ours, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	for _, tenant := range demoTenants {
 		t.Run(tenant, func(t *testing.T) {
-			ov, err := siteValues(t, "testdata/site-ours.yaml", tenant)
+			ov, err := siteValues(t, siteFile, tenant)
 			if err != nil {
 				t.Fatal(err, ov)
 			}
@@ -204,52 +220,113 @@ func TestRenderedTenantsUnchanged(t *testing.T) {
 			// Compare parsed documents: several template comments were
 			// reworded to stop naming one deployment, and comments do not
 			// survive parsing.
-			diff := firstYAMLDiff(t, want, got)
+			//
+			// The two memory tenants differ by design, and only by this: the
+			// S3 gateway, its credentials, the fixtures ConfigMap and the
+			// ingest hook Job are gone, and the ingest CronJob with its
+			// ServiceAccount is added. Every other document, and every other
+			// tenant, is held byte-for-byte to BASE_REF.
+			var removed, added []string
+			switch tenant {
+			case "larkmere-mutual", "wrenmoor-energy":
+				removed = []string{
+					"ConfigMap/omnia-demo-memory-fixtures",
+					"Deployment/memory-s3",
+					"Job/omnia-demo-memory-ingest",
+					"Secret/memory-s3-credentials",
+					"Service/memory-s3",
+				}
+				added = []string{"CronJob/memory-ingest", "ServiceAccount/memory-ingest"}
+			}
+			wantIDs, gotIDs := docIDs(t, want), docIDs(t, got)
+			if gone := setDiff(wantIDs, gotIDs); !reflect.DeepEqual(gone, removed) {
+				t.Errorf("documents removed since %s: %v, want %v", base, gone, removed)
+			}
+			if new := setDiff(gotIDs, wantIDs); !reflect.DeepEqual(new, added) {
+				t.Errorf("documents added since %s: %v, want %v", base, new, added)
+			}
+			diff := firstYAMLDiff(t, want, got, removed, added)
 			if diff == "" {
 				return
 			}
-			if got != want {
-				gf, wf := filepath.Join(t.TempDir(), "got"), filepath.Join(t.TempDir(), "want")
-				_ = os.WriteFile(gf, []byte(got), 0o644)
-				_ = os.WriteFile(wf, []byte(want), 0o644)
-				d, _ := exec.Command("diff", "-u", wf, gf).CombinedOutput()
-				t.Errorf("render differs from %s: %s\n%s", base, diff, d)
-			}
+			gf, wf := filepath.Join(t.TempDir(), "got"), filepath.Join(t.TempDir(), "want")
+			_ = os.WriteFile(gf, []byte(got), 0o644)
+			_ = os.WriteFile(wf, []byte(want), 0o644)
+			d, _ := exec.Command("diff", "-u", wf, gf).CombinedOutput()
+			t.Errorf("render differs from %s: %s\n%s", base, diff, d)
 		})
 	}
 }
 
-// firstYAMLDiff decodes two renders as multi-document YAML and returns a
-// description of the first document that differs, or "". Parsing drops YAML
-// comments and keeps block-scalar content, so a "#" line inside an embedded
-// script or fixture still counts.
-func firstYAMLDiff(t *testing.T, want, got string) string {
+// decodeRender decodes a render as multi-document YAML, dropping empty documents.
+func decodeRender(t *testing.T, s string) []map[string]any {
 	t.Helper()
-	decode := func(s string) []map[string]any {
-		var docs []map[string]any
-		dec := yaml.NewDecoder(strings.NewReader(s))
-		for {
-			var d map[string]any
-			err := dec.Decode(&d)
-			if err == io.EOF {
-				return docs
-			}
-			if err != nil {
-				t.Fatalf("render is not YAML: %v", err)
-			}
-			if d != nil {
-				docs = append(docs, d)
-			}
+	var docs []map[string]any
+	dec := yaml.NewDecoder(strings.NewReader(s))
+	for {
+		var d map[string]any
+		err := dec.Decode(&d)
+		if err == io.EOF {
+			return docs
+		}
+		if err != nil {
+			t.Fatalf("render is not YAML: %v", err)
+		}
+		if d != nil {
+			docs = append(docs, d)
 		}
 	}
-	w, g := decode(want), decode(got)
-	id := func(d map[string]any) string {
-		md, _ := d["metadata"].(map[string]any)
-		return fmt.Sprintf("%v/%v", d["kind"], md["name"])
+}
+
+func docID(d map[string]any) string {
+	md, _ := d["metadata"].(map[string]any)
+	return fmt.Sprintf("%v/%v", d["kind"], md["name"])
+}
+
+func docIDs(t *testing.T, render string) []string {
+	var ids []string
+	for _, d := range decodeRender(t, render) {
+		ids = append(ids, docID(d))
 	}
+	return ids
+}
+
+// setDiff returns the sorted ids in a and not in b (nil when none).
+func setDiff(a, b []string) []string {
+	in := map[string]bool{}
+	for _, id := range b {
+		in[id] = true
+	}
+	var out []string
+	for _, id := range a {
+		if !in[id] {
+			out = append(out, id)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// firstYAMLDiff compares two renders document by document and returns a
+// description of the first document that differs, or "". Documents named in
+// skipWant (from want) and skipGot (from got) are left out first: they are the
+// intended difference. Parsing drops YAML comments and keeps block-scalar
+// content, so a "#" line inside an embedded script or fixture still counts.
+func firstYAMLDiff(t *testing.T, want, got string, skipWant, skipGot []string) string {
+	t.Helper()
+	keep := func(docs []map[string]any, skip []string) []map[string]any {
+		var out []map[string]any
+		for _, d := range docs {
+			if !slices.Contains(skip, docID(d)) {
+				out = append(out, d)
+			}
+		}
+		return out
+	}
+	w, g := keep(decodeRender(t, want), skipWant), keep(decodeRender(t, got), skipGot)
 	for i := 0; i < len(w) && i < len(g); i++ {
 		if !reflect.DeepEqual(w[i], g[i]) {
-			return "document " + id(w[i]) + " differs"
+			return "document " + docID(w[i]) + " differs"
 		}
 	}
 	if len(w) != len(g) {

@@ -44,10 +44,10 @@ analystWorkbench:
   tolerations:
     - { key: workload, operator: Equal, value: sandbox, effect: NoSchedule }
 fieldService: { enabled: true }
-# The field manuals, ingested as institutional memory for the copilot.
+# The field manuals (memory-documents/wrenmoor-energy/), ingested from the
+# tenant's Blob container as institutional memory for the copilot.
 memory:
   enabled: true
-  fixtures: wrenmoor-field-procedures
 
 # A Poppy Company: Personal Agents find it at its own domain. Only the demo's
 # Poppy assistant is admitted.

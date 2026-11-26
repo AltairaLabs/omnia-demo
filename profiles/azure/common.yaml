@@ -53,7 +53,8 @@ workspace:
     podLabels:
       azure.workload.identity/use: "true"
 
-# Off by default; a tenant that ingests fixtures turns it on.
+# Off by default; a tenant that ingests documents turns it on (and the site's
+# memory block says where they are: deploy/azure/site-values.sh).
 memory:
   enabled: false
   image: { tag: sha-682590d }

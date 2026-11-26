@@ -65,6 +65,23 @@ esac
 
 yq e -n '.workspace.roleBindings = [{"groups": load(strenv(SITE)).ownerGroups, "role": "owner"}]'
 
+# Memory is optional. A tenant whose profile turns memory on reads its documents
+# from the Blob container <tenant>-documents in the site's memory.storageAccount;
+# without a site `memory` block it is turned off instead, and the chart renders
+# no ingest CronJob. The block's fields are resolved here, at the top level,
+# for the reason given above.
+profile_dir="${PROFILE_DIR:-$here/../../profiles/azure}"
+if [ -f "$profile_dir/$tenant.yaml" ] && [ "$(yq e '.memory.enabled' "$profile_dir/$tenant.yaml")" = "true" ]; then
+  if site_has memory; then
+    account="$(site_req memory.storageAccount)"
+    ACCOUNT_URL="https://$account.blob.core.windows.net" CONTAINER="$tenant-documents" \
+      yq e -n '.memory.blob.accountURL = strenv(ACCOUNT_URL) | .memory.blob.container = strenv(CONTAINER)'
+  else
+    echo "memory: off for $tenant (site.yaml has no memory block)" >&2
+    yq e -n '.memory.enabled = false'
+  fi
+fi
+
 case "$tenant" in
   larkmere-mutual | wrenmoor-energy)
     DOMAIN="$company.$zone" ASSISTANT="https://assistant.$zone/agent.json" \

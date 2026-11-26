@@ -51,8 +51,8 @@ data:
 {{ .Files.Get "files/arena/field-service-pack.json" | indent 4 }}
 ---
 # Wrenmoor Energy's field-service copilot. What it knows comes from the field
-# manuals in institutional memory, which the memory job ingests (memory.enabled
-# with memory.fixtures: wrenmoor-field-procedures). It looks them up with
+# manuals in institutional memory, which the memory job ingests (memory.enabled,
+# from the tenant's Blob container, seeded from memory-documents/wrenmoor-energy/). It looks them up with
 # memory__recall, so each lookup is a tool call on the session record.
 #
 # Without the documents in memory the copilot still runs, and says the manuals
