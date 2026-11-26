@@ -432,6 +432,22 @@ function SignInButton({ conv }) {
   );
 }
 
+// InlineSignIns puts each waiting sign-in in the chat itself, as one plain
+// button under the assistant's last message, so Ellen acts where she was
+// asked. The same rules as SignInButton: Ellen's click only, https only.
+// Once the sign-in ends, its update clears the button and the page tells the
+// assistant (signedInLine).
+function InlineSignIns({ list }) {
+  const waiting = list.filter((r) => r.conv.signin && r.conv.signin.status === "pending" && httpsURL(r.conv.signin.url));
+  return waiting.map((r) => (
+    <div className="ea-signin-inline" key={"signin-" + r.conv.id}>
+      <button className="ea-primary" onClick={() => { const u = httpsURL(r.conv.signin.url); if (u) window.open(u, "_blank", "noopener"); }}>
+        {"Sign in to " + r.conv.company}
+      </button>
+    </div>
+  ));
+}
+
 function Strip({ list, onTake }) {
   if (list.length === 0) {
     return <div className="ea-strip-empty">No conversations yet. When your assistant contacts a company, it shows here.</div>;
@@ -596,6 +612,7 @@ function App() {
           {thread.map((m, i) => (
             <div key={i} className={"ea-msg " + m.from}>{m.from === "note" ? m.text : emphasis(m.text)}</div>
           ))}
+          <InlineSignIns list={list} />
           {busy && <div className="ea-typing">Working on it…</div>}
         </div>
         {thread.length === 1 && (
