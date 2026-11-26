@@ -27,7 +27,7 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
 
 ## Before the take
 
-1. Sign in to `https://omnia-demo.azure.altairalabs.ai` and switch to the
+1. Sign in to the Omnia dashboard (`<dashboardHost>` in your `site.yaml`) and switch to the
    **Halvern Partners** workspace.
 2. Reset, if a previous take left anything:
    ```bash
@@ -55,7 +55,7 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
   until it is federated. Right after **Try it** shows the agent, and again
   right after **Deploy**, run:
   ```bash
-  make -C ../omnia-azure workspace-identity WS=halvern-partners
+  make azure-identity WS=halvern-partners
   ```
   then wait about 30 seconds and start a **New session**. A stopgap: the
   target federates only the agents that exist when it runs, and Azure has no

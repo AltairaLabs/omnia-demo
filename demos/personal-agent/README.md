@@ -47,7 +47,7 @@ sits behind the demo catalogue's sign-in.
 | Flag | Default | |
 |---|---|---|
 | `--identity-dir` | `/var/run/personal-agent/identity` | `es256.pem` and `ps384.pem`, PKCS#8 (Secret `personal-agent-identity`). |
-| `--base-url` | `https://assistant.azure.altairalabs.ai` | The origin of `client_id` and `jwks_uri`. |
+| `--base-url` | `https://assistant.example.com` | The origin of `client_id` and `jwks_uri`. |
 | `--redis-url` | empty | Store state in Redis. Empty keeps it in memory, lost on restart. |
 | `--addr` | `:8080` | |
 | `--test-identity-dir` | empty | Serve `/poppy-test/` from here. |

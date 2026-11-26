@@ -1,5 +1,8 @@
 # Ellen's assistant: the storm (Poppy, milestones 1 and 2)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 After a storm, Ellen Whitcomb tells her own AI assistant to sort it out. The
 assistant finds her insurer (Larkmere Mutual) and her energy supplier
 (Wrenmoor Energy) from their own domains, opens a conversation with each at
@@ -18,7 +21,7 @@ claims handler is not built (see [What isn't here yet](#what-isnt-here-yet)).
 - **Discovery.** The assistant reads each company's
   `/.well-known/poppy.json`; nothing is wired between them.
 - **The allowlist.** Each company's agent admits only the assistant's
-  `client_id` (`https://assistant.azure.altairalabs.ai/agent.json`) and
+  `client_id` (`https://assistant.<zone>/agent.json`) and
   verifies a signed Session JWT on every request.
 - **Parallel conversations**, each with its own state in the strip.
 - **The person taking over:** "Talk to them yourself" opens a Direct
@@ -31,38 +34,41 @@ claims handler is not built (see [What isn't here yet](#what-isnt-here-yet)).
 First install, in this order. Each step is idempotent, so on a cluster that
 already has the demos you can skip what's done.
 
-1. **Hostnames (omnia-azure).** The companies and the assistant each need a
-   hostname of their own, with a certificate that covers it. The
-   `poppyHosts` values and the `poppy-dns` target are on omnia-azure's
-   `feat/poppy-hosts` branch until it merges, so check it out first.
+1. **Hostnames.** The companies and the assistant each need a hostname of
+   their own, with a certificate that covers it. `make omnia-values` prints the
+   hosts your install's certificate must cover (`TLS hosts: ...`) and writes
+   the values to add to your Omnia install; `make azure-poppy` makes their DNS
+   records:
    ```bash
-   make -C ../omnia-azure poppy-dns
-   kubectl --context aks-omnia-demo -n omnia get certificate omnia-dashboard-tls
+   make omnia-values
+   make azure-poppy
+   kubectl --context "$KUBE_CONTEXT" -n omnia get certificate omnia-dashboard-tls
    ```
-   The certificate must be `READY True` and list all five names as SANs:
-   `larkmere`, `wrenmoor`, `auth.larkmere`, `auth.wrenmoor` and `assistant`,
-   each `.azure.altairalabs.ai`. (The `auth.` names are for milestone 2; they
-   go in now so the install changes once.)
+   Substitute your certificate's name and namespace in the last command. It
+   must be `READY True` and list all five names as SANs: `larkmere`,
+   `wrenmoor`, `auth.larkmere`, `auth.wrenmoor` and `assistant`, each under
+   your `dns.zone`. (The `auth.` names are for milestone 2; they go in now so
+   the install changes once.)
 2. **The page's issuer is trusted.** The assistant's page signs a token for
-   Ellen, as the front doors do, so its issuer goes in omnia-azure's
-   `operator.delegationAPI.trustedIssuers` (`charts/omnia-azure/values-azure.yaml`),
-   beside the portals':
+   Ellen, as the front doors do, so its issuer goes in the operator's
+   `delegationAPI.trustedIssuers`, beside the portals'. It is already in
+   `out/omnia-values.yaml` from step 1:
    ```yaml
    - http://assistant-page.ellens-assistant.svc.cluster.local:8080=http://assistant-page.ellens-assistant.svc.cluster.local:8080/.well-known/jwks.json
    ```
-   Apply it with omnia-azure's `make install`. Without it the conversations
-   with the assistant have no verified user (`docs/stand-ins.md`, "Front
-   doors").
+   Add that file's content to your Omnia install and upgrade it. Without it
+   the conversations with the assistant have no verified user
+   (`docs/stand-ins.md`, "Front doors").
 3. **The assistant's namespace.** Its keys need it, and its Deployment can't
    start without the keys:
    ```bash
-   make -C ../omnia-azure workspace WS=ellens-assistant
+   make azure-tenant WS=ellens-assistant
    ```
 4. **Its keys**, in two Secrets the Deployment mounts:
    `personal-agent-identity` (its identity keys) and `personal-agent-token-key`
    (the key its sign-in tokens are sealed under in Redis):
    ```bash
-   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
+   hack/personal-agent-keys.sh
    ```
    The script creates whichever Secret is missing and leaves an existing one
    alone. **On an existing cluster, run it again before the next
@@ -83,13 +89,13 @@ already has the demos you can skip what's done.
    `make demos` times out.
 6. **The tenants.** `make demos` installs all five (Larkmere, Wrenmoor,
    Halvern Partners, Halvern Research, Ellen's assistant) and federates each
-   tenant's agents (`workspace-identity`) as it goes:
+   tenant's agents (`make azure-identity`) as it goes:
    ```bash
    make demos
    ```
    For one tenant, `make demos TENANTS=ellens-assistant`. If you add agents
    later without `make demos`, federate them with
-   `make -C ../omnia-azure workspace-identity WS=<namespace>`, for the new
+   `make azure-identity WS=<namespace>`, for the new
    Company Agents `larkmere-mutual` and `wrenmoor-energy`, and
    `ellens-assistant` for the assistant.
 7. **Larkmere's member guidance**, so the claims desk has its procedures. An
@@ -108,12 +114,12 @@ Run all of them. Each takes seconds.
 
 ```bash
 # The assistant's public identity (no redirect, valid certificate).
-curl -s https://assistant.azure.altairalabs.ai/agent.json
-curl -s https://assistant.azure.altairalabs.ai/jwks.json
+curl -s https://assistant.<zone>/agent.json
+curl -s https://assistant.<zone>/jwks.json
 
 # Each company's discovery document, on its own domain.
-curl -s https://larkmere.azure.altairalabs.ai/.well-known/poppy.json
-curl -s https://wrenmoor.azure.altairalabs.ai/.well-known/poppy.json
+curl -s https://larkmere.<zone>/.well-known/poppy.json
+curl -s https://wrenmoor.<zone>/.well-known/poppy.json
 ```
 
 `agent.json` names `client_id` as its own URL. Each `poppy.json` lists a
@@ -122,15 +128,15 @@ these is a routing or certificate problem, not an agent one.
 
 ```bash
 # The Workspaces publish their Companies: True, PoppyDiscoveryPublished.
-kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
-kubectl --context aks-omnia-demo get workspace wrenmoor-energy -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+kubectl --context "$KUBE_CONTEXT" get workspace wrenmoor-energy -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
 
 # Each Company Agent serves: True.
-kubectl --context aks-omnia-demo -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
-kubectl --context aks-omnia-demo -n wrenmoor-energy get agentruntime wrenmoor-outages -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get agentruntime wrenmoor-outages -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
 
 # The assistant's side is up.
-kubectl --context aks-omnia-demo -n ellens-assistant get pods
+kubectl --context "$KUBE_CONTEXT" -n ellens-assistant get pods
 ```
 
 In `ellens-assistant` you should see `assistant`, `personal-agent` and
@@ -151,14 +157,14 @@ Two checks, each a few seconds:
 # Wrenmoor's outage route, from inside wrenmoor-energy. A 404 means the wren
 # image (pinned in profiles/azure/common.yaml) predates /wren/outage-status:
 # wrenmoor-outages would have no outage to report.
-kubectl --context aks-omnia-demo -n wrenmoor-energy run outage-check --rm -i --restart=Never \
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy run outage-check --rm -i --restart=Never \
   --image=curlimages/curl:8.11.1 -- curl -sS -X POST -H 'Content-Type: application/json' \
   -d '{"postcode":"HX7 6QA"}' -w '\n%{http_code}\n' http://wren-account.wrenmoor-energy:8080/wren/outage-status
 
 # After the Reset: the assistant's store is empty. personal-agent's
 # NetworkPolicy admits only the assistant and its page, so go through a
 # port-forward, which it does not filter.
-kubectl --context aks-omnia-demo -n ellens-assistant port-forward deploy/personal-agent 18080:8080 &
+kubectl --context "$KUBE_CONTEXT" -n ellens-assistant port-forward deploy/personal-agent 18080:8080 &
 curl -s http://localhost:18080/api/conversations   # []
 kill %1
 ```
@@ -201,7 +207,7 @@ the dashboard sign-in) and type, word for word:
    guidance in its prompt.
 
 **Show the allowlist.** On each Workspace, `spec.poppy.companies[].personalAgents`
-names `https://assistant.azure.altairalabs.ai/agent.json` and nothing else
+names `https://assistant.<zone>/agent.json` and nothing else
 (no `any: true`). The facade fetched that document from the assistant's
 public address, as it would fetch Muse's.
 
@@ -214,7 +220,7 @@ public address, as it would fetch Muse's.
 - **It runs on the same Omnia install** as the companies, which is why the
   dashboard shows both sides. They share only public HTTPS: each company
   fetches the assistant's `agent.json` and `jwks.json` from
-  `assistant.azure.altairalabs.ai`, and the assistant reads each company's
+  `assistant.<zone>`, and the assistant reads each company's
   `poppy.json` from its own domain. No test switch, no cluster addresses.
 - **The model never holds a key.** The personal-agent service signs and
   keeps Ellen's User IDs. The model sees conversation ids, company names and
@@ -252,8 +258,8 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
 ### Setup
 
 1. **The gateway.** Each Company's Workspace sets `auth.issuer` to the
-   gateway's own URL (`https://auth.larkmere.azure.altairalabs.ai`,
-   `https://auth.wrenmoor.azure.altairalabs.ai`, no trailing slash) and
+   gateway's own URL (`https://auth.larkmere.<zone>`,
+   `https://auth.wrenmoor.<zone>`, no trailing slash) and
    `auth.gateway` with the Auth0 `upstream`; both are in the profiles. With
    `poppy.auth.enabled` and `poppy.auth.gateway.enabled` the chart renders
    them, registers the account tools' exchange client in
@@ -268,32 +274,33 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `email` and `email_verified: true` in an exchanged token when Auth0 marked
    the email verified; the stub matches Ellen by it.
    The gateway hosts need DNS and a certificate SAN like the Company hosts.
-   omnia-azure's `poppyHosts` and `make poppy-dns` (branch `feat/poppy-hosts`)
-   already list `auth.larkmere.` and `auth.wrenmoor.`, so milestone 1 Setup
-   step 1 made them. Check them before turning the gateway on:
+   `make azure-poppy` and `make omnia-values` already list `auth.larkmere.` and
+   `auth.wrenmoor.`, so milestone 1 Setup step 1 made them. Check them before turning the gateway on:
    ```bash
-   dig +short auth.larkmere.azure.altairalabs.ai
-   dig +short auth.wrenmoor.azure.altairalabs.ai
-   kubectl --context aks-omnia-demo -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
+   dig +short auth.larkmere.<zone>
+   dig +short auth.wrenmoor.<zone>
+   kubectl --context "$KUBE_CONTEXT" -n omnia get certificate omnia-dashboard-tls -o jsonpath='{.spec.dnsNames}'
    ```
    Both names must resolve to the omnia-external gateway's address and appear
    in `dnsNames`, and the certificate must be `READY True`. If either is
-   missing, run `make -C ../omnia-azure poppy-dns` from that branch again.
-2. **The Auth0 tenant (done 2026-11-25).** Both Companies share one free
-   Auth0 tenant, `dev-kvf5kfvufbv6y3p6` (US), as their upstream: Auth0's free
-   plan allows one tenant per team. The issuers still differ, because each is
-   its Company's gateway host, so there is no `PoppyIssuerConflict`. The
-   tenant has one regular web application per Company ("Larkmere Mutual Poppy
-   gateway", "Wrenmoor Energy Poppy gateway"); their IDs and the tenant's
-   issuer are already in each profile's `poppy.auth.gateway.upstream`. Add
-   `https://auth.larkmere.azure.altairalabs.ai/oauth/callback` (and the
+   missing, run `make azure-poppy` again, and check your certificate covers the
+   `TLS hosts` that `make omnia-values` prints.
+2. **The upstream sign-in tenant.** Both Companies share one free Auth0
+   tenant as their upstream (STAND-IN for the member's real identity provider;
+   Auth0's free plan allows one tenant per team). The issuers still differ,
+   because each is its Company's gateway host, so there is no
+   `PoppyIssuerConflict`. The tenant has one regular web application per
+   Company ("Larkmere Mutual Poppy gateway", "Wrenmoor Energy Poppy
+   gateway"); their client IDs, secrets' Secret names and the tenant's issuer
+   are `poppy.upstream` and `poppy.companies` in your `deploy/azure/site.yaml`.
+   Add `https://auth.larkmere.<zone>/oauth/callback` (and the
    Wrenmoor one) to each application's Allowed Callback URLs. Ellen Whitcomb
    is a test user there, `ellen.whitcomb@example.com`
    (Username-Password-Authentication), email verified, with a password the
    presenter keeps. Each application's secret goes in a Secret in its
    Company's namespace, under `clientSecret`, never in a values file:
    ```bash
-   kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-gateway-upstream \
+   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual create secret generic larkmere-gateway-upstream \
      --from-literal=clientSecret=<the Auth0 application's client secret>
    ```
    Do the same in `wrenmoor-energy` (`wrenmoor-gateway-upstream`).
@@ -306,20 +313,20 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `clientSecret`, with the label privacy-api requires:
    ```bash
    openssl rand -base64 48 > /tmp/larkmere-exchange-secret
-   kubectl --context aks-omnia-demo -n larkmere-mutual create secret generic larkmere-exchange-client \
+   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual create secret generic larkmere-exchange-client \
      --from-file=clientSecret=/tmp/larkmere-exchange-secret
-   kubectl --context aks-omnia-demo -n larkmere-mutual label secret larkmere-exchange-client \
+   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual label secret larkmere-exchange-client \
      omnia.altairalabs.ai/token-exchange-client-secret=true
    rm /tmp/larkmere-exchange-secret
    ```
    Do the same in `wrenmoor-energy` (`wrenmoor-exchange-client`). Don't put
    the secret in a values file.
-4. **[needs a Key Vault key] The Connection's KMS key.** The profiles'
-   `poppy.account.encryption` seals the exchanged tokens under Key Vault key
-   `omnia-connections`, with credentials Secret `kms-credentials` (key
-   `vault-url`) in each Company's namespace. omnia-azure configures neither
-   today, so make the key, grant the workspace's identity on it, and create
-   the Secret first.
+4. **The Connection's KMS key.** The profiles' `poppy.account.encryption`
+   seals the exchanged tokens under Key Vault key `omnia-connections`, with
+   credentials Secret `kms-credentials` (key `vault-url`) in each Company's
+   namespace. `make azure-poppy` makes the key and grants each tenant's
+   identity `Key Vault Crypto User` on it; the chart makes the Secret from
+   `keyVault.name` in your `site.yaml`.
 5. **Rebuild the stub image.** The pinned stub image (`mortgageUnderwriting`
    and `wren` in `profiles/azure/common.yaml`) predates the account routes.
    Without the new image the account tools answer 404.
@@ -334,7 +341,7 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `personal-agent-token-key`. It is made in milestone 1 Setup step 4; check
    it exists:
    ```bash
-   kubectl --context aks-omnia-demo -n ellens-assistant get secret personal-agent-token-key
+   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant get secret personal-agent-token-key
    ```
 7. **Turn sign-in on.** Set `poppy.auth.enabled: true` and
    `poppy.auth.gateway.enabled: true` in `profiles/azure/larkmere-mutual.yaml`
@@ -345,28 +352,28 @@ exchange (the account tools) needs Enterprise. Until Setup is done, leave
    `-signin` pack, which carries the account tools. Both packs ship, and
    `poppy.auth.enabled` chooses.
 8. **Checks**, for each Company (Wrenmoor:
-   `wrenmoor-energy`, `wrenmoor-outages`, `wrenmoor.azure.altairalabs.ai`):
+   `wrenmoor-energy`, `wrenmoor-outages`, `wrenmoor.<zone>`):
    ```bash
    # The gateway is configured and its upstream answers: True, PoppyIssuerGatewayReady.
-   kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuerGateway")]}'
+   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuerGateway")]}'
 
    # The gateway's metadata, through the issuer route.
-   curl -s https://auth.larkmere.azure.altairalabs.ai/.well-known/oauth-authorization-server
+   curl -s https://auth.larkmere.<zone>/.well-known/oauth-authorization-server
 
    # The gateway is the issuer and verified: True, PoppyIssuerVerified.
-   kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuer")]}'
+   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyIssuer")]}'
 
    # The issuer switch has published.
-   kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.poppy.companies[*].switch.phase}'
+   kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.poppy.companies[*].switch.phase}'
 
    # The resource metadata names the gateway.
-   curl -s https://larkmere.azure.altairalabs.ai/.well-known/oauth-protected-resource
+   curl -s https://larkmere.<zone>/.well-known/oauth-protected-resource
 
    # The facade is not refusing on-behalf-of tools (not PoppyOnBehalfNeedsEnterprise).
-   kubectl --context aks-omnia-demo -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
+   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual get agentruntime larkmere-claims-desk -o jsonpath='{.status.conditions[?(@.type=="PoppyFacade")]}'
    ```
    The phase should reach `Published`, and the metadata should name
-   `https://auth.larkmere.azure.altairalabs.ai`.
+   `https://auth.larkmere.<zone>`.
 
 With sign-in still off, the milestone 1 checks above are the only ones that
 apply, and no conversation shows a sign-in row.
@@ -382,14 +389,14 @@ Ellen types the same storm line.
 
 3. **Sign-in, mid-turn.** Larkmere's row shows "Needs you to sign in", and the
    assistant asks her. She says yes and the button opens Larkmere's consent
-   page on `auth.larkmere.azure.altairalabs.ai` (her login at the Auth0
+   page on `auth.larkmere.<zone>` (her login at the Auth0
    tenant comes first, if she has no session). She approves it. The callback
    says "Signed in to Larkmere Mutual", the chat shows "I've signed in to
    Larkmere Mutual.", and Larkmere reports the claim, with an `LM-41...`
    reference. The consent page is the defence that is left against someone else
    completing the sign-in (see `docs/stand-ins.md`).
 4. **Wrenmoor, and the freezer.** Wrenmoor's sign-in goes the same way, to
-   `auth.wrenmoor.azure.altairalabs.ai`, and it reports her hours off (15 to 18
+   `auth.wrenmoor.<zone>`, and it reports her hours off (15 to 18
    hours, as the outage never ends) and the compensation owed (the fictional
    £95 tier; a statement, nothing is paid). The assistant then adds the
    freezer contents to the Larkmere claim, and Larkmere confirms the item and
@@ -399,10 +406,10 @@ Check, after a take:
 
 ```bash
 # Larkmere acted as Ellen: status=200 and her email.
-kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/claims-systems | grep 'tool=claim_add_item'
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/claims-systems | grep 'tool=claim_add_item'
 
 # No token anywhere in the logs: this prints nothing.
-kubectl --context aks-omnia-demo -n ellens-assistant logs deploy/personal-agent | grep -i -E 'bearer|eyJ'
+kubectl --context "$KUBE_CONTEXT" -n ellens-assistant logs deploy/personal-agent | grep -i -E 'bearer|eyJ'
 ```
 
 On the dashboard, Larkmere's session carries a `poppy-account:` tag, and the
@@ -455,7 +462,7 @@ Between takes, close the conversations and clear the assistant's store.
 2. **Clear the assistant's keys in the shared Redis** (`pa:*`: its
    conversations, events and User IDs):
    ```bash
-   kubectl --context aks-omnia-demo -n omnia exec deploy/demo-redis -- sh -c "redis-cli --scan --pattern 'pa:*' | xargs -r redis-cli del"
+   kubectl --context "$KUBE_CONTEXT" -n omnia exec deploy/demo-redis -- sh -c "redis-cli --scan --pattern 'pa:*' | xargs -r redis-cli del"
    ```
    Clearing the User IDs is safe: the assistant makes new ones, and each
    company then sees a new User. It leaves the companies' own keys
@@ -463,8 +470,8 @@ Between takes, close the conversations and clear the assistant's store.
 3. **Restart personal-agent**, so no Reader is still following a conversation
    you deleted, and the page starts empty:
    ```bash
-   kubectl --context aks-omnia-demo -n ellens-assistant rollout restart deploy/personal-agent
-   kubectl --context aks-omnia-demo -n ellens-assistant rollout status deploy/personal-agent
+   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant rollout restart deploy/personal-agent
+   kubectl --context "$KUBE_CONTEXT" -n ellens-assistant rollout status deploy/personal-agent
    ```
    Also restart it after replacing the keys (`--force`), after a clock
    correction, or when the strip shows a conversation that isn't there. On
@@ -483,8 +490,8 @@ Setup). Redis here is not persistent: if `demo-redis` itself restarts, every
 First look at the company's facade, which says why it refused:
 
 ```bash
-kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/larkmere-claims-desk -c facade --since=10m
-kubectl --context aks-omnia-demo -n wrenmoor-energy logs deploy/wrenmoor-outages -c facade --since=10m
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/larkmere-claims-desk -c facade --since=10m
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy logs deploy/wrenmoor-outages -c facade --since=10m
 ```
 
 After a good take, `| grep -i 'refus\|invalid_session'` on either prints
@@ -502,7 +509,7 @@ nothing.
     Workspace's `spec.poppy.companies[].personalAgents.allow`, and the
     profile's `poppy.allow`.
   - **`client_id`.** It must be exactly
-    `https://assistant.azure.altairalabs.ai/agent.json`: the same scheme,
+    `https://assistant.<zone>/agent.json`: the same scheme,
     host and path as `personalAgent.host` in `profiles/azure/ellens-assistant.yaml`
     and as the allowlist. `jwks_uri` and the redirect URIs must be on that
     host too, and the documents must be served with no redirect (the
@@ -512,7 +519,7 @@ nothing.
     key id.
 - **`PoppyDiscovery` is False on a Workspace.** Read the reason and message:
   ```bash
-  kubectl --context aks-omnia-demo get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
+  kubectl --context "$KUBE_CONTEXT" get workspace larkmere-mutual -o jsonpath='{.status.conditions[?(@.type=="PoppyDiscovery")]}'
   ```
   - `PoppyNothingToPublish`: no Company Agent has a ready poppy facade yet.
     Check `PoppyFacade` on the agent (below). A Workspace with the Company
@@ -542,7 +549,7 @@ nothing.
   for instance when the company asked for something the assistant can't do
   (sign-in when it is off, or after a refused refresh). The conversation's record says why:
   ```bash
-  kubectl --context aks-omnia-demo -n ellens-assistant logs deploy/personal-agent --since=10m
+  kubectl --context "$KUBE_CONTEXT" -n ellens-assistant logs deploy/personal-agent --since=10m
   ```
   A stopped conversation isn't resumed. Ask the assistant to start a new one
   with that company, or reset and take again.

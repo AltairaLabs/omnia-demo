@@ -1,5 +1,8 @@
 # Research on a budget (demo 10)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 Halvern Partners' knowledge team runs a research function once per client
 matter, asking what a regulatory change means for it. The workspace has a
 daily budget with `block`. Partway through the matters the budget is spent,
@@ -25,7 +28,7 @@ why the cap is set to the mock's own rate rather than the mock's price raised.
 
 1. Show the budget, $0.005 a day, `block`. The dashboard shows it on the
    workspace in Topology, not on Costs; or show the Workspace:
-   `kubectl --context aks-omnia-demo get workspace halvern-research -o jsonpath='{.spec.costControls}'`.
+   `kubectl --context "$KUBE_CONTEXT" get workspace halvern-research -o jsonpath='{.spec.costControls}'`.
 2. Start the research run, the function on a schedule (ScheduledFunction
    `research-run`, every 30 seconds):
    ```bash

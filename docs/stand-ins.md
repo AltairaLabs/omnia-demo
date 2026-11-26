@@ -36,9 +36,8 @@ Add a row when you add a stand-in.
     for the subject proof that makes the user a *verified* user. User-scoped
     memory needs a verified user, and so does everything else keyed on one.
   - **The issuer must be trusted.** The install lists each site in the
-    operator's `delegation.trustedIssuers` (omnia-azure
-    `charts/omnia-azure/values-azure.yaml`), exactly as it would list Entra
-    or Okta.
+    operator's `delegation.trustedIssuers` (`make omnia-values` writes the
+    list for your Omnia install), exactly as it would list Entra or Okta.
   - **Without the token, or with an untrusted issuer,** the conversation still
     opens but has no user for memory. The runtime then registers no memory
     tools and logs "no verified user on this conversation". An agent whose
@@ -107,7 +106,7 @@ Add a row when you add a stand-in.
 - **Real system:** a claims handler signed in with the insurer's identity
   provider, working a queue page. Omnia has no such page, and referral-api
   takes no user approvers on this install (Omnia #4248). An Entra user would
-  need `workspaceServices.referralApi.oidc` set in omnia-azure.
+  need `workspaceServices.referralApi.oidc` set on the Omnia install.
 - **Downstream:**
   - **The record shows a ServiceAccount, not a person.** `decidedBy` is
     `larkmere-mutual/claims-handler`. Say so on stage.
@@ -127,7 +126,7 @@ Add a row when you add a stand-in.
   own infrastructure, with its own users, sign-in and key storage.
 - **What the stand-in does:** the service holds the agent's keys and Ellen's
   User IDs, serves `agent.json` and `jwks.json` at
-  `https://assistant.azure.altairalabs.ai`, discovers Companies and holds
+  `https://assistant.<zone>` (your `dns.zone`), discovers Companies and holds
   their conversations. The model sees conversation ids, Company names and
   messages, never a key, a User ID or a Session JWT.
 - **Downstream:**
@@ -151,7 +150,7 @@ Add a row when you add a stand-in.
     validator runs). The tools and the page's `/api/*` are reached
     in-cluster; anyone who can reach the Service's port can speak to a
     Company as Ellen. The NetworkPolicy admits only the assistant agent, the
-    page and the Gateway on :8080, but under Istio ambient (omnia-azure
+    page and the Gateway on :8080, but under Istio ambient (the install
     enrols every workspace, with a waypoint) it must admit :15008 from the
     waypoint, so there it checks that a caller came through the mesh, not
     which caller it was. Accepted for the demo; the follow-up is an Istio
@@ -295,7 +294,7 @@ what sits behind and beside it.
   provider (`auth.issuer`, when it speaks PAP natively) or the gateway in
   front of it (`auth.gateway`) is the Company's choice, not a demo shortcut.
 - **What the demo does:** the Workspace sets `auth.gateway`, with `auth.issuer`
-  the gateway's own URL (`https://auth.<company>.azure.altairalabs.ai`), in
+  the gateway's own URL (`https://auth.<company>.<zone>`), in
   front of the Auth0 tenant. The gateway does the PAP parts the tenant cannot,
   signs its own tokens (RS256, `at+jwt`) and puts `email` and
   `email_verified: true` from the tenant into exchanged tokens only. The

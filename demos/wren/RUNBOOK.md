@@ -1,5 +1,8 @@
 # Wren explains a bill (demo 1)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 Amira Saleem, signed in to Wrenmoor's customer portal, asks Wren why her bill
 went up. Wren reads her account through tools, the portal shows the receipts
 (exactly which systems it read), and switching tariff needs her own "Switch me"
@@ -10,7 +13,7 @@ click.
 Forward the site and open the customer portal:
 
 ```bash
-kubectl --context aks-omnia-demo -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
 # http://localhost:8894/ui_kits/portal/
 ```
 
@@ -45,7 +48,7 @@ switched her she stays on Moor Flex, and the next take's "cheaper tariff?"
 answers differently. Put her back on Moor Steady:
 
 ```bash
-kubectl --context aks-omnia-demo -n wrenmoor-energy rollout restart deploy/wren-account
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy rollout restart deploy/wren-account
 ```
 
 ## Gotchas

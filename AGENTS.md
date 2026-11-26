@@ -18,7 +18,7 @@ looks like a bug is often the platform doing its job against a demo shortcut.
    for the setting involved. Write down, in one sentence, what the design
    intends to happen. Do this before you propose a fix.
 2. **Classify the cause, with evidence.** It is one of:
-   - **our configuration**: a value omnia-azure (or another install) does not
+   - **our configuration**: a value the install (whatever installs Omnia) does not
      set, such as a trusted issuer;
    - **a stand-in's shortcut**: something in this repo fakes a component and
      the platform is reacting to the fake (see docs/stand-ins.md);

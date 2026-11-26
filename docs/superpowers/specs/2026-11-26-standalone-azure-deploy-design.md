@@ -111,7 +111,7 @@ A missing required field fails the target with the field's name.
   values the user adds to their Omnia install:
   - `operator.delegationAPI.trustedIssuers` for the four stand-in edges
     (larkmere-portal, card-callers, wrenmoor-site, assistant-page);
-  - `operator.defaultExposure` for the Company agents, on `site.yaml`'s gateway;
+  - `defaultExposure` for the Company agents, on `site.yaml`'s gateway;
   - and it prints the hosts the install's TLS certificate must cover.
 - `make demos`: as now, but calls `azure-tenant` and `azure-identity`, takes
   the identity from the tenant's ConfigMap, and layers values derived from

@@ -301,7 +301,7 @@ live AKS deployment that the new path is a no-op and then cut over.
     `http://wrenmoor-site.wrenmoor-energy.svc.cluster.local:8080` and
     `http://assistant-page.ellens-assistant.svc.cluster.local:8080`.
     Add a comment that each issuer is a stand-in edge (docs/stand-ins.md).
-  - **Default exposure.** `operator.defaultExposure`:
+  - **Default exposure.** `defaultExposure`:
     `{enabled: true, baseDomain: <dns.zone>, gateway: <site gateway>}`.
 - It also prints `TLS hosts: <space-separated FQDNs>`: the five Poppy hosts and
   `dashboardHost`. This is what the install's certificate must cover.

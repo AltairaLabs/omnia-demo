@@ -1,9 +1,12 @@
 # Analyst workbench (Wrenmoor Energy)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 An analyst asks a question that needs more than a lookup, and the agent
 answers it by writing Python, running it in a sandbox and reading the result.
 The point to make: the sandbox is the control, not the prompt. Each sandbox
-is its own Kata VM on omnia-azure's `sandbox` pool, with no service-account
+is its own Kata VM on the cluster's `sandbox` node pool, with no service-account
 token, no DNS and no network except the generation data service.
 
 Enabled in `profiles/azure/wrenmoor-energy.yaml` since Omnia `9f0b955`, which
@@ -27,7 +30,7 @@ does it for every sandbox.
 
 The limit Omnia documents: a pod outside the mesh has no mesh identity, so a
 destination under a STRICT PeerAuthentication refuses it. wrenmoor-grid-data
-has none (omnia-azure sets no PeerAuthentication), so plaintext is accepted.
+has none (the demo installs no PeerAuthentication), so plaintext is accepted.
 If that changes, add a PeerAuthentication selecting only grid-data's pods with
 `mtls.mode: PERMISSIVE`; the sandbox's NetworkPolicy still decides who calls.
 
@@ -48,12 +51,12 @@ minutes; the handler's timeout is 8m), the image pull and the VM boot. Then:
 
 ```bash
 # The sandbox pod: on a Kata node, out of the mesh.
-kubectl --context aks-omnia-demo -n wrenmoor-energy get pods \
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get pods \
   -l app.kubernetes.io/component=sandbox,app.kubernetes.io/part-of=analyst-workbench \
   -o wide --show-labels
-kubectl --context aks-omnia-demo get runtimeclass kata-vm-isolation
+kubectl --context "$KUBE_CONTEXT" get runtimeclass kata-vm-isolation
 # The class: Ready, the runtime family it resolved, NetworkPolicy proven.
-kubectl --context aks-omnia-demo -n wrenmoor-energy get sandboxclass analyst-sandbox -o yaml
+kubectl --context "$KUBE_CONTEXT" -n wrenmoor-energy get sandboxclass analyst-sandbox -o yaml
 ```
 
 Check:

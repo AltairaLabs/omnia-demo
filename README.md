@@ -19,28 +19,35 @@ documents its prerequisites and can be enabled or disabled through values.
   and synthetic fixtures.
 
 - [`profiles/`](profiles/) — per-platform values for the demo tenants (one
-  Workspace per company in the cast). `profiles/azure/` targets an
-  [omnia-azure](https://github.com/AltairaLabs/omnia-azure) deployment.
+  Workspace per company in the cast). `profiles/azure/` targets an Omnia
+  install on AKS.
 
 ## Installing the demo tenants
 
+The demos deploy onto an Omnia you already run on AKS. Describe it in
+`deploy/azure/site.yaml` (copy [`site.example.yaml`](deploy/azure/site.example.yaml)),
+then:
+
 ```bash
-make demos                        # every tenant (larkmere-mutual, wrenmoor-energy, halvern-partners)
+make omnia-values                 # values to add to your Omnia install, and its TLS hosts
+make azure-poppy                  # DNS records and the Key Vault key
+make images                       # build the demo images into your registry
+make demos                        # every tenant (larkmere-mutual, wrenmoor-energy, ellens-assistant, halvern-partners, halvern-research)
 make demos TENANTS=larkmere-mutual
 make builder                      # the Arena builder, in Halvern Partners
 ```
 
-For each tenant, the azure profile:
-1. asks a sibling omnia-azure checkout (`OMNIA_AZURE`, default `../omnia-azure`)
-   to provision the workspace's Azure side: `make workspace WS=<tenant>`
-   creates its namespace, databases, Foundry Providers, content volume and
-   managed identity;
-2. installs `charts/omnia-demo` with `profiles/azure/common.yaml` and the
-   tenant's file, putting that identity on every agent;
-3. has omnia-azure federate each agent (`make workspace-identity`).
+For each tenant, `make demos`:
+1. makes the workspace's Azure side (`make azure-tenant WS=<tenant>`): its
+   namespace, databases, Foundry Providers, content volume and managed identity;
+2. installs `charts/omnia-demo` with `profiles/azure/common.yaml`, the tenant's
+   file and your site's values, putting that identity on every agent;
+3. federates each agent to the identity (`make azure-identity WS=<tenant>`).
 
-omnia-azure knows nothing about the demos; the cast and what each tenant runs
-live here.
+The order of a first install, the Azure resources and rights it needs, and the
+day-two operations are in [`deploy/azure/README.md`](deploy/azure/README.md).
+The demos were first run on the maintainers' own deployment; nothing in this
+repository is specific to it.
 
 More public-safe examples will be added as independent packages. Enterprise
 examples may require an Omnia Enterprise installation; they will not copy

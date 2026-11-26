@@ -1,5 +1,8 @@
 # What members ask that we can't answer (demo 11)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 The head of claims looks for gaps in the society's guidance. The Memory Galaxy
 shows a large cluster of members asking about flood, with no flood procedure
 beside it. The society closes the gap in two parts, kept apart as they would be
@@ -27,13 +30,13 @@ memory through retrieval).
 2. **Before.** Invoke claims triage on the flood claim (dashboard, Functions,
    `claims-triage`, Test): `{"claim_ref": "LM-40751", "peril": "Flood"}`. £420
    payable, within the £500 limit, and no rule says otherwise: `SETTLED`.
-   Reset the claims system after (`kubectl --context aks-omnia-demo -n
+   Reset the claims system after (`kubectl --context "$KUBE_CONTEXT" -n
    larkmere-mutual rollout restart deploy/claims-systems`).
 3. **Add the rule.** Turn CP-7 on:
    ```bash
-   helm --kube-context aks-omnia-demo -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true
+   helm --kube-context "$KUBE_CONTEXT" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true
    ```
-   Show the rule in the ToolPolicy (`kubectl --context aks-omnia-demo -n
+   Show the rule in the ToolPolicy (`kubectl --context "$KUBE_CONTEXT" -n
    larkmere-mutual get toolpolicy claims-triage-policy -o yaml`): it asks the
    claims system for the claim's peril and refuses a payment on a flood claim.
    A policy change takes effect on the next invocation.

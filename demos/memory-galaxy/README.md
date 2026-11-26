@@ -52,13 +52,13 @@ memories plus 150 items and 74 edges.
 ## Running it
 
 Generation needs the Foundry (Azure OpenAI) account, which is keyless and takes
-calls only from the AKS subnet. omnia-azure opens it to this machine for the
-run and closes it again:
+calls only from the AKS subnet. For the run, open it to this machine, and close
+it again afterwards: allow your IP in the account's network rules and give
+yourself the Cognitive Services OpenAI User role on it. The endpoint is
+`foundry.endpoint` in `deploy/azure/site.yaml`:
 
 ```bash
-make -C ../omnia-azure foundry-open     # your IP + Cognitive Services OpenAI User
-go run ./demos/memory-galaxy --endpoint "$(jq -r .endpoint ../omnia-azure/.foundry-open.json)"
-make -C ../omnia-azure foundry-close
+go run ./demos/memory-galaxy --endpoint "$(yq e .foundry.endpoint deploy/azure/site.yaml)"
 ```
 
 `--dry-run` prints the counts and how many prompts are not cached, and calls

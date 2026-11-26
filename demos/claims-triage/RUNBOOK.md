@@ -1,5 +1,8 @@
 # Claims triage: the £500 limit (demo 3)
 
+> Commands name the cluster as `"$KUBE_CONTEXT"`. Set it to your cluster's kube
+> context first (`aks.kubeContext` in `deploy/azure/site.yaml`).
+
 A claims assessor may settle up to £500 on its own. Above that, Larkmere's
 delegated authority schedule says a human approves. Claims triage is a function
 (`mode: function`), invoked with a claim reference.
@@ -26,8 +29,8 @@ it off, DA-2 refuses outright, as this demo first did.
 Reset the claims system (its state is in memory):
 
 ```bash
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout restart deploy/claims-systems
-kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims-systems
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout restart deploy/claims-systems
+kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout status deploy/claims-systems
 ```
 
 Wait a few seconds after it reports ready: the first invocation straight after
@@ -42,7 +45,7 @@ Invoke from the dashboard (Functions, `claims-triage`, Test, `claim_ref`).
 2. **`LM-40718`** (£990 payable): the Test tab comes back straight away. The
    broker held the settlement:
    ```bash
-   kubectl --context aks-omnia-demo -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
+   kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
    # claim_settle outcome=refer deniedBy=refer-settlement-above-delegated-authority phase=hold
    ```
    The claims system has logged `claim_fetch` only. Nothing has been paid.
@@ -78,7 +81,7 @@ the point to make on camera: the model didn't know, and it didn't need to.
   and who made it are real, the page isn't there yet.
 - **Turning referral on rolls every agent** in the workspace's default group,
   and on a full cluster the new pods wait for the autoscaler. Wait for
-  `kubectl --context aks-omnia-demo -n larkmere-mutual rollout status deploy/claims-triage`
+  `kubectl --context "$KUBE_CONTEXT" -n larkmere-mutual rollout status deploy/claims-triage`
   before the take: until it finishes, the old pod refuses instead of holding.
 
 - **The function's facade takes no anonymous calls.** `curl` to
