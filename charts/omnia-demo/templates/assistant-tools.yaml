@@ -1,5 +1,8 @@
 {{- if .Values.personalAgent.enabled }}
 {{- $ns := .Values.namespace }}
+{{- /* Example hosts in the descriptions: the Companies in personalAgent.knownCompanies. */}}
+{{- $larkmere := include "omnia-demo.companyHost" (list . "larkmere") }}
+{{- $wrenmoor := include "omnia-demo.companyHost" (list . "wrenmoor") }}
 {{- $pa := printf "http://personal-agent.%s:8080/tools" $ns }}
 ---
 # Ellen's assistant's six tools, all on the personal-agent service
@@ -38,11 +41,11 @@ spec:
       timeout: 45s
       tool:
         name: find_company
-        description: "Look up a company's Poppy agents by its domain (for example larkmere.azure.altairalabs.ai). Returns the company's name, its domain and what each of its agents can talk about, with its access: \"session\" (no sign-in needed) or \"signed_in\" (the company needs Ellen signed in). When the domain has no Poppy agent it returns found false and a reason; that is an answer, not a failure to retry. When the company couldn't be reached right now, the reason says so (\"couldn't reach ... right now\"); that may pass, so try once more, and if it fails again tell Ellen."
+        description: "Look up a company's Poppy agents by its domain (for example {{ $larkmere }}). Returns the company's name, its domain and what each of its agents can talk about, with its access: \"session\" (no sign-in needed) or \"signed_in\" (the company needs Ellen signed in). When the domain has no Poppy agent it returns found false and a reason; that is an answer, not a failure to retry. When the company couldn't be reached right now, the reason says so (\"couldn't reach ... right now\"); that may pass, so try once more, and if it fails again tell Ellen."
         inputSchema:
           type: object
           properties:
-            domain: { type: string, description: "The company's domain name, with no scheme or path, e.g. wrenmoor.azure.altairalabs.ai" }
+            domain: { type: string, description: "The company's domain name, with no scheme or path, e.g. {{ $wrenmoor }}" }
           required: ["domain"]
       httpConfig:
         endpoint: {{ $pa }}/find_company
@@ -57,7 +60,7 @@ spec:
         inputSchema:
           type: object
           properties:
-            domain: { type: string, description: "The company's domain name, e.g. larkmere.azure.altairalabs.ai" }
+            domain: { type: string, description: "The company's domain name, e.g. {{ $larkmere }}" }
             message: { type: string, description: "The first message to the company, written as Ellen's assistant acting for her" }
           required: ["domain", "message"]
       httpConfig:
@@ -123,7 +126,7 @@ spec:
         inputSchema:
           type: object
           properties:
-            domain: { type: string, description: "The company's domain name, e.g. larkmere.azure.altairalabs.ai" }
+            domain: { type: string, description: "The company's domain name, e.g. {{ $larkmere }}" }
             scopes: { type: string, description: "The scopes to sign in for, space-separated, as read_conversation's sign_in.scopes gave them. Leave out only when none were given." }
           required: ["domain"]
       httpConfig:

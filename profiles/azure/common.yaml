@@ -1,11 +1,14 @@
-# The Azure profile: values every demo tenant shares on an omnia-azure
-# install, layered under the tenant's own file by `make demos`.
+# The Azure profile: values every demo tenant shares on Omnia on AKS, layered
+# under the tenant's own file by `make demos`.
 #
-# Everything Azure-specific a tenant needs is made by omnia-azure's
-# `make workspace WS=<tenant>` (its omnia-workspace chart): the namespace, the
-# workspace's own databases and their Secrets, the keyless Foundry Providers
-# named below, the content volume and a managed identity. `make demos` reads
-# that identity from the workspace's omnia-workspace ConfigMap.
+# Everything Azure-specific a tenant needs is made by `make azure-tenant
+# WS=<tenant>` (the omnia-workspace chart): the namespace, the workspace's own
+# databases and their Secrets, the keyless Foundry Providers named below, the
+# content volume and a managed identity. `make demos` reads that identity from
+# the workspace's omnia-workspace ConfigMap. What belongs to your install (the
+# owner groups, your DNS zone, your Key Vault, your sign-in provider, your
+# gateway) is not here: deploy/azure/site-values.sh prints it from
+# deploy/azure/site.yaml, and `make demos` layers it after the profile.
 
 # Every agent runs on the tenant's keyless Foundry gpt-4o Provider.
 llm:
@@ -14,11 +17,8 @@ llm:
 workspace:
   create: true
   environment: development
-  # Owner for the "Omnia Admins" security group in the HollandTech tenant, the
-  # same group as the dashboard admins (omnia-azure values-azure.yaml).
-  roleBindings:
-    - groups: [0ad6a315-d616-46a5-bf38-3d31203a0be5]
-      role: owner
+  # roleBindings (the Entra groups that own the workspace) come from
+  # site.yaml's ownerGroups, through deploy/azure/site-values.sh.
   services:
     - name: default
       mode: managed
@@ -30,8 +30,8 @@ workspace:
           secretRef: { name: omnia-postgres-memory }
         # Required from beta.22: no embedding Provider, no memory-api.
         providerRef: { name: azure-foundry-embedding }
-        # Keyless Foundry embeddings. omnia-azure's `make workspace-identity`
-        # federates and annotates memory-api's SA (memory-<tenant>-default).
+        # Keyless Foundry embeddings. `make azure-identity` federates and
+        # annotates memory-api's SA (memory-<tenant>-default).
         podOverrides:
           labels:
             azure.workload.identity/use: "true"
@@ -48,7 +48,7 @@ workspace:
   # Workload identity to Foundry. From Omnia beta.23 every agent runs as its
   # own <agent>-facade ServiceAccount; these annotations go on each of them.
   # `make demos` sets the workspace identity's client and tenant ids, and
-  # omnia-azure's `make workspace-identity` federates each agent.
+  # `make azure-identity` federates each agent.
   runtimeIdentity:
     podLabels:
       azure.workload.identity/use: "true"

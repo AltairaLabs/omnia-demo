@@ -63,6 +63,9 @@ poppy:
     larkmere-mutual:
       clientID: client-larkmere
       clientSecretName: larkmere-upstream
+    wrenmoor-energy:
+      clientID: client-wrenmoor
+      clientSecretName: wrenmoor-upstream
 images:
   registry: demoreg
   loginServer: demoreg.azurecr.io
@@ -70,4 +73,7 @@ images:
 builder:
   chart: oci://registry.example.com/charts/omnia-arena-builder
   version: 0.0.0
-  sandboxImage: registry.example.com/sandbox:dev
+  sandboxImage:
+    repository: registry.example.com/sandbox
+    tag: dev
+    digest: sha256:abc

@@ -188,3 +188,16 @@ workspace identity's annotations to copy.
 true
 {{- end -}}
 {{- end }}
+
+{{/*
+The host of one Company among personalAgent.knownCompanies, by the first label
+of its name: call with (list . "larkmere"). Empty when none matches. The
+assistant's pack and tool descriptions name the Companies by this host, so no
+host of any one install is in the chart.
+*/}}
+{{- define "omnia-demo.companyHost" -}}
+{{- $prefix := printf "%s." (index . 1) -}}
+{{- range (index . 0).Values.personalAgent.knownCompanies -}}
+{{- if hasPrefix $prefix . -}}{{- . -}}{{- end -}}
+{{- end -}}
+{{- end -}}

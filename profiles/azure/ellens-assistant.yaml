@@ -11,7 +11,7 @@
 #
 # First install, in this order (the keys need the namespace, and the
 # Deployment cannot start without the keys, so helm --wait would hang):
-#   make -C ../omnia-azure workspace WS=ellens-assistant
+#   make azure-tenant WS=ellens-assistant
 #   CONTEXT=aks-omnia-demo hack/personal-agent-keys.sh
 #   make images        # no published personal-agent image is pinned yet
 #   make demos TENANTS=ellens-assistant
@@ -23,12 +23,10 @@ workspace:
 
 personalAgent:
   enabled: true
-  host: assistant.azure.altairalabs.ai
-  # The Companies she has accounts at. Keep in step with the assistant's
-  # prompt (demos/personal-agent/arena/prompts/assistant.yaml).
-  knownCompanies:
-    - larkmere.azure.altairalabs.ai
-    - wrenmoor.azure.altairalabs.ai
+  # host (assistant.<your zone>) and knownCompanies, the Companies she has
+  # accounts at (larkmere.<zone>, wrenmoor.<zone>), are set by
+  # deploy/azure/site-values.sh from site.yaml. The chart puts the same hosts in
+  # the assistant's prompt.
   # No pin: the sha-682590d build common.yaml pins predates the
   # personal-agent image, and the demo-sites image it pins has no
   # ellens-assistant site. Run both from `make images` (.images.env), or pin
@@ -37,7 +35,7 @@ personalAgent:
   # The page (templates/assistant-page.yaml) is served by the catalogue
   # (halvern-partners.yaml, catalogue.proxies) at /ellens-assistant/. Its
   # issuer, http://assistant-page.ellens-assistant.svc.cluster.local:8080,
-  # goes in omnia-azure's delegation.trustedIssuers beside the portals', or
+  # goes in your Omnia install's delegation.trustedIssuers beside the portals', or
   # the assistant's conversations have no verified user.
   page:
     enabled: true

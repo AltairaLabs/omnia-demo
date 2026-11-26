@@ -2,44 +2,48 @@
 #
 # One Workspace per company in the fictional cast, each an omnia-demo release
 # in its own namespace. The platform-specific values live in profiles/<PROFILE>/
-# (common.yaml under one file per tenant). The azure profile installs onto an
-# omnia-azure deployment: it asks omnia-azure to provision each workspace's Azure
-# side (`make workspace`), installs the chart, then has it federate the agents
-# (`make workspace-identity`).
+# (common.yaml under one file per tenant). The azure profile installs onto your
+# Omnia on AKS, described by deploy/azure/site.yaml (copy site.example.yaml): per
+# tenant it makes the workspace's Azure side (deploy/azure/tenant.sh), installs
+# the chart with the profile and your site's values (deploy/azure/site-values.sh),
+# then federates the agents (deploy/azure/identity.sh).
 #
 #   make demos                          every tenant
 #   make demos TENANTS=wrenmoor-energy  one tenant
 #   make builder                        the Arena builder, for Halvern Partners
 #   make images                         build every image into the dev registry
 #
-# `make images` builds each demo image in omnia-azure's dev registry (its
-# `make registry`) with `az acr build`, tagged dev-<commit>, and records the
-# registry and tag in .images.env. While that file exists, `make demos` runs
+# `make images` builds each demo image into your registry (site.yaml images.*)
+# with `az acr build`, tagged dev-<commit>, and records the registry and tag in
+# .images.env. While that file exists, `make demos` runs
 # every image from that build instead of the azure profile's pins; delete it to
 # go back. Nothing is published from this repository.
 #
-# Requires a sibling checkout of omnia-azure (OMNIA_AZURE) with its deploy
-# outputs, and kubectl/helm access to that cluster.
+# Requires deploy/azure/site.yaml, mikefarah yq v4, and az/kubectl/helm access to
+# your cluster. SITE points at another site file (make lint SITE=...).
 
 SHELL := bash
 
 PROFILE          ?= azure
 # ellens-assistant is not a company: it is the person's side of the Poppy demo
 # (profiles/azure/ellens-assistant.yaml). Its first install needs, in order:
-# `make -C $(OMNIA_AZURE) workspace WS=ellens-assistant` (the namespace),
+# `make azure-tenant WS=ellens-assistant` (the namespace),
 # `CONTEXT=$(KUBE_CONTEXT) hack/personal-agent-keys.sh` (its keys) and
 # `make images` (no personal-agent image is pinned yet); without the keys or
 # the image, `make demos` waits out its 10m timeout.
 # ellens-assistant before halvern-partners: the catalogue's nginx (in halvern-partners) resolves assistant-page.ellens-assistant at start and crashes if that Service doesn't exist yet.
 TENANTS          ?= larkmere-mutual wrenmoor-energy ellens-assistant halvern-partners halvern-research
-KUBE_CONTEXT     ?= aks-omnia-demo
-OMNIA_AZURE      ?= ../omnia-azure
+# Your install's description; the kubectl/helm context comes from it too.
+SITE             ?= deploy/azure/site.yaml
+export SITE
 CHART            ?= charts/omnia-demo
 BUILDER_TENANT   ?= halvern-partners
 BUILDER_PROVIDER ?= azure-foundry-gpt-5-4-mini
 
+# The canary, research and build-loop targets name their cluster by hand:
+# KUBE_CONTEXT is aks.kubeContext in your site.yaml.
+KUBE_CONTEXT     ?= $(or $(shell yq e '.aks.kubeContext | select(. != null)' $(SITE) 2>/dev/null),$(error aks.kubeContext not found in $(SITE): copy deploy/azure/site.example.yaml to deploy/azure/site.yaml and fill it in))
 KUBECTL := kubectl --context $(KUBE_CONTEXT)
-HELM    := helm --kube-context $(KUBE_CONTEXT)
 PROFILE_DIR := profiles/$(PROFILE)
 
 # The last `make images` build, if any, is in .images.env (IMAGE_REGISTRY and
@@ -92,49 +96,18 @@ azure-poppy:
 omnia-values:
 	@deploy/azure/omnia-values.sh
 
+# Per tenant: deploy/azure/demos.sh makes its Azure side, installs the chart with
+# the profile and site-values.sh's overlay, and federates its agents.
 demos:
 	@set -euo pipefail; \
 	test "$(PROFILE)" = azure || { echo "only the azure profile is wired: PROFILE=$(PROFILE)" >&2; exit 1; }; \
-	test -d "$(OMNIA_AZURE)" || { echo "OMNIA_AZURE=$(OMNIA_AZURE) is not a checkout of omnia-azure" >&2; exit 1; }; \
-	image_set=""; \
-	if [[ -f $(IMAGE_ENV) ]]; then \
-	  reg=$$(awk -F' *:?= *' '$$1=="IMAGE_REGISTRY"{print $$2}' $(IMAGE_ENV)); \
-	  tag=$$(awk -F' *:?= *' '$$1=="IMAGE_TAG"{print $$2}' $(IMAGE_ENV)); \
-	  image_set="--set-string images.registry=$$reg --set-string images.tag=$$tag"; \
-	  echo "==> Images: $$reg, tag $$tag ($(IMAGE_ENV))"; \
-	fi; \
 	for t in $(TENANTS); do \
-	  echo "==> $$t"; \
-	  $(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" workspace WS="$$t"; \
-	  client_id=$$($(KUBECTL) -n "$$t" get configmap omnia-workspace -o jsonpath='{.data.workloadIdentityClientId}'); \
-	  tenant_id=$$($(KUBECTL) -n "$$t" get configmap omnia-workspace -o jsonpath='{.data.workloadIdentityTenantId}'); \
-	  $(HELM) upgrade --install "$$t" $(CHART) -n "$$t" \
-	    -f $(PROFILE_DIR)/common.yaml -f "$(PROFILE_DIR)/$$t.yaml" \
-	    --set namespace="$$t" $$image_set \
-	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/client-id=$$client_id" \
-	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/tenant-id=$$tenant_id" \
-	    --wait --timeout 10m >/dev/null; \
-	  $(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" workspace-identity WS="$$t"; \
+	  CHART=$(CHART) PROFILE_DIR=$(PROFILE_DIR) IMAGE_ENV=$(IMAGE_ENV) deploy/azure/demos.sh "$$t"; \
 	done; \
 	echo "==> Demo tenants installed: $(TENANTS)"
 
 images:
-	@set -euo pipefail; \
-	acr=$$(jq -r .name "$(OMNIA_AZURE)/.registry.json" 2>/dev/null || true); \
-	server=$$(jq -r .loginServer "$(OMNIA_AZURE)/.registry.json" 2>/dev/null || true); \
-	sub=$$(jq -r .subscription "$(OMNIA_AZURE)/.registry.json" 2>/dev/null || true); \
-	if [[ -z "$$acr" ]]; then echo "no dev registry: run 'make registry' in $(OMNIA_AZURE)" >&2; exit 1; fi; \
-	tag=dev-$$(git rev-parse --short HEAD); \
-	if [[ -n "$$(git status --porcelain)" ]]; then tag=$$tag-$$(date +%Y%m%d%H%M); fi; \
-	echo "==> Building into $$server, tag $$tag"; \
-	for spec in $(IMAGES); do \
-	  IFS=, read -r name context file <<< "$$spec"; \
-	  echo "==> $$name"; \
-	  az acr build --subscription "$$sub" --registry "$$acr" --platform linux/amd64 --image "$$name:$$tag" \
-	    --file "$$file" --no-logs --output none "$$context"; \
-	done; \
-	printf 'IMAGE_REGISTRY := %s\nIMAGE_TAG := %s\n' "$$server" "$$tag" > $(IMAGE_ENV); \
-	echo "==> Built $$tag; make demos now runs it (rm .images.env to go back)"
+	@IMAGE_ENV=$(IMAGE_ENV) deploy/azure/images.sh $(IMAGES)
 
 # The eval-gated canary on Larkmere Mutual's member assistant (agent pii-chat,
 # values piiChat.canary).
@@ -150,7 +123,7 @@ images:
 # average judge score (RolloutAnalysis card-support-gate), and a failed
 # gate rolls back on its own. The rollout names the namespace's waypoint
 # (mesh.waypoint, CANARY_WAYPOINT), so the controller labels the Service to use
-# it, as Omnia's rollout docs intend; omnia-azure `make workspace` makes the
+# it, as Omnia's rollout docs intend; `make azure-tenant` makes the
 # waypoint and labels the namespace the same way. (Omnia #3952, which emptied
 # the Service when this was set, is fixed in #3995.)
 # Not in the chart: a promotion rewrites
@@ -246,12 +219,23 @@ build-loop-reset:
 	  echo "==> deleting agent $(BUILD_LOOP_AGENT)"; \
 	  $(KUBECTL) -n $(BUILD_LOOP_NS) delete agentruntime $(BUILD_LOOP_AGENT) >/dev/null; \
 	fi; \
-	$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" workspace-identity WS=$(BUILD_LOOP_NS); \
+	deploy/azure/identity.sh $(BUILD_LOOP_NS); \
 	echo "==> $(BUILD_LOOP_NS) ready for a take"
 
+# The Arena builder (chart and version from site.yaml builder.*), then the
+# tenant's agent federation.
 builder:
-	@$(MAKE) --no-print-directory -C "$(OMNIA_AZURE)" builder BUILDER_TARGETS="$(BUILDER_TENANT):$(BUILDER_PROVIDER)"
+	@deploy/azure/builder.sh $(BUILDER_TENANT) $(BUILDER_PROVIDER)
 
+# Every tenant must render with the profile and the site's values, so lint needs a
+# site file: make lint SITE=deploy/azure/testdata/site-full.yaml
+LINT_VALUES := out/lint-site-values.yaml
 lint:
 	@helm lint $(CHART)
-	@for t in $(TENANTS); do helm template "$$t" $(CHART) -f $(PROFILE_DIR)/common.yaml -f "$(PROFILE_DIR)/$$t.yaml" --set namespace="$$t" >/dev/null && echo "$$t renders"; done
+	@set -euo pipefail; mkdir -p out; \
+	for t in $(TENANTS); do \
+	  deploy/azure/site-values.sh "$$t" > "$(LINT_VALUES)"; \
+	  helm template "$$t" $(CHART) -f $(PROFILE_DIR)/common.yaml -f "$(PROFILE_DIR)/$$t.yaml" -f "$(LINT_VALUES)" --set namespace="$$t" \
+	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/client-id=lint" \
+	    --set-string "workspace.runtimeIdentity.serviceAccountAnnotations.azure\.workload\.identity/tenant-id=lint" >/dev/null && echo "$$t renders"; \
+	done

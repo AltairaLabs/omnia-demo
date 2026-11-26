@@ -29,7 +29,7 @@ spec:
     properties:
       domain:
         type: string
-        description: The company's domain name, e.g. larkmere.azure.altairalabs.ai
+        description: The company's domain name, e.g. @LARKMERE_DOMAIN@
       scopes:
         type: string
         description: >-

@@ -146,5 +146,9 @@ builder:
   chart: oci://registry.example.com/charts/omnia-arena-builder
   # Chart version to install.
   version: 0.0.0
-  # Optional sandbox image override.
-  sandboxImage: ""
+  # Optional: override the sandbox image the chart pins (remove the block to
+  # keep it). Only `repository` is required; tag and digest are optional.
+  # sandboxImage:
+  #   repository: registry.example.com/omnia-promptarena-sandbox
+  #   tag: dev
+  #   digest: sha256:0000000000000000000000000000000000000000000000000000000000000000

@@ -44,5 +44,7 @@ jobs:
       - uses: azure/setup-helm@v4
       - run: helm lint charts/omnia-demo
       - run: helm template omnia-demo charts/omnia-demo >/dev/null
+      # Every tenant, with the profile and a site's values (needs yq).
+      - run: make lint SITE=deploy/azure/testdata/site-full.yaml
       - run: helm lint charts/omnia-workspace --set name=larkmere-mutual --set postgres.password.externalSecret.store=azure-kv
       - run: helm template workspace-larkmere-mutual charts/omnia-workspace --namespace omnia --set name=larkmere-mutual --set postgres.password.secretRef.name=omnia-db-admin --set postgres.password.secretRef.key=PGPASSWORD >/dev/null

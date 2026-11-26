@@ -21,8 +21,8 @@ wren: { enabled: true }
 wrenmoorSite: { enabled: true }
 incidentAgent: { enabled: true }
 dataAnalyst: { enabled: true }
-# The analyst workbench. Each sandbox runs on omnia-azure's Kata pool
-# (bicep/modules/sandbox-pool.bicep), its own VM: the RuntimeClass's own
+# The analyst workbench. Each sandbox runs on your cluster's Kata
+# node pool, its own VM: the RuntimeClass's own
 # scheduling picks the Kata nodes, and the toleration admits the pool's taint.
 # The pool scales from zero, so a first sandbox waits a few minutes for a node.
 #
@@ -53,8 +53,11 @@ memory:
 # Poppy assistant is admitted.
 poppy:
   enabled: true
-  domain: wrenmoor.azure.altairalabs.ai
-  allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
+  # domain, allow (only the demo's Poppy assistant is admitted), and the
+  # hosts and ids below that come from your install (auth.issuer,
+  # auth.gateway.upstream.issuer and clientID, auth.accessTokens.audiences,
+  # account.audience, account.encryption.vaultURL) are set by
+  # deploy/azure/site-values.sh from site.yaml.
   # The Company Agent, wrenmoor-outages, at https://<domain>/poppy. Its one
   # tool, outage_status, calls wren-account's /wren/outage-status, so the
   # wren image pinned in common.yaml must include that route (checked in
@@ -65,31 +68,29 @@ poppy:
     description: Power cuts, restoration times and compensation for Wrenmoor Energy customers
   # Company sign-in, and the account tools that act as the signed-in customer
   # (their own outage and the compensation they're owed). OFF until the deploy
-  # prep in demos/personal-agent/RUNBOOK.md (milestone 2) is done: the Auth0
-  # callback, the three Secrets and the issuer host's TLS. Then set
+  # prep in demos/personal-agent/RUNBOOK.md (milestone 2) is done: the upstream
+  # sign-in callback, the three Secrets and the issuer host's TLS. Then set
   # auth.enabled and gateway.enabled together. The issuer is Omnia's issuer
-  # gateway (Omnia dd2e94540) on auth.wrenmoor.azure.altairalabs.ai, in front
-  # of the demo's Auth0 tenant (shared with Larkmere); without gateway.enabled
+  # gateway (Omnia dd2e94540) on auth.wrenmoor.<your zone>, in front of your
+  # upstream sign-in provider (shared with Larkmere); without gateway.enabled
   # nothing serves that issuer. account.tokenURL and account.subjectIssuer
   # stay empty: they default to the gateway.
   auth:
     enabled: true
-    # The gateway's own URL: Omnia serves the gateway on this host.
-    issuer: https://auth.wrenmoor.azure.altairalabs.ai
+    # issuer, the gateway's own URL (Omnia serves the gateway on its host), is
+    # set from site.yaml.
     gateway:
       enabled: true
       upstream:
-        # The demo's one Auth0 tenant; this is its "Wrenmoor Energy Poppy gateway"
-        # application (Regular Web Application).
-        issuer: https://dev-kvf5kfvufbv6y3p6.us.auth0.com/
-        clientID: aEXiTb7YZgIJfxayMwdP11kU52ye8ltE
+        # The upstream sign-in provider's issuer and this Company's client at it
+        # (site.yaml poppy.upstream and poppy.companies); one provider serves
+        # both Companies.
         clientSecretRef: wrenmoor-gateway-upstream
     scopes:
       outages: See how long your supply has been off and the compensation you're owed
     scopeHints:
       outages: { changes: none, personalData: true }
-    accessTokens:
-      audiences: ["https://wrenmoor.azure.altairalabs.ai"]
+    # accessTokens.audiences is set from site.yaml.
   account:
     # The exchange client the gateway registers (auth.gateway.exchangeClients)
     # and the Connection uses. Its Secret, wrenmoor-exchange-client, holds a
@@ -101,7 +102,7 @@ poppy:
       kmsProvider: azure-keyvault
       keyID: omnia-connections
       secretRef: { name: kms-credentials }
-      # The persistent Key Vault; privacy-api reaches it keylessly (Omnia #4466).
-      vaultURL: https://kv-omnia-demo-p-gotzfbhj.vault.azure.net/
-    # The account API's audience: the stub accepts only tokens for it.
-    audience: https://wrenmoor.azure.altairalabs.ai/api
+      # vaultURL, your Key Vault (site.yaml keyVault.name); privacy-api reaches
+      # it keylessly (Omnia #4466).
+    # account.audience, the account API's audience (the stub accepts only tokens
+    # for it), is set from site.yaml.

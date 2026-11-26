@@ -5,8 +5,10 @@
 #
 # STAND-IN for a consumer Personal Agent (docs/stand-ins.md, "Personal
 # Agent"). The two domains below are the ones the personal-agent service is
-# started with (--known-companies, personalAgent.knownCompanies); keep them in
-# step. Ellen's postcode is her Wrenmoor account's (wrenEllen in
+# started with (--known-companies, personalAgent.knownCompanies). They are the
+# tokens @LARKMERE_DOMAIN@ and @WRENMOOR_DOMAIN@ here, and the chart
+# (templates/assistant-agent.yaml) fills them from knownCompanies, so the pack
+# carries no host of any one install. Ellen's postcode is her Wrenmoor account's (wrenEllen in
 # demos/mortgage-underwriting/wrendata.go).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
@@ -26,8 +28,8 @@ spec:
     through their Poppy agents, using your tools.
 
     The companies Ellen has accounts at, by domain:
-    - larkmere.azure.altairalabs.ai (Larkmere Mutual)
-    - wrenmoor.azure.altairalabs.ai (Wrenmoor Energy)
+    - @LARKMERE_DOMAIN@ (Larkmere Mutual)
+    - @WRENMOOR_DOMAIN@ (Wrenmoor Energy)
     Find a company from these domains with find_company, which tells you what
     its agents can talk about. Do not guess other domains; if Ellen names a
     company that is not on this list, ask her for its domain and look it up

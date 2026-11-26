@@ -1,5 +1,7 @@
 # The model's descriptor for find_company. The ToolRegistry binding
-# (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
+# (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step. The
+# @LARKMERE_DOMAIN@ and @WRENMOOR_DOMAIN@ tokens (here and in the other tools)
+# are filled by the chart from personalAgent.knownCompanies.
 # Served by the personal-agent service's POST /tools/find_company
 # (demos/personal-agent/server.go): PAP discovery (§3) of a domain's
 # /.well-known/poppy.json. Reads public documents only.
@@ -11,7 +13,7 @@ spec:
   name: find_company
   description: >-
     Look up a company's Poppy agents by its domain (for example
-    larkmere.azure.altairalabs.ai). Returns the company's name, its domain and
+    @LARKMERE_DOMAIN@). Returns the company's name, its domain and
     what each of its agents can talk about, with its access: "session" (no
     sign-in needed) or "signed_in" (the company needs Ellen signed in). When
     the domain has no Poppy agent it returns found false and a reason; that
@@ -23,7 +25,7 @@ spec:
     properties:
       domain:
         type: string
-        description: The company's domain name, with no scheme or path, e.g. wrenmoor.azure.altairalabs.ai
+        description: The company's domain name, with no scheme or path, e.g. @WRENMOOR_DOMAIN@
     required: [domain]
   output_schema:
     type: object
@@ -44,7 +46,7 @@ spec:
   timeout_ms: 45000
   mock_result:
     name: Wrenmoor Energy
-    domain: wrenmoor.azure.altairalabs.ai
+    domain: wrenmoor.example.com
     agents:
       - description: Power cuts, restoration times and compensation for Wrenmoor Energy customers
         access: session

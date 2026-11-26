@@ -49,7 +49,7 @@ piiChat:
 # Dreaming on the member assistant: its failed conversations become Arena
 # scenarios each evening, and a candidate prompt goes to the canary's rollout
 # once a person approves it on the Dreams page. 18:17 UTC, not Omnia's 03:17:
-# omnia-azure's demo-power workflow stops the cluster at 21:00 UK time.
+# the demo cluster's power schedule stops it at 21:00 UK time.
 dreaming:
   enabled: true
   schedule: "17 18 * * *"
@@ -59,7 +59,7 @@ dreaming:
     name: larkmere-dreaming
 
 # The card line: "Call the card line" in the portal's assistant, a realtime
-# voice agent on omnia-azure's azure-foundry-gpt-realtime, held to the chat's
+# voice agent on the tenant's azure-foundry-gpt-realtime, held to the chat's
 # tools, ToolPolicy, privacy policy and edge. It speaks the AI disclosure
 # first, then acts on the signed-in member's card. Relies on Omnia main 9f0b955
 # or later (PromptKit #2690: a realtime tool call carries the member; Omnia
@@ -74,8 +74,11 @@ galaxy: { enabled: true }
 # Poppy assistant is admitted.
 poppy:
   enabled: true
-  domain: larkmere.azure.altairalabs.ai
-  allow: ["https://assistant.azure.altairalabs.ai/agent.json"]
+  # domain, allow (only the demo's Poppy assistant is admitted), and the
+  # hosts and ids below that come from your install (auth.issuer,
+  # auth.gateway.upstream.issuer and clientID, auth.accessTokens.audiences,
+  # account.audience, account.encryption.vaultURL) are set by
+  # deploy/azure/site-values.sh from site.yaml.
   # The Company Agent, larkmere-claims-desk, at https://<domain>/poppy.
   agent:
     enabled: true
@@ -83,31 +86,29 @@ poppy:
     description: Home insurance claims and cover for Larkmere Mutual members
   # Company sign-in, and the account tools that act as the signed-in member
   # (report a home claim, add to it, its status). OFF until the deploy prep in
-  # demos/personal-agent/RUNBOOK.md (milestone 2) is done: the Auth0 callback,
-  # the three Secrets and the issuer host's TLS. Then set auth.enabled and
-  # gateway.enabled together. The issuer is Omnia's issuer gateway (Omnia
-  # dd2e94540) on auth.larkmere.azure.altairalabs.ai, in front of the demo's
-  # Auth0 tenant (shared with Wrenmoor); without gateway.enabled nothing
-  # serves that issuer. account.tokenURL and account.subjectIssuer stay empty:
-  # they default to the gateway.
+  # demos/personal-agent/RUNBOOK.md (milestone 2) is done: the upstream
+  # sign-in callback, the three Secrets and the issuer host's TLS. Then set
+  # auth.enabled and gateway.enabled together. The issuer is Omnia's issuer
+  # gateway (Omnia dd2e94540) on auth.larkmere.<your zone>, in front of your
+  # upstream sign-in provider (shared with Wrenmoor); without gateway.enabled
+  # nothing serves that issuer. account.tokenURL and account.subjectIssuer stay
+  # empty: they default to the gateway.
   auth:
     enabled: true
-    # The gateway's own URL: Omnia serves the gateway on this host.
-    issuer: https://auth.larkmere.azure.altairalabs.ai
+    # issuer, the gateway's own URL (Omnia serves the gateway on its host), is
+    # set from site.yaml.
     gateway:
       enabled: true
       upstream:
-        # The demo's one Auth0 tenant; this is its "Larkmere Mutual Poppy gateway"
-        # application (Regular Web Application).
-        issuer: https://dev-kvf5kfvufbv6y3p6.us.auth0.com/
-        clientID: 4uxuGZw33S2pR6p940BENb6TCkot1lUx
+        # The upstream sign-in provider's issuer and this Company's client at it
+        # (site.yaml poppy.upstream and poppy.companies); one provider serves
+        # both Companies.
         clientSecretRef: larkmere-gateway-upstream
     scopes:
       claims: Report a home insurance claim, add items to it, and see its status
     scopeHints:
       claims: { changes: irreversible, personalData: true }
-    accessTokens:
-      audiences: ["https://larkmere.azure.altairalabs.ai"]
+    # accessTokens.audiences is set from site.yaml.
   account:
     # The exchange client the gateway registers (auth.gateway.exchangeClients)
     # and the Connection uses. Its Secret, larkmere-exchange-client, holds a
@@ -119,7 +120,7 @@ poppy:
       kmsProvider: azure-keyvault
       keyID: omnia-connections
       secretRef: { name: kms-credentials }
-      # The persistent Key Vault; privacy-api reaches it keylessly (Omnia #4466).
-      vaultURL: https://kv-omnia-demo-p-gotzfbhj.vault.azure.net/
-    # The account API's audience: the stub accepts only tokens for it.
-    audience: https://larkmere.azure.altairalabs.ai/api
+      # vaultURL, your Key Vault (site.yaml keyVault.name); privacy-api reaches
+      # it keylessly (Omnia #4466).
+    # account.audience, the account API's audience (the stub accepts only tokens
+    # for it), is set from site.yaml.

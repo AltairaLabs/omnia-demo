@@ -22,7 +22,7 @@ spec:
     properties:
       domain:
         type: string
-        description: The company's domain name, e.g. larkmere.azure.altairalabs.ai
+        description: The company's domain name, e.g. @LARKMERE_DOMAIN@
       message:
         type: string
         description: The first message to the company, written as Ellen's assistant acting for her

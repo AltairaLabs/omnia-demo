@@ -1,6 +1,10 @@
 {{- if .Values.personalAgent.enabled }}
 {{- $pa := .Values.personalAgent }}
 {{- $ns := .Values.namespace }}
+{{- /* The pack names the Companies by token (@LARKMERE_DOMAIN@, @WRENMOOR_DOMAIN@); personalAgent.knownCompanies has their hosts. */}}
+{{- $pack := .Files.Get "files/arena/assistant-pack.json" }}
+{{- $pack = replace "@LARKMERE_DOMAIN@" (include "omnia-demo.companyHost" (list . "larkmere")) $pack }}
+{{- $pack = replace "@WRENMOOR_DOMAIN@" (include "omnia-demo.companyHost" (list . "wrenmoor")) $pack }}
 ---
 apiVersion: omnia.altairalabs.ai/v1alpha1
 kind: PromptPack
@@ -29,7 +33,7 @@ metadata:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
 data:
   pack.json: |
-{{ .Files.Get "files/arena/assistant-pack.json" | indent 4 }}
+{{ $pack | indent 4 }}
 ---
 # Ellen's assistant: the person's side of the Poppy demo, a Personal Agent
 # acting for Ellen Whitcomb with the Companies she has accounts at.
