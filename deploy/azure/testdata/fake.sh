@@ -42,6 +42,9 @@ if [ -n "${FAKE_FAIL:-}" ]; then
   esac
 fi
 
+# $FAKE_STDERR, when set, is a warning every successful call prints on stderr.
+[ -z "${FAKE_STDERR:-}" ] || printf '%s\n' "$FAKE_STDERR" >&2
+
 [ -n "${FAKE_FIXTURES:-}" ] && [ -d "$FAKE_FIXTURES" ] || exit 0
 key="$*"
 key="${key// /_}"

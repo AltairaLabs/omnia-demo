@@ -69,6 +69,16 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
     echo "no documents directory $docs/$t" >&2
     exit 1
   fi
+  # An empty documents directory (or a wrong DOCS_DIR) would make every blob
+  # look removed and delete them all: refuse before any write.
+  nfiles=0
+  for f in "$docs/$t"/*; do
+    [ -f "$f" ] && nfiles=$((nfiles + 1))
+  done
+  if [ "$nfiles" -eq 0 ]; then
+    echo "no documents in $docs/$t: refusing to seed (it would delete every blob in $t-documents)" >&2
+    exit 1
+  fi
   p="$(azm identity show -g "$id_rg" -n "$prefix-$t" --query principalId -o tsv)"
   if [ -z "$p" ]; then
     echo "identity $prefix-$t not found in $id_rg (run make azure-tenant WS=$t first)" >&2
@@ -93,7 +103,13 @@ md5_b64() {
   openssl dgst -md5 -binary "$1" | base64
 }
 
-changed=()
+# stderr of the reads whose stdout is compared or parsed goes to a file: an az
+# warning mixed into stdout would corrupt the MD5 compare or a blob name.
+errf="$(mktemp)"
+trap 'rm -f "$errf"' EXIT
+
+changed=""
+granted=""
 for ((i = 0; i < ${#tenants[@]}; i++)); do
   t="${tenants[$i]}"
   c="$t-documents"
@@ -119,13 +135,16 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
     name="$(basename "$file")"
     want="$(md5_b64 "$file")"
     if have="$(azm storage blob show --auth-mode login --account-name "$acct" -c "$c" -n "$name" \
-      --query properties.contentSettings.contentMd5 -o tsv 2>&1)"; then
+      --query properties.contentSettings.contentMd5 -o tsv 2>"$errf")"; then
       if [ "$have" = "$want" ]; then
         continue
       fi
-    elif ! is_not_found "$have"; then
-      echo "looking up blob $c/$name failed: $have" >&2
-      exit 1
+    else
+      err="$(cat "$errf")"
+      if ! is_not_found "$err"; then
+        echo "looking up blob $c/$name failed: $err" >&2
+        exit 1
+      fi
     fi
     echo "==> uploading $c/$name"
     run azm storage blob upload --auth-mode login --account-name "$acct" -c "$c" -n "$name" \
@@ -136,7 +155,7 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
   # Deletes: blobs with no file behind them. A container just created in a
   # dry run does not exist to list, so there is nothing to delete either.
   if listed="$(azm storage blob list --auth-mode login --account-name "$acct" -c "$c" \
-    --query '[].name' -o tsv 2>&1)"; then
+    --query '[].name' -o tsv 2>"$errf")"; then
     while IFS= read -r name; do
       [ -n "$name" ] || continue
       if [ ! -f "$docs/$t/$name" ]; then
@@ -145,9 +164,12 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
         did=1
       fi
     done <<<"$listed"
-  elif [ "${DRY_RUN:-0}" != "1" ] || ! is_not_found "$listed"; then
-    echo "listing container $c failed: $listed" >&2
-    exit 1
+  else
+    err="$(cat "$errf")"
+    if [ "${DRY_RUN:-0}" != "1" ] || ! is_not_found "$err"; then
+      echo "listing container $c failed: $err" >&2
+      exit 1
+    fi
   fi
 
   # Storage Blob Data Reader on this container only, never the account.
@@ -159,24 +181,43 @@ for ((i = 0; i < ${#tenants[@]}; i++)); do
       --assignee-principal-type ServicePrincipal --role 'Storage Blob Data Reader' \
       --scope "$scope" -o none
     did=1
+    granted="$granted $t "
   fi
 
   if [ "$did" = 1 ]; then
-    changed+=("$t")
+    changed="$changed $t "
   fi
 done
 
-# Start one connector run for each tenant whose container or access just
-# changed, so the documents reach memory without waiting for the schedule. A
-# re-run that changes nothing starts nothing. The CronJob comes from `make
-# demos`; before that there is nothing to start, and its schedule picks the
-# documents up once it exists.
-for ((i = 0; i < ${#changed[@]}; i++)); do
-  t="${changed[$i]}"
-  if "${KUBECTL[@]}" -n "$t" get cronjob memory-ingest -o name >/dev/null 2>&1; then
-    echo "==> starting a memory-ingest run in $t"
-    run "${KUBECTL[@]}" -n "$t" create job --from=cronjob/memory-ingest "memory-ingest-$(date +%s)"
-  else
-    echo "memory-ingest is not installed in $t yet (make demos first); its schedule will ingest the documents"
+# Start one connector run for a tenant when its container or documents changed,
+# or when the CronJob has never run (none of its Jobs exists yet), so the
+# documents reach memory without waiting for the schedule. `--from` Jobs do not
+# set the CronJob's lastScheduleTime, so existence of a memory-ingest Job (by
+# name or owner) is what says it has run. A re-run that changes nothing, after a
+# run, starts nothing. The CronJob comes from `make demos`; before that there is
+# nothing to start, and a later re-run starts the first run.
+#
+# A role assignment made in this run takes a few minutes to reach the data
+# plane, and a Job started now would fail with 403: wait for a re-run instead.
+for ((i = 0; i < ${#tenants[@]}; i++)); do
+  t="${tenants[$i]}"
+  if ! "${KUBECTL[@]}" -n "$t" get cronjob memory-ingest -o name >/dev/null 2>&1; then
+    echo "memory-ingest is not installed in $t yet (make demos first, then re-run make azure-memory)"
+    continue
   fi
+  jobs="$("${KUBECTL[@]}" -n "$t" get jobs \
+    -o jsonpath='{range .items[*]}{.metadata.name} {.metadata.ownerReferences[*].name}{"\n"}{end}' 2>/dev/null || true)"
+  need=0
+  case "$changed" in *" $t "*) need=1 ;; esac
+  case "$jobs" in *memory-ingest*) ;; *) need=1 ;; esac
+  [ "$need" = 1 ] || continue
+  case "$granted" in
+    *" $t "*)
+      echo "$prefix-$t was just granted read access; that takes a few minutes to propagate." \
+        "Re-run make azure-memory then to start the first ingest run in $t"
+      continue
+      ;;
+  esac
+  echo "==> starting a memory-ingest run in $t"
+  run "${KUBECTL[@]}" -n "$t" create job --from=cronjob/memory-ingest "memory-ingest-$(date +%s)"
 done

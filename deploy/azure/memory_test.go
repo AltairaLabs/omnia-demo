@@ -46,6 +46,7 @@ func memFixtures() map[string]string {
 		"*storage_blob_list*":           "a.md\nb.md",
 		"*identity_show*":               "pid-1",
 		"*role_assignment_list*":        "/assignment/1",
+		"*get_jobs*":                    "memory-ingest-1 memory-ingest",
 	}
 }
 
@@ -76,7 +77,7 @@ func TestMemoryRerunWithNothingChangedWritesNothing(t *testing.T) {
 		t.Errorf("want a hash check per file (2), got %d: %v", n, log)
 	}
 	// An idempotent re-run also starts no ingest run.
-	if count(log, "kubectl") != 0 {
+	if count(log, "create job") != 0 {
 		t.Errorf("nothing changed, nothing to start: %v", log)
 	}
 }
@@ -231,7 +232,6 @@ func TestMemoryWithoutABlockIsANoOp(t *testing.T) {
 
 func TestMemoryDryRunWritesNothing(t *testing.T) {
 	fx := memFixtures()
-	fx["*role_assignment_list*"] = ""
 	fx["*storage_blob_show*_-n_a.md_*"] = "stale"
 	log, out, err := runScript(t, memScript, memEnv(memDocs(t), map[string]string{
 		"DRY_RUN": "1", "FAKE_FAIL": "az storage container show*",
@@ -242,7 +242,7 @@ func TestMemoryDryRunWritesNothing(t *testing.T) {
 	}
 	assertContexts(t, log, testCtx, testSub)
 	assertNoWrites(t, log)
-	for _, want := range []string{"DRY_RUN: az storage container create", "DRY_RUN: az storage blob upload", "DRY_RUN: az role assignment create", "DRY_RUN: kubectl"} {
+	for _, want := range []string{"DRY_RUN: az storage container create", "DRY_RUN: az storage blob upload", "DRY_RUN: kubectl"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("dry-run output lacks %q: %s", want, out)
 		}
@@ -251,7 +251,7 @@ func TestMemoryDryRunWritesNothing(t *testing.T) {
 
 func TestMemoryStartsARunWhenTheCronJobExists(t *testing.T) {
 	fx := memFixtures()
-	fx["*role_assignment_list*"] = ""
+	fx["*storage_blob_show*_-n_a.md_*"] = "stale"
 	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
 	if err != nil {
 		t.Fatal(err, out)
@@ -267,7 +267,7 @@ func TestMemoryStartsARunWhenTheCronJobExists(t *testing.T) {
 
 func TestMemoryNoJobWhenTheCronJobIsAbsent(t *testing.T) {
 	fx := memFixtures()
-	fx["*role_assignment_list*"] = ""
+	fx["*storage_blob_show*_-n_a.md_*"] = "stale"
 	env := memEnv(memDocs(t), map[string]string{"FAKE_FAIL": "kubectl*get cronjob*"})
 	log, out, err := runScript(t, memScript, env, fx)
 	if err != nil {
@@ -330,4 +330,76 @@ func mustAbs(t *testing.T, p string) string {
 		t.Fatal(err)
 	}
 	return a
+}
+
+func TestMemoryStartsTheFirstRunWhenTheCronJobHasNeverRun(t *testing.T) {
+	fx := memFixtures()
+	fx["*get_jobs*"] = ""
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertContexts(t, log, testCtx, testSub)
+	if count(log, "create job --from=cronjob/memory-ingest memory-ingest-") != 1 {
+		t.Errorf("never ran, nothing changed: want one job: %v", log)
+	}
+	if len(writesIn(log)) != 1 {
+		t.Errorf("only the job should write: %v", writesIn(log))
+	}
+}
+
+func TestMemoryStartsNothingWhenAJobAlreadyRan(t *testing.T) {
+	// Matched by owner name alone as well as by name prefix.
+	fx := memFixtures()
+	fx["*get_jobs*"] = "manual-run-9 memory-ingest"
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "create job") != 0 {
+		t.Errorf("a Job exists, nothing changed: %v", log)
+	}
+}
+
+func TestMemoryDoesNotStartAJobRightAfterANewGrant(t *testing.T) {
+	fx := memFixtures()
+	fx["*role_assignment_list*"] = ""
+	fx["*get_jobs*"] = ""
+	log, out, err := runScript(t, memScript, memEnv(memDocs(t), nil), fx)
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	if count(log, "role assignment create") != 1 {
+		t.Fatalf("want the grant: %v", log)
+	}
+	if count(log, "create job") != 0 {
+		t.Errorf("a Job would 403 before the grant propagates: %v", log)
+	}
+	if !strings.Contains(out, "few minutes to propagate") || !strings.Contains(out, "Re-run make azure-memory") {
+		t.Errorf("should say to wait and re-run: %q", out)
+	}
+}
+
+func TestMemoryIgnoresAzWarningsOnStderr(t *testing.T) {
+	env := memEnv(memDocs(t), map[string]string{"FAKE_STDERR": "WARNING: a deprecation notice"})
+	log, out, err := runScript(t, memScript, env, memFixtures())
+	if err != nil {
+		t.Fatal(err, out)
+	}
+	assertNoWrites(t, log)
+}
+
+func TestMemoryRefusesAnEmptyDocumentsDirectory(t *testing.T) {
+	docs := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(docs, "mem-a"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	log, out, err := runScript(t, memScript, memEnv(docs, nil), memFixtures())
+	if exitCode(err) != 1 || !strings.Contains(out, "no documents in") {
+		t.Fatalf("want exit 1 naming the empty directory, got %v (%s)", err, out)
+	}
+	assertNoWrites(t, log)
+	if count(log, "storage blob list") != 0 {
+		t.Errorf("must stop before looking at blobs: %v", log)
+	}
 }
