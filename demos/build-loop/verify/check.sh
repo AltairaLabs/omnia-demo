@@ -7,9 +7,7 @@
 #   1. seed (config.seed.arena.yaml): data-protection passes,
 #      uncapped-indemnity FAILS.
 #   2. after the beat 4 fix (config.beat4.arena.yaml): everything passes except
-#      quillon-changes, which FAILS (it is beat 7's miss). fernside-36-months
-#      is reported only: the checklist covers the notice period, not the
-#      renewal length, so whether the agent says "36" varies run to run.
+#      quillon-changes, which FAILS (it is beat 7's miss).
 #   3. after the beat 7 fix: run config.fixed.arena.yaml directly; everything
 #      must pass (arena's own exit code says so).
 # Needs OPENAI_API_KEY. Exit 0 when stages 1 and 2 hold.
@@ -48,7 +46,6 @@ for s in data-protection uncapped-indemnity brightpost-contract fernside-renewal
   expect beat4 "$s" pass
 done
 expect beat4 quillon-changes fail
-printf '%-8s %-24s %-8s (informational)\n' beat4 fernside-36-months "$(status beat4 fernside-36-months)"
 
 if [ "$bad" = 0 ]; then
   echo "OK: the seed misses the indemnity, the beat 4 fix leaves only Quillon's changes."

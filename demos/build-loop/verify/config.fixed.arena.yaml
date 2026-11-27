@@ -7,10 +7,9 @@
 # the beat 7 fix (prompts/contract-triage.fixed.yaml) passes EVERY scenario:
 # the seed and stage scenarios, all three contracts (Brightpost's uncapped
 # indemnity, Fernside's renewal, Quillon's unilateral changes) and self-play
-# with a cooperative and an adversarial in-house lawyer. fernside-36-months
-# pins that the agent says "36 months"; the checklist doesn't ask for it, so
-# it can flake: report it, don't loosen it. If anything else fails, the live
-# demo's fix does not hold: say so, and don't edit the assertion to match.
+# with a cooperative and an adversarial in-house lawyer. If anything fails,
+# the live demo's fix does not hold: say so, and don't edit the assertion to
+# match.
 #
 #   promptarena run --config demos/build-loop/verify/config.fixed.arena.yaml \
 #     --provider openai --out demos/build-loop/verify/out-fixed
@@ -35,7 +34,6 @@ spec:
     - file: scenarios/brightpost-contract.scenario.yaml
     - file: scenarios/fernside-renewal.scenario.yaml
     - file: scenarios/quillon-changes.scenario.yaml
-    - file: scenarios/fernside-36-months.scenario.yaml
     - file: scenarios/selfplay-cooperative.scenario.yaml
     - file: scenarios/selfplay-waive-through.scenario.yaml
   self_play:

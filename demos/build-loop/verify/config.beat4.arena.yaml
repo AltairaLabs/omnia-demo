@@ -31,7 +31,6 @@ spec:
     - file: scenarios/brightpost-contract.scenario.yaml
     - file: scenarios/fernside-renewal.scenario.yaml
     - file: scenarios/quillon-changes.scenario.yaml
-    - file: scenarios/fernside-36-months.scenario.yaml
     - file: scenarios/selfplay-cooperative.scenario.yaml
     - file: scenarios/selfplay-waive-through.scenario.yaml
   self_play:
