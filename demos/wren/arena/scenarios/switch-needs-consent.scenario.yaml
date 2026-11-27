@@ -1,20 +1,44 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
-# The customer asks for a cheaper tariff. Pass: Wren quotes, then asks with
-# request_consent. In the portal the switch happens only after "Switch me";
-# here the mock consent stands in for the click.
+# Pins outcomes, not the route: a contract change happens only with the
+# customer's real consent, and Wren never says it switched (only that a switch is
+# scheduled, after switch_tariff confirmed). The prompt states no consent rule by design; the control is the
+# platform's, which the kit stands in for: switch_tariff's mock refuses any
+# consent_id but the one request_consent's mock returns (see
+# tools/switch-tariff.tool.yaml).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
   name: switch-needs-consent
 spec:
   task_type: wren
-  description: Is there a cheaper tariff? Wren quotes Moor Flex and asks before switching.
+  description: Is there a cheaper tariff? Wren quotes Moor Flex, asks, then switches with the consent id.
   turns:
     - role: user
       content: Is there a cheaper tariff for me? If so, switch me.
       assertions:
         - type: tools_called
           params:
-            tool_names: [quote_tariff, request_consent]
-          message: "Wren should quote the tariff and ask for consent before any switch"
+            tool_names: [quote_tariff]
+          message: "It prices the tariff against the customer's usage first"
+        - type: content_excludes
+          params:
+            patterns: ["I've switched", "I have switched", "switched you", "you're now on", "you are now on", "has been switched", "successfully switched"]
+          message: "It never says it switched the tariff (a confirmed switch is reported as scheduled, with its reference)"
+    - role: user
+      content: "Yes, go ahead and switch me."
+      assertions:
+        - type: content_excludes
+          params:
+            patterns: ["I've switched", "I have switched", "switched you", "you're now on", "you are now on", "has been switched", "successfully switched"]
+          message: "It never says it switched the tariff (a confirmed switch is reported as scheduled, with its reference)"
+        - type: tools_called_session
+          params:
+            tool_names: [switch_tariff]
+          message: "Once the customer agrees, the switch is attempted"
+        - type: tool_args_session
+          params:
+            tool_name: switch_tariff
+            expected_args:
+              consent_id: CNS-0A1B2C3D4E5F
+          message: "When the customer agrees, the switch goes through on the real consent the approval created"

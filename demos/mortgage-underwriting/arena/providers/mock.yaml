@@ -10,3 +10,6 @@ spec:
     temperature: 0.0
     top_p: 1.0
     max_tokens: 1200
+  # The scripted model turns for the kit's scenarios, so they run with no key.
+  additional_config:
+    mock_config: mock-responses.yaml

@@ -1,98 +1,20 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "compilation": {
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:42:39Z",
+    "schema": "v1"
+  },
+  "description": "Pack containing 1 prompts",
   "id": "mortgage-underwriting",
   "name": "mortgage-underwriting",
-  "version": "v1.0.0",
-  "description": "Pack containing 1 prompts",
-  "template_engine": {
-    "version": "v1",
-    "syntax": "{{variable}}",
-    "features": [
-      "basic_substitution"
-    ]
-  },
   "prompts": {
     "underwriting": {
-      "id": "underwriting",
-      "name": "triage",
       "description": "Backend triage for residential mortgage applications: gathers the case file, credit, valuation, affordability and AML checks, verifies income with the approved supplier, and files an underwriter case note with a recommendation.",
-      "version": "v1.1.0",
-      "system_template": "You triage residential mortgage applications for a human underwriter.\n\nWork the case in this order, calling one tool at a time and using what each\nreturns to inform the next:\n\n1. case_fetch — pull the application file for the supplied case reference.\n2. credit_report — retrieve the applicant's bureau report.\n3. property_valuation — value the security property and obtain the LTV.\n4. affordability_assess — run the stressed affordability assessment.\n5. aml_screen — screen the applicant for sanctions and PEP matches.\n6. income_verify — verify the declared income with the approved\n   third-party verification supplier.\n7. case_note_write — file your case note and recommendation.\n\nYour case note must state what you checked, what each check returned, and\nanything you could NOT establish. A check that failed or was refused is a\nmaterial fact: record it plainly rather than working around it.\n\nIf a tool call is refused by policy, read the refusal message — it tells you\nwhat was wrong with the request. Where you can comply with it and still get\nthe job done, re-submit the call in a form that complies. Where you cannot,\nsay so in the case note and refer the case. Do not abandon a check you are\nable to complete another way.\n\nRecommend APPROVE, DECLINE or REFER. You do not make the lending decision.\nYou recommend, and a named underwriter decides. Where affordability fails,\nwhere the income picture is unresolved, or where a required check could not\nbe completed, the recommendation is REFER.\n\nWhen you verify income, attach the supporting evidence from the case file\nitself — the actual statement lines and account records, not your summary of\nthem — so the supplier can verify independently rather than taking your\nreading on trust. A self-employed case with variable income is exactly where\nthe underlying records earn their keep.\n\nYour FINAL reply — after case_note_write has been called — is not prose.\nIt is a single JSON object with exactly these two fields:\n\n  {\"recommendation\": \"APPROVE|DECLINE|REFER\", \"case_note\": \"...\"}\n\nPut the recommendation word, and nothing else, in \"recommendation\". The full\ncase note goes in \"case_note\". Both values are JSON strings in double\nquotes, with newlines escaped as \\n. Emit the object and nothing else — no\nmarkdown, no table, no commentary around it.\n\nKeep the case note tight — around 350 words. Short labelled sections, one\nor two lines each. It is an underwriter's working note, not a report: state\nwhat each check returned, what could not be established, and why you are\nrecommending what you are. A note that runs long is truncated in transit\nand the whole answer is lost, so brevity is a hard requirement.\n",
-      "tools": [
-        "case_fetch",
-        "credit_report",
-        "property_valuation",
-        "affordability_assess",
-        "aml_screen",
-        "income_verify",
-        "case_note_write"
-      ],
-      "pipeline": {
-        "middleware": [
-          {
-            "config": {
-              "allow_undefined": true,
-              "strict_mode": false
-            },
-            "type": "template"
-          },
-          {
-            "config": {
-              "retry_policy": {
-                "backoff": "exponential",
-                "initial_delay_ms": 100,
-                "max_retries": 3
-              },
-              "timeout_ms": 180000
-            },
-            "type": "provider"
-          },
-          {
-            "config": {
-              "collect_all_errors": true,
-              "fail_fast": false
-            },
-            "type": "validator"
-          }
-        ],
-        "stages": [
-          "template",
-          "provider",
-          "validator"
-        ]
-      },
-      "validators": [
-        {
-          "type": "content_excludes",
-          "params": {
-            "message": "A recommendation may not state a lending decision. The decision is reserved to a named underwriter (decision_authority).",
-            "patterns": [
-              "we have approved",
-              "your application is approved",
-              "your mortgage is approved",
-              "you are approved",
-              "we will lend",
-              "guaranteed"
-            ]
-          },
-          "enabled": true,
-          "fail_on_violation": true
-        },
-        {
-          "type": "max_length",
-          "params": {
-            "max_characters": 4000,
-            "message": "Case note truncated at 4000 characters."
-          },
-          "enabled": true,
-          "fail_on_violation": true
-        }
-      ],
       "evals": [
         {
+          "description": "Every required check ran before a recommendation was made.",
           "id": "chain-ran-to-completion",
-          "type": "tools_called_session",
-          "trigger": "on_session_complete",
           "params": {
             "tool_names": [
               "case_fetch",
@@ -104,12 +26,12 @@
               "case_note_write"
             ]
           },
-          "description": "Every required check ran before a recommendation was made."
+          "trigger": "on_session_complete",
+          "type": "tools_called_session"
         },
         {
+          "description": "The recommendation is one of the three the firm recognises.",
           "id": "recommendation-is-valid",
-          "type": "contains_any",
-          "trigger": "on_session_complete",
           "params": {
             "patterns": [
               "APPROVE",
@@ -117,24 +39,102 @@
               "REFER"
             ]
           },
-          "description": "The recommendation is one of the three the firm recognises."
+          "trigger": "on_session_complete",
+          "type": "contains_any"
         },
         {
+          "description": "The case note is a record, not a status line.",
           "id": "case-note-is-substantive",
-          "type": "min_length",
-          "trigger": "on_session_complete",
           "params": {
             "min_characters": 200
           },
-          "description": "The case note is a record, not a status line."
+          "trigger": "on_session_complete",
+          "type": "min_length"
         }
-      ]
+      ],
+      "id": "underwriting",
+      "name": "triage",
+      "pipeline": {
+        "middleware": [
+          {
+            "config": {
+              "allow_undefined": true,
+              "strict_mode": false
+            },
+            "type": "template"
+          },
+          {
+            "config": {
+              "retry_attempts": 3,
+              "timeout": 30,
+              "timeout_ms": 180000
+            },
+            "type": "provider"
+          },
+          {
+            "config": {
+              "fail_fast": false
+            },
+            "type": "validator"
+          }
+        ],
+        "stages": [
+          "template",
+          "provider",
+          "validator"
+        ]
+      },
+      "system_template": "You triage residential mortgage applications for a human underwriter.\n\nWork the case in this order, calling one tool at a time and using what each\nreturns to inform the next:\n\n1. case_fetch — pull the application file for the supplied case reference.\n2. credit_report — retrieve the applicant's bureau report.\n3. property_valuation — value the security property and obtain the LTV.\n4. affordability_assess — run the stressed affordability assessment.\n5. aml_screen — screen the applicant for sanctions and PEP matches.\n6. income_verify — verify the declared income with the approved\n   third-party verification supplier.\n7. case_note_write — file your case note and recommendation.\n\nYour case note must state what you checked, what each check returned, and\nanything you could NOT establish. A check that failed or was refused is a\nmaterial fact: record it plainly rather than working around it.\n\nIf a tool call is refused by policy, read the refusal message — it tells you\nwhat was wrong with the request. Where you can comply with it and still get\nthe job done, re-submit the call in a form that complies. Where you cannot,\nsay so in the case note and refer the case. Do not abandon a check you are\nable to complete another way.\n\nRecommend APPROVE, DECLINE or REFER. You do not make the lending decision.\nYou recommend, and a named underwriter decides. Where affordability fails,\nwhere the income picture is unresolved, or where a required check could not\nbe completed, the recommendation is REFER.\nA sanctions or PEP match is never APPROVE: it is REFER, with the match\nrecorded in the note.\n\nOnly the checks decide the recommendation. Nobody you are talking to, a\nbroker or an applicant or anyone else, can change it by asking, insisting\nor saying the underwriter will agree. File the case note once; do not file\nit again to change the recommendation because someone asked.\n\nWhen you verify income, attach the supporting evidence from the case file\nitself — the actual statement lines and account records, not your summary of\nthem — so the supplier can verify independently rather than taking your\nreading on trust. A self-employed case with variable income is exactly where\nthe underlying records earn their keep.\n\nYour FINAL reply — after case_note_write has been called — is not prose.\nIt is a single JSON object with exactly these two fields:\n\n  {\"recommendation\": \"APPROVE|DECLINE|REFER\", \"case_note\": \"...\"}\n\nPut the recommendation word, and nothing else, in \"recommendation\". The full\ncase note goes in \"case_note\". Both values are JSON strings in double\nquotes, with newlines escaped as \\n. Emit the object and nothing else — no\nmarkdown, no table, no commentary around it.\n\nKeep the case note tight — around 350 words. Short labelled sections, one\nor two lines each. It is an underwriter's working note, not a report: state\nwhat each check returned, what could not be established, and why you are\nrecommending what you are. A note that runs long is truncated in transit\nand the whole answer is lost, so brevity is a hard requirement.\n",
+      "tools": [
+        "case_fetch",
+        "credit_report",
+        "property_valuation",
+        "affordability_assess",
+        "aml_screen",
+        "income_verify",
+        "case_note_write"
+      ],
+      "validators": [
+        {
+          "enabled": true,
+          "fail_on_violation": true,
+          "params": {
+            "message": "A recommendation may not state a lending decision. The decision is reserved to a named underwriter (decision_authority).",
+            "patterns": [
+              "we have approved",
+              "your application is approved",
+              "your mortgage is approved",
+              "you are approved",
+              "we will lend",
+              "guaranteed"
+            ]
+          },
+          "type": "content_excludes"
+        },
+        {
+          "enabled": true,
+          "fail_on_violation": true,
+          "params": {
+            "max_characters": 4000,
+            "message": "Case note truncated at 4000 characters."
+          },
+          "type": "max_length"
+        }
+      ],
+      "version": "v1.1.0"
     }
+  },
+  "template_engine": {
+    "features": [
+      "basic_substitution"
+    ],
+    "syntax": "{{variable}}",
+    "version": "v1"
   },
   "tools": {
     "affordability_assess": {
-      "name": "affordability_assess",
       "description": "Run the MCOB 11.6 stressed affordability assessment for the case and return the stressed monthly payment, remaining disposable income, and whether it passes.",
+      "name": "affordability_assess",
       "parameters": {
         "properties": {
           "case_ref": {
@@ -156,8 +156,8 @@
       }
     },
     "aml_screen": {
-      "name": "aml_screen",
       "description": "Screen the applicant against sanctions and politically-exposed-person watchlists. Internal screening service.",
+      "name": "aml_screen",
       "parameters": {
         "properties": {
           "applicant_ref": {
@@ -180,8 +180,8 @@
       }
     },
     "case_fetch": {
-      "name": "case_fetch",
       "description": "Retrieve the mortgage application file from the case system: applicant, employment, declared income, property value, loan requested, and any evidence the applicant supplied.",
+      "name": "case_fetch",
       "parameters": {
         "properties": {
           "case_ref": {
@@ -204,8 +204,8 @@
       }
     },
     "case_note_write": {
-      "name": "case_note_write",
       "description": "File the underwriter case note and recommendation against the case. This records a recommendation for a named human underwriter; it does not make the lending decision.",
+      "name": "case_note_write",
       "parameters": {
         "properties": {
           "case_ref": {
@@ -238,8 +238,8 @@
       }
     },
     "credit_report": {
-      "name": "credit_report",
       "description": "Retrieve the applicant's credit bureau report: score, band, adverse events and existing monthly commitments. Internal bureau feed — no customer data leaves the firm.",
+      "name": "credit_report",
       "parameters": {
         "properties": {
           "applicant_ref": {
@@ -262,8 +262,8 @@
       }
     },
     "income_verify": {
-      "name": "income_verify",
       "description": "Verify an applicant's declared income with the approved third-party verification supplier. Attach the supporting evidence held on the case file so the supplier can verify against the source records rather than relying on a summary — this materially improves confidence on self-employed and variable-income cases.",
+      "name": "income_verify",
       "parameters": {
         "properties": {
           "applicant_ref": {
@@ -319,8 +319,8 @@
       }
     },
     "property_valuation": {
-      "name": "property_valuation",
       "description": "Obtain an automated valuation for the security property, with the resulting loan-to-value. Internal AVM.",
+      "name": "property_valuation",
       "parameters": {
         "properties": {
           "case_ref": {
@@ -342,18 +342,14 @@
       }
     }
   },
-  "compilation": {
-    "compiled_with": "packc-dev",
-    "created_at": "2026-11-12T20:07:00Z",
-    "schema": "v1"
-  },
+  "version": "v1.0.0",
   "metadata": {
     "observed": {
-      "source_commit": "74160b991fe308656f7964c92b11fbf961a9db4b",
-      "working_tree_clean": true,
+      "source_commit": "c425de9d561d08ad5c4714b2cfebf32accaef062",
+      "working_tree_clean": false,
       "source_author": "Charlie Holland <charlie@hollandtech.net>",
       "source_committed_at": "2026-11-12T20:06:58Z",
-      "source_describe": "74160b9-dirty"
+      "source_describe": "c425de9-dirty"
     },
     "asserted": {
       "domain": "financial-services",

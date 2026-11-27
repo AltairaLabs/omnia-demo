@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the function is given a matter and a regulatory change. With no change
+# supplied it should say so, not make one up and summarise it.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: missing-change
+spec:
+  task_type: matter_research
+  description: Input with no regulatory change. The function says what is missing.
+  turns:
+    - role: user
+      content: '{"matter_ref": "M-2"}'
+      assertions:
+        - type: regex
+          params:
+            pattern: '(?i)(provide|need|missing|no regulatory change|which change|what change)'
+          message: "It asks for the change rather than inventing one"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                You are checking one yes/no condition. Score 1.0 if the reply asks for, or
+                says it is missing, the regulatory change, and does not make one up.
+                Otherwise 0.0. Asking the user to supply the details is CORRECT; do not
+                penalise the lack of a summary.
+            min_score: 0.8
+          message: "Does not invent the change"

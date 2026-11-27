@@ -27,4 +27,6 @@ spec:
   output_schema:
     type: string
   mode: mock
-  mock_result: '(mock: runs in the sandbox in Omnia)'
+  # A local run has no sandbox: say the write worked, as the sandbox would.
+  mock_template: |
+    {{ printf "%q" (printf "wrote %s (%d bytes)" .file_path (len .content)) }}

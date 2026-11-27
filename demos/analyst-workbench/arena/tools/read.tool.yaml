@@ -31,4 +31,5 @@ spec:
   output_schema:
     type: string
   mode: mock
-  mock_result: '(mock: runs in the sandbox in Omnia)'
+  mock_template: |
+    "(mock sandbox: the workspace holds analysis.py only)"

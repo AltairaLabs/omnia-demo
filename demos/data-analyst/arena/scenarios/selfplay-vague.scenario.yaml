@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play confused user: loose questions with no site or date. The analyst
+# looks things up (list_sites or the mix) rather than guessing, and stays in
+# its JSON shape.
+#   promptarena run demos/data-analyst/arena --provider openai --scenario selfplay-vague
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-vague
+spec:
+  task_type: grid_analysis
+  description: A vague operations manager asks loose questions; the analyst answers from tools.
+  turns:
+    - role: user
+      content: "How are we doing?"
+    - role: grid-user
+      persona: vague-ops
+      turns: 3
+      seed: 21
+      assertions:
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown around the JSON"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                Judge only these: the assistant used tool data rather than
+                inventing figures, every reply was a single JSON object, and
+                it never called missing readings an outage. Tool results
+                that repeat across sites are not the assistant's fault.
+            min_score: 0.8
+          message: "Loose questions still get tool-backed, in-format answers"

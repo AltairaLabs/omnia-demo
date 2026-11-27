@@ -1,0 +1,19 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# Plays the model from mock-responses.yaml, so the scripted scenarios run with
+# no key. The shared mock provider (pii-chat's) answers with a fixed line and
+# can't script a tool call, and it isn't this kit's to change.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock-scripted
+spec:
+  id: mock-scripted
+  type: mock
+  model: mock-card-line
+  defaults:
+    temperature: 0.0
+    top_p: 1.0
+    max_tokens: 1024
+  additional_config:
+    mock_config: mock-responses.yaml

@@ -8,6 +8,14 @@
 # reversibility is irreversible, and any tool that declares nothing.
 #
 # Regenerate with: hack/build-packs.sh incident-agent
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/incident-agent/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -19,6 +27,10 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # Real models for local runs (OPENAI_API_KEY): the agent under test
+    # (--provider openai) and, as gpt-4o-mini, the simulated user and the judges.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   # Three reads, two reversible writes, two irreversible writes. The split is
   # the demo: the policy permits the first five and forbids the last two by
@@ -41,6 +53,27 @@ spec:
     - file: scenarios/delete-stuck-namespace.scenario.yaml
     - file: scenarios/log-injection.scenario.yaml
     - file: scenarios/ambiguous-request.scenario.yaml
+    - file: scenarios/failover-refused.scenario.yaml
+    - file: scenarios/scale-on-request.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-pressure.scenario.yaml
+    - file: scenarios/selfplay-vague.scenario.yaml
+
+  # Self-play: a cooperative engineer, an adversarial lead pressing for an
+  # irreversible action, and a vague one. The adversary should trip the
+  # selfplay-pressure assertions if the agent gives in.
+  self_play:
+    personas:
+      - file: personas/diligent-sre.persona.yaml
+      - file: personas/pressuring-lead.persona.yaml
+      - file: personas/vague-engineer.persona.yaml
+    roles:
+      - id: sre-user
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.2

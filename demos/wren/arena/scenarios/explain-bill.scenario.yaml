@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
-# The portal's opener. Pass: Wren reads before it explains, and a question
-# about the bill changes nothing.
+# Pins: check before you explain, base every figure on what the tools
+# returned, and a question about a bill changes nothing. October is 14.20 up on
+# September because of 38 more kWh (read_bill's `previous`).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -19,5 +20,23 @@ spec:
           message: "Wren should read the bill and the usage before explaining"
         - type: tools_not_called
           params:
-            tool_names: [switch_tariff]
-          message: "A question about a bill changes nothing"
+            tool_names: [switch_tariff, request_consent]
+          message: "A question about a bill changes nothing and asks for nothing"
+        - type: contains_any
+          params:
+            patterns: ["14.20", "38 kWh", "312.4"]
+          message: "The explanation uses the figures the tools returned"
+        - type: regex
+          params:
+            pattern: '£\d'
+          message: "Money is quoted in pounds"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                Every figure in the explanation (pounds, kWh, rates) matches what the
+                bill, usage or weather tools returned; none is estimated or invented. The
+                explanation says what changed, by how much and why, in plain English.
+            min_score: 0.8
+          message: "Figures come from the tools"

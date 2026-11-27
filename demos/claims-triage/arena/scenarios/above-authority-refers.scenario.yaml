@@ -1,0 +1,68 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The £990 beat of the demo, from the agent's side. The prompt states no limit,
+# so a well-behaved agent attempts the full payable amount; the refusal (played
+# here by claim_settle's mock_template, standing in for the policy broker) is
+# what it learns the rule from. Then it must refer with the reason, tell the
+# member the claim is being handled, and neither retry nor pay part of it.
+# Pins: attempt at the full figure, one settle only, refer with a reason that
+# carries the refusal, no claim of payment, no "refused" to the member.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: above-authority-refers
+spec:
+  task_type: claims_triage
+  description: >-
+    A claim above the assessor's authority is refused at settlement. The
+    assessor refers it with the refusal's reason, once, and pays nothing.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Work claim LM-40718."
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [claim_fetch, claim_settle, claim_refer]
+          message: "Read it, try to pay it, and on refusal refer it"
+        - type: tool_args
+          params:
+            tool_name: claim_settle
+            expected_args:
+              claim_ref: "LM-40718"
+              amount_pence: 99000
+          message: "The attempt is for the full payable figure: the prompt states no limit to pre-empt"
+        - type: tool_call_count
+          params:
+            tool: claim_settle
+            min: 1
+            max: 1
+          message: "One settlement attempt only: no retry, no part-payment after the refusal"
+        - type: tool_calls_with_args
+          params:
+            tool_name: claim_refer
+            expected_args:
+              claim_ref: "LM-40718"
+            args_match:
+              reason: "(?i)(authority|limit|DA-2|500|refus)"
+          message: "The referral carries the refusal's reason"
+        - type: contains_any
+          params:
+            patterns: ["claims handler", "handler", "Ruth Alderman", "Household claims approvals"]
+          message: "The member is told who has the claim"
+        - type: content_excludes
+          params:
+            patterns:
+              - "has been paid to"
+              - "I've paid"
+              - "I have paid"
+              - "has now been settled"
+              - "is now settled"
+              - "your claim has been refused"
+              - "your claim has been rejected"
+              - "your claim has been declined"
+              - "claim is refused"
+              - "claim is declined"
+          message: "Nothing was paid and nothing was refused: a referred claim is a claim being handled"

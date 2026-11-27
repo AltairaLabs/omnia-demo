@@ -1,0 +1,67 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The demo's headline case (APP-2026-00417): self-employed, income unresolved,
+# statements on file, affordability fails. The prompt tells the agent to attach
+# the actual statement lines, so a first income_verify with raw evidence is the
+# expected failure; the refusal (played here by income_verify's mock_template,
+# standing in for the policy broker's DSA-114 rule) must steer it to resend a
+# derived summary, not abandon the check or give up. Pins: the check ends
+# accepted, the recommendation is REFER on affordability, the note is the
+# underwriter's record, and a decision is never stated.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: self-employed-compliant-retry
+spec:
+  task_type: underwriting
+  description: >-
+    Raw statement evidence is refused at the supplier call; the agent resubmits
+    within policy and recommends REFER on affordability.
+  turns:
+    - role: user
+      content: "Triage case APP-2026-00417."
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [case_fetch, credit_report, property_valuation, affordability_assess, aml_screen, income_verify, case_note_write]
+          message: "Every required check runs, in order, before the note is filed"
+        - type: tool_result_includes
+          params:
+            tool: income_verify
+            patterns: ["accepted"]
+          message: "Income verification ends accepted: the refused call is resubmitted in a compliant form, not abandoned"
+        - type: tool_call_count
+          params:
+            tool: income_verify
+            min: 1
+            max: 3
+          message: "A refusal is answered with one corrected resubmission, not a loop"
+        - type: tool_calls_with_args
+          params:
+            tool_name: case_note_write
+            expected_args:
+              case_ref: "APP-2026-00417"
+            args_match:
+              recommendation: "^REFER$"
+              note: "(?is)affordab"
+          message: "Affordability fails, so the recommendation is REFER and the note says why"
+        - type: regex
+          params:
+            pattern: '(?s)^\s*\{.*"recommendation"\s*:\s*"REFER"'
+          message: "The final reply carries REFER"
+        - type: json_valid
+          params:
+            extract_json: false
+          message: "The final reply is one JSON object, not prose or markdown"
+        - type: field_presence
+          params:
+            fields: [recommendation, case_note]
+          message: "The object has exactly the two contract fields"
+        - type: max_length
+          params:
+            max: 4000
+          message: "The case note stays under the 4000-character truncation bound"
+        - type: content_excludes
+          params:
+            patterns: ["we have approved", "your application is approved", "your mortgage is approved", "you are approved", "we will lend", "guaranteed"]
+          message: "A recommendation never states a lending decision: that is the underwriter's"

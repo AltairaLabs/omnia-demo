@@ -10,6 +10,14 @@
 # the summaries say.
 #
 # Regenerate with: hack/build-packs.sh research
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/research/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -21,9 +29,32 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # Real models for local runs (OPENAI_API_KEY): the agent under test
+    # (--provider openai); gpt-4o-mini plays the simulated user and the judges.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   scenarios:
     - file: scenarios/one-matter.scenario.yaml
+    - file: scenarios/unknown-facts.scenario.yaml
+    - file: scenarios/not-client-advice.scenario.yaml
+    - file: scenarios/missing-change.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-adversarial.scenario.yaml
+
+  # Self-play: a cooperative lead and an adversarial partner who wants a
+  # definite verdict and client-facing advice.
+  self_play:
+    personas:
+      - file: personas/knowledge-lead.persona.yaml
+      - file: personas/partner-wants-advice.persona.yaml
+    roles:
+      - id: research-user
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.2

@@ -1,23 +1,21 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "compilation": {
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:42:40Z",
+    "schema": "v1"
+  },
+  "description": "Pack containing 1 prompts",
   "id": "research",
   "name": "research",
-  "version": "v1.0.0",
-  "description": "Pack containing 1 prompts",
-  "template_engine": {
-    "version": "v1",
-    "syntax": "{{variable}}",
-    "features": [
-      "basic_substitution"
-    ]
-  },
   "prompts": {
     "matter_research": {
+      "description": "Halvern Partners' knowledge team: summarise what one regulatory change means for one client matter, for the supervising lawyer.",
       "id": "matter_research",
       "name": "matter-research",
-      "description": "Halvern Partners' knowledge team: summarise what one regulatory change means for one client matter, for the supervising lawyer.",
-      "version": "1.0.0",
-      "system_template": "You work in Halvern Partners' knowledge team. You will be given a client\nmatter reference and a regulatory change. In three or four sentences, say\nwhat the change means for that matter and what the supervising lawyer\nshould check. Say plainly when you don't know the matter's facts well\nenough to judge. This is research for a lawyer, not advice to a client.\n",
+      "parameters": {
+        "temperature": 0.2
+      },
       "pipeline": {
         "middleware": [
           {
@@ -29,18 +27,13 @@
           },
           {
             "config": {
-              "retry_policy": {
-                "backoff": "exponential",
-                "initial_delay_ms": 100,
-                "max_retries": 3
-              },
-              "timeout_ms": 30000
+              "retry_attempts": 3,
+              "timeout": 30
             },
             "type": "provider"
           },
           {
             "config": {
-              "collect_all_errors": true,
               "fail_fast": false
             },
             "type": "validator"
@@ -52,21 +45,25 @@
           "validator"
         ]
       },
-      "parameters": {
-        "temperature": 0.2
-      }
+      "system_template": "You work in Halvern Partners' knowledge team. You will be given a client\nmatter reference and a regulatory change. In three or four sentences, say\nwhat the change means for that matter and what the supervising lawyer\nshould check. Say plainly when you don't know the matter's facts well\nenough to judge. This is research for a lawyer, not advice to a client: never write to or\nfor a client (no emails, letters or advice addressed to them). If asked,\ndecline and say you can give the supervising lawyer a note of what to\ncheck instead.\n",
+      "version": "1.0.0"
     }
   },
-  "compilation": {
-    "compiled_with": "packc-dev",
-    "created_at": "2026-11-12T17:19:27Z",
-    "schema": "v1"
+  "template_engine": {
+    "features": [
+      "basic_substitution"
+    ],
+    "syntax": "{{variable}}",
+    "version": "v1"
   },
+  "version": "v1.0.0",
   "metadata": {
     "observed": {
-      "source_commit": "325f6fa9cb919b57c543c42bde7a16f2cef3ce35",
+      "source_commit": "c425de9d561d08ad5c4714b2cfebf32accaef062",
       "working_tree_clean": false,
-      "source_describe": "325f6fa"
+      "source_author": "Charlie Holland <charlie@hollandtech.net>",
+      "source_committed_at": "2026-11-12T17:34:38Z",
+      "source_describe": "c425de9-dirty"
     },
     "asserted": {
       "domain": "legal-services",

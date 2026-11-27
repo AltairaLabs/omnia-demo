@@ -1,8 +1,10 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
-# The question the incident agent asks over A2A during the meter-ingest
-# incident. Wrenmoor Edge's export readings are missing from 08:30 to 11:30;
-# the pass is reading that as missing data, not as lost generation.
+# Pins: the question the incident agent asks over A2A during the meter-ingest
+# incident. Wrenmoor Edge has missing export readings (7 in the tool result).
+# The pass is reading that as missing data, not lost generation or an outage,
+# quoting figures with units and the date, from get_site_output, and replying
+# with one JSON object.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -15,9 +17,39 @@ spec:
       content: >-
         {"question": "What does output look like at Wrenmoor Edge (WM-EDGE) today, 2026-11-09?"}
       assertions:
-        - type: tools_called
+        - type: tool_args_session
           params:
-            tool_names: [get_site_output]
-          message: "The analyst should read the site's output"
+            tool_name: get_site_output
+            expected_args:
+              site_id: WM-EDGE
+          message: "The analyst reads the site it was asked about"
         - type: json_valid
           message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: json_path
+          params:
+            expression: "length(findings)"
+            min: 1
+          message: "The findings list the figures behind the answer"
+        - type: contains_any
+          params:
+            patterns: ["551.76", "92.81", "29 MW"]
+          message: "Figures come from the tool result, with their units"
+        - type: contains_any
+          params:
+            patterns: ["missing", "no data", "gap"]
+          message: "The gap is named as missing readings"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                The assistant treated the missing readings as missing data from the export meter
+                and said how many were missing (7). It did not describe them as lost
+                generation, an outage, or the site going offline, and it quoted figures
+                with units and the date.
+            min_score: 0.8
+          message: "A gap is missing data, not an outage"

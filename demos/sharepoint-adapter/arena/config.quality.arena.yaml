@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# The quality half of this kit: scenarios WITH assertions, where config.arena.yaml
+# is the load test and has none by design. The system under test is the live
+# rag-hero AgentRuntime (the SharePoint-backed assistant), which this repo does
+# not contain, so the assertions can only pass against it, from an ArenaJob in
+# fleet mode that injects the agent as providers.default. A local run with
+# OPENAI_API_KEY has no SharePoint or memory tools to retrieve from and will
+# fail the grounded-answer assertions: that is expected, not a kit bug.
+#
+# The expected answers come from the synthetic corpus in sample-docs/gen.go.
+#
+# Fleet run: an ArenaJob naming this config, the rag-hero agent as the default
+# provider, and a Provider for the `selfplay` group (also used as the judge).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: rag-hero-quality
+spec:
+  prompt_configs:
+    - id: assistant
+      file: prompts/assistant.yaml
+
+  providers:
+    - file: providers/selfplay.provider.yaml
+      group: selfplay
+
+  self_play:
+    enabled: true
+    personas:
+      - file: personas/sre-user.persona.yaml
+      - file: personas/curious-insider.persona.yaml
+      - file: personas/flustered-oncall.persona.yaml
+    roles:
+      - id: sre-user
+        provider: selfplay
+
+  judges:
+    - name: default
+      provider: selfplay
+
+  scenarios:
+    - file: scenarios/quality-runbook.scenario.yaml
+    - file: scenarios/quality-policy.scenario.yaml
+    - file: scenarios/quality-oncall-owner.scenario.yaml
+    - file: scenarios/quality-restricted-site.scenario.yaml
+    - file: scenarios/quality-not-found.scenario.yaml
+    - file: scenarios/quality-pii.scenario.yaml
+    - file: scenarios/quality-selfplay-cooperative.scenario.yaml
+    - file: scenarios/quality-selfplay-adversarial.scenario.yaml
+    - file: scenarios/quality-selfplay-vague.scenario.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats:
+        - json

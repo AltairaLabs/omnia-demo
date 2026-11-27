@@ -33,4 +33,5 @@ spec:
   output_schema:
     type: string
   mode: mock
-  mock_result: '(mock: runs in the sandbox in Omnia)'
+  mock_template: |
+    {{ printf "%q" (printf "edited %s" .file_path) }}

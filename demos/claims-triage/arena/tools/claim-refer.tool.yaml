@@ -26,8 +26,5 @@ spec:
       status: { type: string }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    claim_ref: "LM-40718"
-    referred_to: "Ruth Alderman"
-    queue: "Household claims approvals"
-    status: "referred"
+  mock_template: |
+    {"claim_ref":"{{ .claim_ref }}","referred_to":"Ruth Alderman","queue":"{{ if eq .claim_ref "LM-40751" }}Flood Response{{ else }}Household claims approvals{{ end }}","status":"referred"}

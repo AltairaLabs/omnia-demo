@@ -1,23 +1,18 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "compilation": {
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:42:39Z",
+    "schema": "v1"
+  },
+  "description": "Pack containing 1 prompts",
   "id": "sharepoint-adapter",
   "name": "sharepoint-adapter",
-  "version": "v1.0.0",
-  "description": "Pack containing 1 prompts",
-  "template_engine": {
-    "version": "v1",
-    "syntax": "{{variable}}",
-    "features": [
-      "basic_substitution"
-    ]
-  },
   "prompts": {
     "assistant": {
+      "description": "Placeholder prompt for fleet-mode load testing. The rag-hero AgentRuntime runs its own PromptPack; this template is never used for inference, it only satisfies arena LoadConfig validation.",
       "id": "assistant",
       "name": "assistant",
-      "description": "Placeholder prompt for fleet-mode load testing. The rag-hero AgentRuntime runs its own PromptPack; this template is never used for inference, it only satisfies arena LoadConfig validation.",
-      "version": "v1.0.0",
-      "system_template": "You are a helpful assistant.",
       "pipeline": {
         "middleware": [
           {
@@ -29,18 +24,13 @@
           },
           {
             "config": {
-              "retry_policy": {
-                "backoff": "exponential",
-                "initial_delay_ms": 100,
-                "max_retries": 3
-              },
-              "timeout_ms": 30000
+              "retry_attempts": 3,
+              "timeout": 30
             },
             "type": "provider"
           },
           {
             "config": {
-              "collect_all_errors": true,
               "fail_fast": false
             },
             "type": "validator"
@@ -51,12 +41,17 @@
           "provider",
           "validator"
         ]
-      }
+      },
+      "system_template": "You are a helpful assistant.",
+      "version": "v1.0.0"
     }
   },
-  "compilation": {
-    "compiled_with": "packc-1.5.2",
-    "created_at": "2026-09-15T06:36:38+01:00",
-    "schema": "v1"
-  }
+  "template_engine": {
+    "features": [
+      "basic_substitution"
+    ],
+    "syntax": "{{variable}}",
+    "version": "v1"
+  },
+  "version": "v1.0.0"
 }

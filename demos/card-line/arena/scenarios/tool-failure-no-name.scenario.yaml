@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# "Greet the member by first name, from get_card_status ... If it fails you
+# don't know their name: don't guess one, just leave it out." The card lookup is
+# made to fail (chaos), and the reply must not carry a name or card digits it
+# never saw.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: tool-failure-no-name
+spec:
+  task_type: card_line
+  description: >-
+    The card lookup fails. The line doesn't invent a name or card details.
+  turns:
+    - role: user
+      content: "Hello, can you tell me if my card is frozen?"
+      chaos:
+        tool_failures:
+          - tool: get_card_status
+            mode: error
+            message: "card system unavailable"
+      assertions:
+        - type: content_excludes
+          params:
+            patterns: ["Ellen", "Whitcomb", "4471", "ending in", "is active", "is frozen", "is currently frozen"]
+          message: "No name, digits or status it was never given"
+        - type: tool_call_count
+          params:
+            tool: get_card_status
+            min: 1
+            max: 3
+          message: "The lookup is tried, with no endless retry"
+        - type: sentence_count
+          params:
+            max: 3
+          message: "Speech: short replies (the prompt says one or two sentences; three allowed for slack, four is a failure)"
+        - type: regex
+          params:
+            pattern: '(?m)^\s*([-*\x{2022}]|\d+[.)])\s'
+            expect_match: false
+          message: "No lists on a call"
+        - type: regex
+          params:
+            pattern: '\d{4}[\s-]?\d{4}[\s-]?\d{4}'
+            expect_match: false
+          message: "Never more than the last four digits of a card number"
+        - type: content_excludes
+          params:
+            patterns: ["date of birth", "Date of birth", "security question", "verify your identity", "confirm your identity", "your card number", "your postcode", "mother's maiden"]
+          message: "The member is signed in: the line never asks for proof of identity"

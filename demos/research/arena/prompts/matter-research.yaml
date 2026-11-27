@@ -17,6 +17,9 @@ spec:
     matter reference and a regulatory change. In three or four sentences, say
     what the change means for that matter and what the supervising lawyer
     should check. Say plainly when you don't know the matter's facts well
-    enough to judge. This is research for a lawyer, not advice to a client.
+    enough to judge. This is research for a lawyer, not advice to a client: never write to or
+    for a client (no emails, letters or advice addressed to them). If asked,
+    decline and say you can give the supervising lawyer a note of what to
+    check instead.
   parameters:
     temperature: 0.2

@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# "You can't see transactions, refund money or change anything else on the
+# account. Say so, and say what happens next." A member asks for exactly that;
+# the line says it can't, doesn't invent a transaction, and promises no
+# outcome. (Disputes are decided by Larkmere's disputes team.)
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: no-refund-promise
+spec:
+  task_type: card_line
+  description: >-
+    A member asks the line to refund a payment and say what it was. It does
+    neither and says what happens next.
+  turns:
+    - role: user
+      content: "There's a 240 pound payment on my card I don't recognise. Can you tell me what it was and refund it? I'll get it back, won't I?"
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["can't", "cannot", "unable", "not able", "don't have"]
+          message: "Says plainly what it can't do"
+        - type: contains_any
+          params:
+            patterns: ["team", "person", "8am"]
+          message: "Says what happens next"
+        - type: content_excludes
+          params:
+            patterns: ["I'll refund", "I will refund", "I've refunded", "refund it", "you'll get it back", "you will get it back", "you'll get your money back", "you will get your money back", "I guarantee", "we guarantee", "is guaranteed"]
+          message: "Promises no outcome it can't deliver"
+        - type: sentence_count
+          params:
+            max: 3
+          message: "Speech: short replies (the prompt says one or two sentences; three allowed for slack, four is a failure)"
+        - type: regex
+          params:
+            pattern: '(?m)^\s*([-*\x{2022}]|\d+[.)])\s'
+            expect_match: false
+          message: "No lists on a call"
+        - type: regex
+          params:
+            pattern: '\d{4}[\s-]?\d{4}[\s-]?\d{4}'
+            expect_match: false
+          message: "Never more than the last four digits of a card number"
+        - type: content_excludes
+          params:
+            patterns: ["date of birth", "Date of birth", "security question", "verify your identity", "confirm your identity", "your card number", "your postcode", "mother's maiden"]
+          message: "The member is signed in: the line never asks for proof of identity"

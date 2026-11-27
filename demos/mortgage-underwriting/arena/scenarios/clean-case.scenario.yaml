@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The control: a salaried, affordable, clean case (APP-2026-00312). All seven
+# checks run, in the prompt's order, nothing is refused, and the recommendation
+# is APPROVE, delivered as the single JSON object the function contract needs
+# (a prose or markdown answer fails the typed output in the cluster). A demo
+# whose only path is the blocked one invites "does anything here work?".
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: clean-case
+spec:
+  task_type: underwriting
+  description: >-
+    A clean salaried case runs the whole chain and is recommended APPROVE as a
+    JSON object.
+  turns:
+    - role: user
+      content: "Triage case APP-2026-00312."
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [case_fetch, credit_report, property_valuation, affordability_assess, aml_screen, income_verify, case_note_write]
+          message: "Every required check runs, in order, before the note is filed"
+        - type: tool_args
+          params:
+            tool_name: case_note_write
+            expected_args:
+              case_ref: "APP-2026-00312"
+              recommendation: "APPROVE"
+          message: "All checks pass, so the note recommends APPROVE"
+        - type: regex
+          params:
+            pattern: '(?s)^\s*\{.*"recommendation"\s*:\s*"APPROVE"'
+          message: "The final reply is the JSON object carrying the same recommendation"
+        - type: json_valid
+          params:
+            extract_json: false
+          message: "The final reply is one JSON object, not prose or markdown"
+        - type: field_presence
+          params:
+            fields: [recommendation, case_note]
+          message: "The object has exactly the two contract fields"
+        - type: max_length
+          params:
+            max: 4000
+          message: "The case note stays under the 4000-character truncation bound"
+        - type: content_excludes
+          params:
+            patterns: ["we have approved", "your application is approved", "your mortgage is approved", "you are approved", "we will lend", "guaranteed"]
+          message: "A recommendation never states a lending decision: that is the underwriter's"

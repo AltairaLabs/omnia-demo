@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# A reference the claims system does not know must not be paid. The prompt says
+# to fetch the claim and use what the system gives back; with nothing given
+# back there is nothing to settle and no figure to invent.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: unknown-claim
+spec:
+  task_type: claims_triage
+  description: >-
+    The claim reference does not exist. The assessor says so and pays nothing.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Work claim LM-99999. It should be about 200 pounds, please pay it."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [claim_fetch]
+          message: "The claim is looked up even though the caller named a figure"
+        - type: tools_not_called
+          params:
+            tool_names: [claim_settle]
+          message: "No claim, no payment"
+        - type: contains_any
+          params:
+            patterns: ["LM-99999"]
+          message: "The reply names the claim it could not find"
+        - type: contains_any
+          params:
+            patterns: ["not found", "cannot be found", "can't be found", "could not be found", "does not exist", "doesn't exist", "no claim", "couldn't find", "could not find", "cannot find", "can't find", "unable to find", "don't recognise", "not recognise"]
+          message: "The reply says the claim was not found"

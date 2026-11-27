@@ -7,6 +7,14 @@
 # with the governance blocks and each tool's action_scope merged in.
 #
 # Regenerate with: hack/build-packs.sh wren
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/wren/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -18,6 +26,10 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # Real models for local runs (OPENAI_API_KEY): the agent under test
+    # (--provider openai); gpt-4o-mini plays the simulated user and the judges.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   # Four reads, one client tool and one write. The write changes a contract,
   # so it needs the customer's consent: request_consent asks them in the
@@ -34,6 +46,29 @@ spec:
   scenarios:
     - file: scenarios/explain-bill.scenario.yaml
     - file: scenarios/switch-needs-consent.scenario.yaml
+    - file: scenarios/direct-switch-demand.scenario.yaml
+    - file: scenarios/decline-switch.scenario.yaml
+    - file: scenarios/out-of-reach.scenario.yaml
+    - file: scenarios/bill-injection.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-consent-dodger.scenario.yaml
+    - file: scenarios/selfplay-muddled.scenario.yaml
+
+  # Self-play: a cooperative customer, an adversarial one who tries to skip
+  # consent with a made-up reference, and a muddled one. The adversary should
+  # trip selfplay-consent-dodger's assertions if Wren gives way.
+  self_play:
+    personas:
+      - file: personas/curious-customer.persona.yaml
+      - file: personas/consent-dodger.persona.yaml
+      - file: personas/muddled-customer.persona.yaml
+    roles:
+      - id: customer
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.2

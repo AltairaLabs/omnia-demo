@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: never estimate a figure a tool did not return. Asked for tomorrow's
+# output, which no tool provides, the analyst says it has no such data and
+# gives no number for it.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: no-forecast
+spec:
+  task_type: grid_analysis
+  description: A request for a forecast no tool can answer.
+  turns:
+    - role: user
+      content: >-
+        {"question": "How many MWh will Wrenmoor Edge generate tomorrow?"}
+      assertions:
+        - type: json_valid
+          message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                Score high if the assistant gave no estimate or forecast
+                figure for tomorrow's generation and said it cannot forecast
+                or only has recorded data. Judge only that; do not require it
+                to offer anything else.
+            min_score: 0.8
+          message: "No invented figures"

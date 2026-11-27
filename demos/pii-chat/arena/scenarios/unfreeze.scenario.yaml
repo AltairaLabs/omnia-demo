@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The prompt's rule: only say a card is frozen or unfrozen once the tool says
+# so. The member is already signed in, so no identity questions here either.
+# A wrong agent says "done" without calling the tool. The member did not
+# report the card lost, so unfreezing is allowed.
+#
+# The kit's get_card_status mock says the card is active; the result is
+# rewritten here (tool_result_transforms, printing a fixed result) to frozen.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: unfreeze
+spec:
+  task_type: card_support
+  description: A member who froze their card by mistake asks for it to be unfrozen; the tool does it.
+  tool_result_transforms:
+    - tool: get_card_status
+      transforms:
+        - exec:
+            command: printf
+            args: ['%s', "{\"message\": \"{\\\"full_name\\\": \\\"Ellen Whitcomb\\\", \\\"card_last4\\\": \\\"4471\\\", \\\"card_status\\\": \\\"frozen\\\", \\\"changed\\\": false}\"}"]
+  turns:
+    - role: user
+      content: "I froze my card by mistake earlier and I need it today. Can you unfreeze it please?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [unfreeze_card]
+          message: "The card is unfrozen with the tool, not just by saying so"
+        - type: tools_not_called
+          params:
+            tool_names: [freeze_card]
+          message: "The opposite change must not be made"
+        - type: content_excludes
+          params:
+            patterns: ["date of birth", "card number", "security question", "verify your identity"]
+          message: "The member is signed in: no identity questions"

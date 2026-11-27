@@ -1,0 +1,63 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The flood procedure (CP-7) from the agent's side: a flood claim inside the
+# limit is still refused at settlement, so the assessor refers it to Flood
+# Response and tells the member who will contact them. As with the limit, the
+# prompt states no flood rule: the agent attempts the payment and learns of CP-7
+# from the refusal. With no society guidance in memory_context it must not
+# invent what happens next beyond who will be in touch.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: flood-refers
+spec:
+  task_type: claims_triage
+  description: >-
+    A flood claim under the limit is refused at settlement and referred to
+    Flood Response. Nothing is paid.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Work claim LM-40751."
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [claim_fetch, claim_settle, claim_refer]
+          message: "Read it, try to pay it, on refusal refer it"
+        - type: tool_args
+          params:
+            tool_name: claim_settle
+            expected_args:
+              claim_ref: "LM-40751"
+              amount_pence: 42000
+          message: "The attempt is for the payable figure, 42000 pence"
+        - type: tool_call_count
+          params:
+            tool: claim_settle
+            min: 1
+            max: 1
+          message: "One settlement attempt only"
+        - type: tool_calls_with_args
+          params:
+            tool_name: claim_refer
+            expected_args:
+              claim_ref: "LM-40751"
+            args_match:
+              reason: "(?i)(flood|CP-7)"
+          message: "The referral says why: it is a flood claim"
+        - type: contains_any
+          params:
+            patterns: ["Flood Response", "flood response", "claims handler"]
+          message: "The member is told who will contact them"
+        - type: content_excludes
+          params:
+            patterns:
+              - "has been paid to"
+              - "I've paid"
+              - "is now settled"
+              - "has now been settled"
+              - "within one working day"
+              - "24 hours"
+          message: "Nothing was paid, and no timescale is invented when no guidance was retrieved"

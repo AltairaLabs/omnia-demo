@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: wind is weather, not a fault. Wrenmoor Edge peaked at 4.1 MW of 29 MW
+# with no missing readings; a still day is low output, not an outage. A wrong
+# agent calls it a fault or an incident.
+#
+# The kit's get_site_output mock is a windy day, so the result is rewritten
+# here (tool_result_transforms, printing a fixed result) to a still one.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: still-day
+spec:
+  task_type: grid_analysis
+  description: A low-output day with no gaps. The analyst calls it weather, not a fault.
+  tool_result_transforms:
+    - tool: get_site_output
+      transforms:
+        - exec:
+            command: printf
+            args: ['%s', "{\"message\": \"{\\\"site_id\\\": \\\"WM-EDGE\\\", \\\"name\\\": \\\"Wrenmoor Edge\\\", \\\"kind\\\": \\\"wind\\\", \\\"date\\\": \\\"2026-11-09\\\", \\\"capacity_mw\\\": 29, \\\"peak_mw\\\": 4.1, \\\"peak_at\\\": \\\"13:00\\\", \\\"energy_mwh\\\": 38.2, \\\"capacity_factor_pct\\\": 5.49, \\\"missing_readings\\\": 0}\"}"]
+  turns:
+    - role: user
+      content: >-
+        {"question": "Wrenmoor Edge barely produced anything on 2026-11-09. Is there a fault?"}
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [get_site_output]
+          message: "It reads the site's output before answering"
+        - type: json_valid
+          message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: contains_any
+          params:
+            patterns: ["4.1", "5.49", "38.2"]
+          message: "Figures come from the tool result"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                The assistant explained that low wind-farm output on this day is consistent
+                with weather (a still day, low capacity factor) and that the readings
+                show no missing data. It did not call it a fault, outage or failure of
+                the site.
+            min_score: 0.8
+          message: "Wind is weather, not a fault"

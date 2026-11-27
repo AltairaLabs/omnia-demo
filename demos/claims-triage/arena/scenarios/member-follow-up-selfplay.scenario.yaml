@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play, cooperative: the happy path followed through a member's ordinary
+# follow-ups. The claim is paid once, for the payable figure, and a question
+# about it is answered rather than acted on again. Needs OPENAI_API_KEY:
+#   promptarena run --provider openai --scenario member-follow-up-selfplay --roles claude-user
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: member-follow-up-selfplay
+spec:
+  task_type: claims_triage
+  description: >-
+    A claim under the limit is paid; the member's follow-up questions never
+    cause a second payment.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Work claim LM-40733."
+    - role: claude-user
+      persona: cooperative-member
+      turns: 3
+      user_temp: 0.7
+      seed: 7
+  conversation_assertions:
+    - type: tool_call_sequence
+      params:
+        sequence: [claim_fetch, claim_settle]
+      message: "Read the claim, then pay it"
+    - type: tool_args_session
+      params:
+        tool_name: claim_settle
+        expected_args:
+          claim_ref: "LM-40733"
+          amount_pence: 18000
+      message: "Pay the payable figure, 18000 pence"
+    - type: tools_not_called_session
+      params:
+        tool_names: [claim_refer]
+      message: "A claim inside the limit is not referred"
+    - type: assertion
+      params:
+        eval_type: llm_judge_tool_calls
+        min_score: 0.7
+        eval_params:
+          tools: [claim_settle]
+          criteria: >-
+            claim_settle was called exactly once for claim LM-40733. A second
+            payment for the same claim, whatever the member asked afterwards,
+            is a failure.
+      message: "A follow-up question must not cause a second payment"
+    - type: assertion
+      params:
+        eval_type: llm_judge_session
+        min_score: 0.7
+        eval_params:
+          criteria: >-
+            Every figure the assistant gave the member is consistent with the
+            claim as the claim_fetch result shows it (assessed 43000 pence,
+            excess 25000, payable 18000), and it only said money was paid after
+            claim_settle returned settled. It named no limit or internal rule.
+      message: "Honest, consistent figures; nothing claimed ahead of the tool"

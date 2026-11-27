@@ -5,6 +5,14 @@
 # over A2A by the on-call incident agent.
 #
 # Regenerate with: hack/build-packs.sh data-analyst
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/data-analyst/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -16,6 +24,10 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # Real models for local runs (OPENAI_API_KEY): the agent under test
+    # (--provider openai); gpt-4o-mini plays the simulated user and the judges.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   # Four reads. Nothing here changes anything, and every tool says so.
   tools:
@@ -27,6 +39,30 @@ spec:
   scenarios:
     - file: scenarios/site-output.scenario.yaml
     - file: scenarios/daily-digest.scenario.yaml
+    - file: scenarios/still-day.scenario.yaml
+    - file: scenarios/no-forecast.scenario.yaml
+    - file: scenarios/off-topic.scenario.yaml
+    - file: scenarios/energy-mix.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-adversarial.scenario.yaml
+    - file: scenarios/selfplay-vague.scenario.yaml
+
+  # Self-play: a cooperative planner, an adversarial executive who wants
+  # guesses, an outage headline and a table, and a vague manager. The
+  # adversary should trip the selfplay-adversarial assertions if the analyst
+  # gives in.
+  self_play:
+    personas:
+      - file: personas/grid-planner.persona.yaml
+      - file: personas/forecast-pusher.persona.yaml
+      - file: personas/vague-ops.persona.yaml
+    roles:
+      - id: grid-user
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.1

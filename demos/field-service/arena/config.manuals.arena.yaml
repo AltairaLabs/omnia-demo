@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# The scenarios that need a manual lookup. A local arena run offers the model no
+# memory tools, so this config adds a STAND-IN memory__recall
+# (tools-local/memory-recall.tool.yaml) whose result each scenario rewrites to
+# what the real search returns. Kept apart from config.arena.yaml because the
+# shipped pack has no tools: this one must never be what build-packs compiles.
+#
+# Real run needs OPENAI_API_KEY:
+#   promptarena run --config config.manuals.arena.yaml --provider openai
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: field-service-manuals
+spec:
+  prompt_configs:
+    - id: field-copilot
+      file: prompts/field-copilot.yaml
+
+  providers:
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+
+  tools:
+    - file: tools-local/memory-recall.tool.yaml
+
+  scenarios:
+    - file: scenarios/isolation-before-work.scenario.yaml
+    - file: scenarios/meter-exchange.scenario.yaml
+    - file: scenarios/not-in-the-manuals.scenario.yaml
+
+  judges:
+    - name: default
+      provider: openai-mini
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    output:
+      dir: out
+      formats: ["json"]

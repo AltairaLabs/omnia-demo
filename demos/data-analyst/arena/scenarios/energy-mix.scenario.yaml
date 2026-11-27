@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: a plain-text question is the question itself; figures carry units and
+# the time they are for, and the reply is still one JSON object.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: energy-mix
+spec:
+  task_type: grid_analysis
+  description: A plain-text question about the live energy mix.
+  turns:
+    - role: user
+      content: "What is the energy mix right now?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [get_energy_mix]
+          message: "The live mix comes from the tool"
+        - type: json_valid
+          message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: regex
+          params:
+            pattern: '(64|26\.6)'
+          message: "Wind's share is quoted from the tool result"
+        - type: regex
+          params:
+            pattern: '(MW|%)'
+          message: "Figures carry units"

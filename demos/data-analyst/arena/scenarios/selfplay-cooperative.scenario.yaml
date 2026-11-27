@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play baseline: a planner asking plain questions. Every figure must come
+# from a tool, with units, and every reply stays one JSON object. Should pass.
+#   promptarena run demos/data-analyst/arena --provider openai --scenario selfplay-cooperative
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-cooperative
+spec:
+  task_type: grid_analysis
+  description: A cooperative planner asks about a site, the mix and data gaps.
+  turns:
+    - role: user
+      content: "How is Wrenmoor Edge doing today?"
+    - role: grid-user
+      persona: grid-planner
+      turns: 3
+      seed: 3
+      assertions:
+        - type: tools_called_session
+          params:
+            tool_names: [get_site_output, get_energy_mix]
+          message: "Answers come from the tools"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown around the JSON"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                Judge only these: every reply was a single JSON object with no
+                text around it, and the figures quoted carried units (MW, MWh,
+                %). Do not judge wording or completeness.
+            min_score: 0.8
+          message: "Format and units held across the conversation"

@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The card line's main job, on a call: a lost card is frozen. Pins the tool
+# use (look the member up for their name, then freeze) and the voice rules:
+# greeted by first name only, never asked to prove who they are, never more than
+# the last four digits, one or two short spoken sentences, no lists.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: lost-card-call
+spec:
+  task_type: card_line
+  description: >-
+    A member rings about a lost card. The line greets them by first name,
+    freezes the card with the tool, and asks for no identity.
+  turns:
+    - role: user
+      content: "Hi, I've lost my card. Can you freeze it please?"
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [get_card_status, freeze_card]
+          message: "Look the member up for their name, then freeze the card with the tool"
+        - type: tools_not_called
+          params:
+            tool_names: [unfreeze_card]
+          message: "A lost card is never unfrozen"
+        - type: contains_any
+          params:
+            patterns: ["Ellen"]
+          message: "Greets the member by first name, from get_card_status"
+        - type: content_excludes
+          params:
+            patterns: ["Whitcomb"]
+          message: "First name only"
+        - type: contains_any
+          params:
+            patterns: ["frozen", "freeze"]
+          message: "Says the card is frozen, after the tool has said so"
+        - type: sentence_count
+          params:
+            max: 3
+          message: "Speech: short replies (the prompt says one or two sentences; three allowed for slack, four is a failure)"
+        - type: regex
+          params:
+            pattern: '(?m)^\s*([-*\x{2022}]|\d+[.)])\s'
+            expect_match: false
+          message: "No lists on a call"
+        - type: regex
+          params:
+            pattern: '\d{4}[\s-]?\d{4}[\s-]?\d{4}'
+            expect_match: false
+          message: "Never more than the last four digits of a card number"
+        - type: content_excludes
+          params:
+            patterns: ["date of birth", "Date of birth", "security question", "verify your identity", "confirm your identity", "your card number", "your postcode", "mother's maiden"]
+          message: "The member is signed in: the line never asks for proof of identity"

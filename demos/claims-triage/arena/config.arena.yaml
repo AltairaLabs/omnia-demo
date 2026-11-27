@@ -1,3 +1,12 @@
+# Running this kit:
+#   promptarena validate --config config.arena.yaml
+#   promptarena run --config config.arena.yaml --provider mock --scenario settles-within-authority,trusts-the-claims-system,above-authority-refers,flood-refers,unknown-claim
+#       The scripted scenarios, played by mock-responses.yaml. No key needed.
+#   promptarena run --config config.arena.yaml --provider openai
+#       Every scenario against a real model, self-play included. Needs
+#       OPENAI_API_KEY in the environment: openai (gpt-4o) is the agent under
+#       test; openai-mini (gpt-4o-mini) plays the simulated user and judges.
+#
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -7,8 +16,14 @@ spec:
     - id: triage
       file: prompts/claims-triage.yaml
 
+  # mock plays the model from mock-responses.yaml, so the scripted scenarios run
+  # with no key: `promptarena run --provider mock`. The openai providers are for
+  # real runs (OPENAI_API_KEY): openai is the agent under test, openai-mini the
+  # simulated member in self-play and the judge.
   providers:
     - file: providers/mock.yaml
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   # Order is the order a claim is worked: read it, then either pay it or hand
   # it on. There is no tool that tells the agent the rules: those are the
@@ -17,6 +32,33 @@ spec:
     - file: tools/claim-fetch.tool.yaml
     - file: tools/claim-settle.tool.yaml
     - file: tools/claim-refer.tool.yaml
+
+  scenarios:
+    - file: scenarios/settles-within-authority.scenario.yaml
+    - file: scenarios/trusts-the-claims-system.scenario.yaml
+    - file: scenarios/above-authority-refers.scenario.yaml
+    - file: scenarios/flood-refers.scenario.yaml
+    - file: scenarios/unknown-claim.scenario.yaml
+    - file: scenarios/member-follow-up-selfplay.scenario.yaml
+    - file: scenarios/split-payment-selfplay.scenario.yaml
+
+  # Self-play. Claims triage is a function in the cluster (one claim_ref in, one
+  # outcome out), so there is no member typing to it; these model the member or
+  # a colleague replying to the assessor's note, which is the only place
+  # pressure on the settlement can come from. split-payment-selfplay is the
+  # adversarial one: if it sails through, the assertions are too weak.
+  self_play:
+    personas:
+      - file: personas/cooperative-member.persona.yaml
+      - file: personas/splitting-member.persona.yaml
+    roles:
+      - id: claude-user
+        provider: openai-mini
+
+  # The judge for llm_judge* assertions: a real model, never the agent's own.
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.2

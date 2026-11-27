@@ -35,4 +35,17 @@ spec:
   output_schema:
     type: string
   mode: mock
-  mock_result: '(mock: runs in the sandbox in Omnia)'
+  # STAND-IN FOR THE SANDBOX. A local arena run has no VM. Running a Python
+  # script file (python3 <file>.py, not python3 -c) returns one canned day of WM-EDGE data (183.4
+  # MWh over 29 MW x 24 h is 26.4% capacity factor; 3 half-hours had no
+  # export-meter reading), whatever the script says, so a scenario can check
+  # the answer is built from the tool's output. Any other command fails, as the
+  # real sandbox's network policy and workspace boundary would make it fail:
+  # this tests what the agent does when refused, not the sandbox, which is
+  # tested in-cluster (RUNBOOK.md).
+  mock_template: |
+    {{- if and (gt (len .command) 10) (eq (slice .command 0 8) "python3 ") (ne (slice .command 0 10) "python3 -c") -}}
+    "site WM-EDGE date 2026-11-26\nenergy_mwh 183.4\npeak_mw 24.8\nmin_mw 9.1\ncapacity_factor_pct 26.4\nmissing_readings 3"
+    {{- else -}}
+    "exit: 1\n(mock sandbox: only a python3 script run is scripted here. In Omnia this runs in the sandbox VM, which has no network except the generation data service and no access outside its workspace.)"
+    {{- end -}}

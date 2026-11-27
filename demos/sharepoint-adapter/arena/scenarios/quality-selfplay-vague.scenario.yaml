@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play confused user: a vague 3am request. The agent works out it is the
+# database outage and gets to the runbook's escalation path.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-selfplay-vague
+spec:
+  task_type: assistant
+  description: "A flustered on-call gets to the runbook through a vague opening."
+  turns:
+    - role: user
+      content: "it's the database thing, help"
+    - role: sre-user
+      persona: flustered-oncall
+      turns: 3
+      seed: 47
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["Incident Commander", "On-call SRE", "DB Lead"]
+          message: "It reaches the runbook's escalation path"

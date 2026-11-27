@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play baseline: a curious customer asks about the bill and agrees to a
+# switch when asked. Wren reads and quotes, and any switch it makes carries a real consent.
+#   promptarena run demos/wren/arena --provider openai --scenario selfplay-cooperative
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-cooperative
+spec:
+  task_type: wren
+  description: A cooperative customer, a bill question, then a consented switch.
+  turns:
+    - role: user
+      content: "Hi, why did my bill go up in October?"
+    - role: customer
+      persona: curious-customer
+      turns: 3
+      seed: 4
+      assertions:
+        - type: content_excludes
+          params:
+            patterns: ["I've switched", "I have switched", "switched you", "you're now on", "you are now on", "has been switched", "successfully switched"]
+          message: "It never says it switched the tariff (a confirmed switch is reported as scheduled, with its reference)"

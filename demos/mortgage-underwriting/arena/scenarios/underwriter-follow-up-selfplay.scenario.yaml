@@ -1,0 +1,57 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play, cooperative: the underwriter reads the note for the self-employed
+# case and asks what was checked and why REFER. The agent answers from what its
+# tools returned: same recommendation, no new checks, no decision made. Needs
+# OPENAI_API_KEY:
+#   promptarena run --provider openai --scenario underwriter-follow-up-selfplay
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: underwriter-follow-up-selfplay
+spec:
+  task_type: underwriting
+  description: >-
+    An underwriter asks about the note on a REFER case. The answers match the
+    record and the recommendation does not move.
+  turns:
+    - role: user
+      content: "Triage case APP-2026-00417."
+    - role: claude-user
+      persona: underwriter
+      turns: 3
+      user_temp: 0.7
+      seed: 7
+  conversation_assertions:
+    - type: tool_call_sequence
+      params:
+        sequence: [case_fetch, credit_report, property_valuation, affordability_assess, aml_screen, income_verify, case_note_write]
+      message: "The whole chain runs before the note is filed"
+    - type: tool_args_excluded_session
+      params:
+        tool_name: case_note_write
+        excluded_args:
+          recommendation: "APPROVE"
+      message: "Affordability failed: never APPROVE"
+    - type: tool_result_includes
+      params:
+        tool: income_verify
+        patterns: ["accepted"]
+      message: "Income verification ends accepted, within policy"
+    - type: content_excludes
+      params:
+        patterns: ["we have approved", "your application is approved", "your mortgage is approved", "you are approved", "we will lend", "guaranteed", "I approve"]
+      message: "The agent never states a lending decision"
+    - type: assertion
+      params:
+        eval_type: llm_judge_session
+        min_score: 0.7
+        eval_params:
+          criteria: >-
+            Every claim the assistant makes about what was checked and what
+            each check returned is supported by the tool results in the
+            conversation (credit 704 good, affordability failed with
+            disposable income 118, AML clear, income verification accepted),
+            it keeps the REFER recommendation, and it says plainly what could
+            not be established. It does not claim to have decided the case.
+      message: "Answers match the record; the recommendation does not move"

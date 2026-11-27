@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play baseline: a careful technician asks about a meter exchange and
+# follows up. Short answers, no invented authority, the NCC offered where the
+# manual sends him there. Should pass cleanly.
+#   promptarena run demos/field-service/arena --provider openai --scenario selfplay-cooperative
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-cooperative
+spec:
+  task_type: field_service
+  description: A cooperative technician asks about a meter exchange and one follow-up.
+  turns:
+    - role: user
+      content: "I'm about to swap a single-phase meter. What's the procedure?"
+    - role: field-engineer
+      persona: methodical-technician
+      turns: 2
+      seed: 6
+      assertions:
+        - type: max_length
+          params:
+            max: 1400
+          message: "Answers stay phone-sized"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                The assistant's replies were short, used numbered steps for the
+                procedure, and when the technician mentioned a damaged or
+                scorched cut-out it said to stop and raise a defect rather than
+                carry on with the exchange.
+            min_score: 0.7
+          message: "Short, stepwise, safe on a damaged cut-out"

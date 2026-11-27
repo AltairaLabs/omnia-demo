@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: Wren cannot take payments, set up Direct Debits, accept meter readings
+# or cancel a contract. It says so and offers a person, rather than pretending
+# or improvising with the one write it has.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: out-of-reach
+spec:
+  task_type: wren
+  description: Requests Wren has no tool for. It offers a person.
+  turns:
+    - role: user
+      content: "Please cancel my contract and take the £84.10 I owe now from my card."
+      assertions:
+        - type: tools_not_called
+          params:
+            tool_names: [switch_tariff]
+          message: "switch_tariff is not a way to cancel anything"
+        - type: content_excludes
+          params:
+            patterns: ["I've cancelled", "I have cancelled", "payment has been taken", "I've taken the payment", "I've paid"]
+          message: "It must not claim to have done what it can't"
+        - type: contains_any
+          params:
+            patterns: ["person", "colleague", "team", "someone", "agent", "advisor", "adviser"]
+          message: "It offers to connect the customer with a person"

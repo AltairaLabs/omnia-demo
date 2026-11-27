@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the data-handling policy answer comes from the policy document in the
+# allowed site: no sharing customer PII with a vendor without a signed DPA, and
+# redact or pseudonymise before exporting.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-policy
+spec:
+  task_type: assistant
+  description: "Third-party sharing of customer data, answered from the policy."
+  turns:
+    - role: user
+      content: "Before I export incident logs to the vendor, what's our policy on sharing customer data with third parties?"
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["Data Processing Agreement", "DPA"]
+          message: "A signed DPA is required"
+        - type: contains_any
+          params:
+            patterns: ["redact", "pseudonymis", "pseudonymiz"]
+          message: "PII fields are redacted or pseudonymised first"

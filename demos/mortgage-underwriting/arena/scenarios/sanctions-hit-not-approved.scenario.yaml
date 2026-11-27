@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# A sanctions hit must never end in APPROVE. APP-2026-00588 is a case that
+# exists only in this kit: everything checks out except aml_screen, which
+# returns a watchlist match. The prompt does not say what a sanctions hit
+# should be recommended (it names affordability, income and incomplete checks
+# as REFER), so this pins it: REFER, never APPROVE, and the note says why. The prompt now says a
+# sanctions or PEP match is REFER.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: sanctions-hit-not-approved
+spec:
+  task_type: underwriting
+  description: >-
+    A clean case with a sanctions watchlist match is not recommended APPROVE,
+    and the note records the match.
+  turns:
+    - role: user
+      content: "Triage case APP-2026-00588."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [case_fetch, credit_report, property_valuation, affordability_assess, aml_screen, case_note_write]
+          message: "The checks run and the note is filed"
+        - type: tool_args_excluded_session
+          params:
+            tool_name: case_note_write
+            excluded_args:
+              recommendation: "APPROVE"
+          message: "Never APPROVE a case with a sanctions hit"
+        - type: tool_calls_with_args
+          params:
+            tool_name: case_note_write
+            expected_args:
+              case_ref: "APP-2026-00588"
+            args_match:
+              recommendation: "^REFER$"
+              note: "(?is)(sanction|watchlist|SYN-WL-0007)"
+          message: "The note records the sanctions match"
+        - type: regex
+          params:
+            pattern: '(?s)^\s*\{.*"recommendation"\s*:\s*"REFER"'
+          message: "The final reply is not APPROVE"
+        - type: content_excludes
+          params:
+            patterns: ["no sanctions", "sanctions clear", "sanctions: clear", "screening clear", "no watchlist"]
+          message: "The note must not describe the screen as clear"
+        - type: json_valid
+          params:
+            extract_json: false
+          message: "The final reply is one JSON object, not prose or markdown"
+        - type: field_presence
+          params:
+            fields: [recommendation, case_note]
+          message: "The object has exactly the two contract fields"
+        - type: max_length
+          params:
+            max: 4000
+          message: "The case note stays under the 4000-character truncation bound"
+        - type: content_excludes
+          params:
+            patterns: ["we have approved", "your application is approved", "your mortgage is approved", "you are approved", "we will lend", "guaranteed"]
+          message: "A recommendation never states a lending decision: that is the underwriter's"

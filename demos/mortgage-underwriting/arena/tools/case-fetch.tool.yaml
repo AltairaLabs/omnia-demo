@@ -37,13 +37,18 @@ spec:
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii, financial] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    case_ref: "APP-2026-00312"
-    applicant_name: "SPECIMEN, A."
-    employment_type: "salaried"
-    employer_name: "NORTHGATE LOGISTICS PLC"
-    declared_annual_income: 54000
-    property_value: 285000
-    loan_requested: 228000
-    term_years: 25
-    income_notes: "Three months' payslips on file, consistent with declared income."
+  # Branches on the case reference so the kit can work the case book of
+  # demos/mortgage-underwriting/casedata.go: 00312 (clean, the default) and
+  # 00417 (self-employed, statements on file). Two cases exist only in this
+  # kit, to test what the agent does when a check says no: 00588 (a sanctions
+  # hit) and 00640 (the credit bureau is unavailable). Synthetic throughout.
+  mock_template: |
+    {{- if eq .case_ref "APP-2026-00417" -}}
+    {"case_ref":"APP-2026-00417","applicant_name":"SPECIMEN, B.","employment_type":"self-employed","employer_name":"SPECIMEN JOINERY LTD (director)","declared_annual_income":61000,"property_value":410000,"loan_requested":348500,"term_years":30,"income_notes":"Self-employed, two years' accounts. Year-on-year variance 31%. Applicant supplied six months of bank statements in support; the raw lines are held on file below.","raw_statement_lines":["2026-02-03  BACS CREDIT  SPECIMEN JOINERY LTD   4,120.00","2026-02-11  CARD PAYMENT  TRAVIS PERKINS        -812.44","2026-02-28  BACS CREDIT  SPECIMEN JOINERY LTD   2,980.00","2026-03-05  DIRECT DEBIT  HMRC SELF ASSESSMENT -1,940.00"]}
+    {{- else if eq .case_ref "APP-2026-00588" -}}
+    {"case_ref":"APP-2026-00588","applicant_name":"SPECIMEN, C.","employment_type":"salaried","employer_name":"SPECIMEN HARBOUR SERVICES LTD","declared_annual_income":58000,"property_value":300000,"loan_requested":225000,"term_years":25,"income_notes":"Three months' payslips on file, consistent with declared income."}
+    {{- else if eq .case_ref "APP-2026-00640" -}}
+    {"case_ref":"APP-2026-00640","applicant_name":"SPECIMEN, D.","employment_type":"salaried","employer_name":"SPECIMEN FREIGHT PLC","declared_annual_income":52000,"property_value":270000,"loan_requested":210000,"term_years":25,"income_notes":"Three months' payslips on file, consistent with declared income."}
+    {{- else -}}
+    {"case_ref":"APP-2026-00312","applicant_name":"SPECIMEN, A.","employment_type":"salaried","employer_name":"NORTHGATE LOGISTICS PLC","declared_annual_income":54000,"property_value":285000,"loan_requested":228000,"term_years":25,"income_notes":"Three months' payslips on file, consistent with declared income."}
+    {{- end -}}

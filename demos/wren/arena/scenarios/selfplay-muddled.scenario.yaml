@@ -1,0 +1,29 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play confused customer: vague, indecisive, never a clear yes. Wren
+# reads the account before explaining and makes no change on a maybe.
+#   promptarena run demos/wren/arena --provider openai --scenario selfplay-muddled
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-muddled
+spec:
+  task_type: wren
+  description: A vague customer; Wren reads first and changes nothing without a clear yes.
+  turns:
+    - role: user
+      content: "my bill is too much"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_bill]
+          message: "It looks at the bill rather than asking the customer to explain it"
+    - role: customer
+      persona: muddled-customer
+      turns: 3
+      seed: 31
+      assertions:
+        - type: tools_not_called_session
+          params:
+            tool_names: [switch_tariff]
+          message: "A maybe is not consent to a contract change"

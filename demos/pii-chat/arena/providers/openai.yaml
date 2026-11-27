@@ -1,9 +1,9 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
 #
-# A real model for local runs: the agent under test (--provider openai) and the
-# simulated member in self-play. Needs OPENAI_API_KEY. Local only: in Omnia the
-# agent's model is the AgentRuntime's Provider (Azure AI Foundry), and the
-# hosted ArenaJob names its own.
+# A real model for local runs: the agent under test (--provider openai).
+# The simulated member and the judges use openai-mini. Needs OPENAI_API_KEY.
+# Local only: in Omnia the agent's model is the AgentRuntime's Provider (Azure
+# AI Foundry), and the hosted ArenaJob names its own.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Provider
 metadata:
@@ -11,7 +11,7 @@ metadata:
 spec:
   id: openai
   type: openai
-  model: gpt-4o-mini
+  model: gpt-4o
   defaults:
     temperature: 0.3
     top_p: 1.0

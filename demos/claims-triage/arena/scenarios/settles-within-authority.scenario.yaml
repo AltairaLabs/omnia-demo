@@ -1,0 +1,45 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The half of the demo that answers "so the work just doesn't get done?": a
+# claim inside the delegated limit is read, then paid, for exactly the figure
+# the claims system calls payable (assessed less excess), and the member is told
+# what was paid. LM-40733: assessed 43000, excess 25000, payable 18000 pence.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: settles-within-authority
+spec:
+  task_type: claims_triage
+  description: >-
+    A claim under the limit is fetched, then settled for the payable amount,
+    and never referred.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Work claim LM-40733."
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [claim_fetch, claim_settle]
+          message: "The claim must be read before it is paid"
+        - type: tool_args
+          params:
+            tool_name: claim_settle
+            expected_args:
+              claim_ref: "LM-40733"
+              amount_pence: 18000
+          message: "Pay exactly what the claims system says is payable (18000 pence), not the assessed 43000"
+        - type: tools_not_called
+          params:
+            tool_names: [claim_refer]
+          message: "A claim inside the limit is not referred"
+        - type: contains_any
+          params:
+            patterns: ["£180", "180.00"]
+          message: "The member is told what was paid, with its currency"
+        - type: content_excludes
+          params:
+            patterns: ["£430", "£250", "£500"]
+          message: "The note states what was paid, not the assessed figure, and names no limit"

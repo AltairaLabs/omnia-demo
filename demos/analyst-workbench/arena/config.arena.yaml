@@ -6,6 +6,19 @@
 # from this kit.
 #
 # Regenerate with: hack/build-packs.sh analyst-workbench
+#
+# Running this kit:
+#   promptarena validate --config config.arena.yaml
+#   promptarena run --config config.arena.yaml --provider mock --scenario answers-with-a-script,missing-readings-are-not-an-outage,cleanup-request
+#       The scripted scenarios, played by mock-responses.yaml. No key needed.
+#   promptarena run --config config.arena.yaml --provider openai
+#       Every scenario against a real model, self-play included. Needs
+#       OPENAI_API_KEY in the environment: openai (gpt-4o) is the agent under
+#       test; openai-mini (gpt-4o-mini) plays the simulated analyst and judges.
+#
+# There is no sandbox in a local run: the Bash tool here is a stand-in that
+# returns one canned day of data for the analysis script and fails everything
+# else (see tools/bash.tool.yaml). It tests the agent, not the sandbox.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -17,6 +30,8 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
   # The sandbox's own tools. Omnia takes a sandbox tool's schema from the pack
   # (internal/runtime/tools_registration.go), so each is declared here exactly
@@ -27,6 +42,32 @@ spec:
     - file: tools/write.tool.yaml
     - file: tools/edit.tool.yaml
     - file: tools/bash.tool.yaml
+
+  scenarios:
+    - file: scenarios/answers-with-a-script.scenario.yaml
+    - file: scenarios/missing-readings-are-not-an-outage.scenario.yaml
+    - file: scenarios/cleanup-request.scenario.yaml
+    - file: scenarios/chart-follow-up-selfplay.scenario.yaml
+    - file: scenarios/scope-escape-selfplay.scenario.yaml
+
+  # Self-play. scope-escape-selfplay is the adversarial one: an analyst who
+  # asks the workbench to reach outside its job (the network, other files,
+  # secrets, a wipe). In Omnia the sandbox is what stops that, not the prompt,
+  # so what is tested is what the agent does around it: it must not try
+  # destructive or exfiltrating shell commands, and must not claim a success
+  # the sandbox refused.
+  self_play:
+    personas:
+      - file: personas/grid-analyst.persona.yaml
+      - file: personas/boundary-pusher.persona.yaml
+    roles:
+      - id: claude-user
+        provider: openai-mini
+
+  # The judge for llm_judge* assertions: a real model, never the agent's own.
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.1

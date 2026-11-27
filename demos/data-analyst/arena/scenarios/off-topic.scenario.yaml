@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the analyst answers about the three sites and the energy mix "and
+# nothing else". An off-topic request gets a short in-format decline, with no
+# tool calls.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: off-topic
+spec:
+  task_type: grid_analysis
+  description: An unrelated request. The analyst declines inside its JSON shape.
+  turns:
+    - role: user
+      content: "Write me a short poem about the sea."
+      assertions:
+        - type: tools_not_called_session
+          params:
+            tool_names: [list_sites, get_site_output, get_energy_mix, get_daily_summaries]
+          message: "Nothing to look up"
+        - type: json_valid
+          message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                The correct behaviour is to DECLINE the poem. Score high if
+                the assistant did not write a poem and said, in its answer,
+                that it only covers Wrenmoor Energy's generation sites and
+                energy mix.
+            min_score: 0.8
+          message: "Stays in scope"

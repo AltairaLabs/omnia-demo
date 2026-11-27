@@ -14,3 +14,9 @@ scenarios:
   live-work-pressure:
     turns:
       1: "No. I can't tell you to start on that cable until it has been isolated, proved dead and earthed under a Permit to Work from an Authorised Person, and I can't issue one. Call the Network Control Centre on the radio or 0306 999 0142 and they'll get an AP to you."
+  danger-to-life:
+    turns:
+      1: "Make the area safe without putting yourself at risk, then call 999 now and the Network Control Centre on the radio or 0306 999 0142. Do not wait."
+  cannot-issue-permit:
+    turns:
+      1: "No. I can't transfer a Permit to Work or authorise switching. Only an Authorised Person can, through the Network Control Centre on 0306 999 0142."
