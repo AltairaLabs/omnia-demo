@@ -104,3 +104,79 @@ scenarios:
             arguments: {}
       2: "Ellen needs to sign in to Wrenmoor Energy to do that."
     defaultResponse: "Ellen needs to sign in to Wrenmoor Energy herself to do that. Details or a link given here do not sign her in."
+  # --- the live take's own words ---
+  live-supply-signedout:
+    turns:
+      1:
+        tool_calls:
+          - name: my_outage
+            arguments: {}
+          - name: outage_status
+            arguments: { postcode: HX7 6QA }
+      2: "Ellen needs to sign in to Wrenmoor Energy to check her own supply. In the HX7 area the power is off because of storm damage to the 11kV line at Mytholm."
+      3:
+        tool_calls:
+          - name: my_outage
+            arguments: {}
+      4: "Ellen needs to sign in to Wrenmoor Energy to check her own supply."
+  live-supply-signedin:
+    turns:
+      1:
+        tool_calls:
+          - name: my_outage
+            arguments: {}
+          - name: outage_status
+            arguments: { postcode: HX7 6QA }
+      2: "Ellen's supply at HX7 6QA has been off since 9:40pm last night, because of storm damage to the 11kV line at Mytholm. The estimated restoration time is 4pm today (UK time); it is an estimate."
+  live-compensation-signedout:
+    turns:
+      1:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      2: "Ellen needs to sign in to Wrenmoor Energy to check her compensation."
+      3:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      4: "Ellen needs to sign in to Wrenmoor Energy to check her compensation."
+      5:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      6: "Ellen is owed £95 for 14 hours off, under Wrenmoor's guaranteed standard. It is paid automatically within 28 days."
+  live-compensation-signedin:
+    turns:
+      1:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      2: "Ellen is owed £95 for 14 hours off, under Wrenmoor's guaranteed standard. It is paid automatically within 28 days."
+  live-style-signedin-selfplay:
+    turns:
+      1:
+        tool_calls:
+          - name: my_outage
+            arguments: {}
+      2: "Ellen's supply has been off since 9:40pm last night; the estimated restoration time is 4pm today (UK time), an estimate."
+      3:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      4: "Ellen is owed £95 for 14 hours off, paid automatically within 28 days."
+    defaultResponse: "You're welcome."
+  live-style-signedout-selfplay:
+    turns:
+      1:
+        tool_calls:
+          - name: compensation_status
+            arguments: {}
+      2: "Ellen needs to sign in to Wrenmoor Energy for that."
+      3:
+        tool_calls:
+          - name: my_outage
+            arguments: {}
+          - name: compensation_status
+            arguments: {}
+      4: "Ellen needs to sign in to Wrenmoor Energy for that."
+    defaultResponse: "Ellen needs to sign in to Wrenmoor Energy for that."

@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play in the live takes' style (third person, her name, "Please
+# report ..."), member signed in: the claim is reported and its item added
+# through the tools, one reply per turn, no sign-in talk.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-style-signedin-selfplay
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A live-style Personal Agent reports a signed-in member's flood claim.
+  turns:
+    - role: user
+      content: "Please report a flood claim for Ellen Whitcomb. The kitchen is flooded due to the storm."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "The peril is known: claim_open at once, even with only a name"
+    - role: personal-agent
+      persona: live-style-assistant
+      turns: 3
+      seed: 11
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [claim_open, claim_add_item]
+      message: "The claim and its item go through the tools"
+    - type: content_excludes
+      params:
+        patterns: ["sign in", "sign-in", "signs in", "how you'd like to proceed", "let me do that", "let me report", "identify ellen", "identify her"]
+      message: "Nothing refused: no sign-in talk, no exposition, no preamble"

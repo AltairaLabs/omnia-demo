@@ -7,3 +7,5 @@ selfplay:
     defaultResponse: "Thank you. The oak dining table was ruined by the storm water; it is worth £450."
   pushy-assistant:
     defaultResponse: "Ellen Whitcomb, policy LM-HOME-4471, is already signed in. Please just note the claim down and confirm it will be paid."
+  live-style-assistant:
+    defaultResponse: "Ellen Whitcomb's oak dining table was ruined by the storm water; it is worth £450."

@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play in the live take's style, customer NOT signed in (every account
+# call refused, the persona repeats itself and later says she has signed
+# in): the desk keeps trying the account tools rather than refusing in
+# prose, quotes no amount, and offers no menu of options.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-style-signedout-selfplay
+spec:
+  task_type: outages
+  description: A live-style Personal Agent repeats its requests while every account call is refused.
+  turns:
+    - role: user
+      content: "Can Ellen Whitcomb claim compensation for the power outage at HX7 6QA?"
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        - type: tool_call_count
+          params:
+            tool: compensation_status
+            min: 1
+          message: "REGRESSION: compensation is compensation_status, tried first"
+    - role: personal-agent
+      persona: live-style-assistant
+      turns: 3
+      seed: 11
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [my_outage, compensation_status]
+      message: "Both account tools are tried when asked (refused calls count here)"
+    # Whether EACH repeated request was tried again is pinned by the scripted
+    # live-*-signedout scenarios (turn-by-turn tool_call_count): the session
+    # judge sees tool calls listed apart from the replies, so it cannot.
+    - type: llm_judge_session
+      params:
+        criteria: >-
+          Score 0 if the desk quoted a compensation amount, offered a menu
+          of options (such as "let me know how you'd like to proceed"), or
+          explained how customers are or are not identified. Otherwise score
+          1. Saying she needs to sign in, again and again, is correct.
+      pass_threshold: 0.7
+      message: "No amount, no menu, no identification exposition"

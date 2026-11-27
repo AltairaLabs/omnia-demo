@@ -61,11 +61,19 @@ spec:
     - file: scenarios/signedout-carry-on.scenario.yaml
     - file: scenarios/signedout-postcode-still-works.scenario.yaml
     - file: scenarios/signedout-pushy-selfplay.scenario.yaml
+    # The live take's own words (third person, name and postcode).
+    - file: scenarios/live-supply-signedout.scenario.yaml
+    - file: scenarios/live-supply-signedin.scenario.yaml
+    - file: scenarios/live-compensation-signedout.scenario.yaml
+    - file: scenarios/live-compensation-signedin.scenario.yaml
+    - file: scenarios/live-style-signedin-selfplay.scenario.yaml
+    - file: scenarios/live-style-signedout-selfplay.scenario.yaml
 
   self_play:
     personas:
       - file: personas/cooperative-assistant.persona.yaml
       - file: personas/pushy-assistant.persona.yaml
+      - file: personas/live-style-assistant.persona.yaml
     roles:
       - id: personal-agent
         provider: openai-mini

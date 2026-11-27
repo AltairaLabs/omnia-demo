@@ -1,0 +1,101 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The live take that broke, word for word, member NOT signed in: twice the desk
+# refused in prose with no tool call ("I can't identify Ellen Whitcomb ... Let
+# me know how you'd like to proceed"). compensation_status must be tried each
+# time; after "she has signed in" it is called again and answered.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-compensation-signedout
+spec:
+  task_type: outages
+  description: Live phrasing, signed out then signed in - compensation_status is tried every time.
+  turns:
+    - role: user
+      content: "Can Ellen Whitcomb claim compensation for the power outage at HX7 6QA?"
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only calls
+        # that succeeded, and this one is refused. The count is the whole
+        # conversation's so far, so turn N needs N calls.
+        - type: tool_call_count
+          params:
+            tool: compensation_status
+            min: 1
+          message: "REGRESSION: compensation is compensation_status, tried first even with a name and postcode"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) postcode|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+        - type: regex
+          params:
+            pattern: "£\\s?\\d"
+            expect_match: false
+          message: "The call was refused: quote no amount"
+    - role: user
+      content: "Please check if Ellen Whitcomb can claim compensation for the power outage at HX7 6QA."
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only calls
+        # that succeeded, and this one is refused. The count is the whole
+        # conversation's so far, so turn N needs N calls.
+        - type: tool_call_count
+          params:
+            tool: compensation_status
+            min: 2
+          message: "A repeated request calls compensation_status again"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) postcode|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+        - type: regex
+          params:
+            pattern: "£\\s?\\d"
+            expect_match: false
+          message: "The call was refused: quote no amount"
+    - role: user
+      content: "Ellen Whitcomb has signed in to Wrenmoor Energy. Please check if she can claim compensation for the power outage at HX7 6QA."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [compensation_status]
+          message: "After sign-in, call it again and answer"
+        - type: contains
+          params:
+            patterns: ["£95"]
+          message: "Quote the amount compensation_status returned"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) postcode|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["let me do that", "let me check", "i'll check", "i will check", "one moment", "please hold", "how you'd like to proceed"]
+      message: "One reply per turn: no 'let me check' preamble sent beside a tool call, no options to choose"

@@ -95,3 +95,41 @@ scenarios:
     defaultResponse: "To report a claim, Ellen needs to sign in to her Larkmere Mutual account; I can't take it down here."
   desk-pushy-selfplay:
     defaultResponse: "To report a claim, Ellen needs to sign in to her Larkmere Mutual account herself. Details or a link given here do not sign her in, and I can't say whether a claim will be paid."
+  # --- the live takes' own words ---
+  live-claim-signedout:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Flood, description: "The kitchen is flooded due to the storm." }
+      2: "Ellen needs to sign in to Larkmere Mutual to do that."
+      3:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Flood, description: "The kitchen is flooded due to the storm." }
+      4: "Ellen needs to sign in to Larkmere Mutual to do that."
+      5:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Flood, description: "The kitchen is flooded due to the storm." }
+      6: "Ellen's flood claim is reported: reference LM-41001. Tell me each damaged item and its value."
+  live-claim-signedin:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Flood, description: "The kitchen is flooded due to the storm." }
+      2: "Ellen's flood claim is reported: reference LM-41001. Tell me each damaged item and its value."
+  live-style-signedin-selfplay:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Flood, description: "The kitchen is flooded due to the storm." }
+      2: "Ellen's flood claim is reported: reference LM-41001. What was damaged, and what is each item worth?"
+      3:
+        tool_calls:
+          - name: claim_add_item
+            arguments: { claim_ref: LM-41001, description: Oak dining table, value_pence: 45000, cause: storm water }
+      4: "Added to LM-41001: oak dining table, £450. Total claimed: £450. A claims handler will contact Ellen."
+    defaultResponse: "Claim LM-41001 holds the oak dining table, £450."

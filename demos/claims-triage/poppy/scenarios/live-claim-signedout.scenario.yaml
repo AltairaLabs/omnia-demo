@@ -1,0 +1,121 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The live take, word for word, member NOT signed in: her name in a third-
+# person request. claim_open must be tried on every request, refused, and only
+# then sign-in mentioned; after "she has signed in" it is called again and
+# the claim read back.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-claim-signedout
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: Live phrasing, signed out then signed in - claim_open is tried every time.
+  turns:
+    - role: user
+      content: "Please report a flood claim for Ellen Whitcomb. The kitchen is flooded due to the storm."
+      chaos:
+        tool_failures:
+          - tool: claim_open
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: claim_add_item
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: claim_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only calls
+        # that succeeded, and this one is refused. The count is the whole
+        # conversation's so far, so turn N needs N calls.
+        - type: tool_call_count
+          params:
+            tool: claim_open
+            min: 1
+          message: "REGRESSION: the peril is known, so claim_open is tried first even with only a name"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) (name|postcode|policy)|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+        - type: regex
+          params:
+            pattern: "LM-\\d"
+            expect_match: false
+          message: "The call was refused: there is no claim reference"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have|is|'s) been (reported|logged|registered|submitted|opened|raised)|\\bI('ve| have) (reported|logged|registered|submitted|opened|raised|noted)"
+            expect_match: false
+          message: "Never say a claim was reported unless the tool confirmed it"
+    - role: user
+      content: "Please go ahead and report the flood claim."
+      chaos:
+        tool_failures:
+          - tool: claim_open
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: claim_add_item
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: claim_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only calls
+        # that succeeded, and this one is refused. The count is the whole
+        # conversation's so far, so turn N needs N calls.
+        - type: tool_call_count
+          params:
+            tool: claim_open
+            min: 2
+          message: "A repeated request calls claim_open again"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) (name|postcode|policy)|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+        - type: regex
+          params:
+            pattern: "LM-\\d"
+            expect_match: false
+          message: "The call was refused: there is no claim reference"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have|is|'s) been (reported|logged|registered|submitted|opened|raised)|\\bI('ve| have) (reported|logged|registered|submitted|opened|raised|noted)"
+            expect_match: false
+          message: "Never say a claim was reported unless the tool confirmed it"
+    - role: user
+      content: "Ellen Whitcomb has signed in to Larkmere Mutual. Please go ahead and report the flood claim."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "After sign-in, call it again and report"
+        - type: contains
+          params:
+            patterns: ["LM-41001"]
+          message: "Read back the reference claim_open returned"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) (name|postcode|policy)|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["let me do that", "let me report", "i'll report that", "one moment", "please hold", "how you'd like to proceed"]
+      message: "One reply per turn: no preamble sent beside a tool call, no options to choose"

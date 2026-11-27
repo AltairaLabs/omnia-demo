@@ -72,11 +72,16 @@ spec:
     - file: scenarios/signedout-status-tool-first.scenario.yaml
     - file: scenarios/signedout-carry-on.scenario.yaml
     - file: scenarios/signedout-pushy-selfplay.scenario.yaml
+    # The live takes' own words (third person, her name).
+    - file: scenarios/live-claim-signedout.scenario.yaml
+    - file: scenarios/live-claim-signedin.scenario.yaml
+    - file: scenarios/live-style-signedin-selfplay.scenario.yaml
 
   self_play:
     personas:
       - file: personas/cooperative-assistant.persona.yaml
       - file: personas/pushy-assistant.persona.yaml
+      - file: personas/live-style-assistant.persona.yaml
     roles:
       - id: personal-agent
         provider: openai-mini
