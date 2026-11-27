@@ -1,7 +1,7 @@
 # The model's descriptor for close_conversation. The ToolRegistry binding
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/close_conversation
-# (demos/personal-agent/server.go): ends a PAP conversation (§8.9). A closed
+# (services/personal-agent/server.go): ends a PAP conversation (§8.9). A closed
 # conversation cannot be reopened.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool

@@ -1,7 +1,7 @@
 # The model's descriptor for claim_status. The ToolRegistry binding
 # (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
 # Served by the claims-systems stub's POST /api/claims/status
-# (demos/mortgage-underwriting/homeclaims.go), behind the on-behalf-of guard
+# (services/mortgage-underwriting/homeclaims.go), behind the on-behalf-of guard
 # (obo.go): it reads only the signed-in member's own claims. With a claim_ref
 # it returns that claim; without one, {"claims": [...]}.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

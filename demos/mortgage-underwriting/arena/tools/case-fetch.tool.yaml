@@ -38,7 +38,7 @@ spec:
   mode: mock
   timeout_ms: 30000
   # Branches on the case reference so the kit can work the case book of
-  # demos/mortgage-underwriting/casedata.go: 00312 (clean, the default) and
+  # services/mortgage-underwriting/casedata.go: 00312 (clean, the default) and
   # 00417 (self-employed, statements on file). Two cases exist only in this
   # kit, to test what the agent does when a check says no: 00588 (a sanctions
   # hit) and 00640 (the credit bureau is unavailable). Synthetic throughout.

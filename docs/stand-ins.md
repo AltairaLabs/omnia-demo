@@ -19,7 +19,7 @@ Add a row when you add a stand-in.
 
 ## Identity
 
-### Front doors (`demos/demo-sites`: the Larkmere member portal, the Wrenmoor customer portal)
+### Front doors (`services/demo-sites`: the Larkmere member portal, the Wrenmoor customer portal)
 
 - **Fakes:** the signed-in user. Each site has one fixed, fictional user (Ellen
   Whitcomb at Larkmere, Amira Saleem at Wrenmoor) and no login page.
@@ -29,7 +29,7 @@ Add a row when you add a stand-in.
 - **What the stand-in does:** it acts as the edge and as the identity provider.
   It asserts the user in the headers `externalAuth.edgeTrust` reads
   (`x-user-id`, `x-user-email`, `x-user-roles`). It also forwards an RS256
-  token it signed for that user (`demos/demoidp`, flag `--issuer-url`) and
+  token it signed for that user (`services/demoidp`, flag `--issuer-url`) and
   serves its key at `/.well-known/jwks.json`.
 - **Downstream:**
   - **The headers admit the conversation.** Omnia's mint exchanges the token
@@ -84,7 +84,7 @@ Add a row when you add a stand-in.
     in the Galaxy corpus, so the Galaxy is untouched, and she starts afresh
     the next time she talks to the member assistant.
 
-### Scripted callers (`demos/card-callers`)
+### Scripted callers (`services/card-callers`)
 
 - **Fakes:** four signed-in members of the portal, with scripted lines, so the
   canary has traffic to judge.
@@ -116,7 +116,7 @@ Add a row when you add a stand-in.
   - **referral-api stays ClusterIP.** The script needs kubectl access to the
     cluster, which a real handler would never have.
 
-### Personal Agent (`demos/personal-agent`, the `ellens-assistant` workspace)
+### Personal Agent (`services/personal-agent`, the `ellens-assistant` workspace)
 
 - **Fakes:** the person's own AI assistant, and the vendor that runs it.
   Ellen Whitcomb's assistant is an Omnia agent (`assistant`) whose five tools
@@ -159,7 +159,7 @@ Add a row when you add a stand-in.
   - **It has one user.** The assistant's facade trusts its page as the edge
     (`externalAuth.edgeTrust`), as the front doors do.
   - **The page stands in for Ellen's signed-in app** (`assistant-page`,
-    `demos/demo-sites --site ellens-assistant`). It has no sign-in of its
+    `services/demo-sites --site ellens-assistant`). It has no sign-in of its
     own: the catalogue's dashboard sign-in is in front of it, and anyone past
     that acts as Ellen. Like the front doors it signs a token for her
     (`--issuer-url`), so its issuer must be in the operator's
@@ -223,7 +223,7 @@ Add a row when you add a stand-in.
 
 ## Line-of-business systems
 
-### Case, claims and account stubs (`demos/mortgage-underwriting`, one binary)
+### Case, claims and account stubs (`services/mortgage-underwriting`, one binary)
 
 - **Fakes:** the systems the agents' tools call:
   - mortgage case, credit, income, affordability, valuation, AML and case
@@ -382,7 +382,7 @@ what sits behind and beside it.
 
 ## Memory
 
-### The Galaxy corpus (`demos/memory-galaxy`, replayed by `demos/memory-seeder`)
+### The Galaxy corpus (`services/memory-galaxy`, replayed by `services/memory-seeder`)
 
 - **Fakes:** the history of conversations. About 10,000 memories for fictional
   members, three agents and the society's knowledge graph,

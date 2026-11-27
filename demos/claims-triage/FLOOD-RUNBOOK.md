@@ -25,7 +25,7 @@ memory through retrieval).
    flood and the mortgage valuation, whether the policy covers flooding). The
    few blue institutional points in it are what the policy covers and the
    Flood claim type's definition; no procedure says what happens to a flood
-   claim. The corpus plants it (`demos/memory-galaxy/taxonomy.yaml`, "Planted
+   claim. The corpus plants it (`services/memory-galaxy/taxonomy.yaml`, "Planted
    finding 1").
 2. **Before.** Invoke claims triage on the flood claim (dashboard, Functions,
    `claims-triage`, Test): `{"claim_ref": "LM-40751", "peril": "Flood"}`. £420

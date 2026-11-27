@@ -7,7 +7,7 @@ spec:
   name: freeze_card
   # No arguments: the card system acts on the signed-in member's card, named by
   # the runtime on the call, never by anything the model writes
-  # (demos/mortgage-underwriting/cards.go).
+  # (services/mortgage-underwriting/cards.go).
   description: >-
     Freeze the member's card so no new payments go through, for example when
     it is lost or stolen. Returns the card's last four digits and new status;

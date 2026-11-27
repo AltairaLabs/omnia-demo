@@ -111,7 +111,7 @@ Ellen's 4471.
 
 The canary rolls a new version of the member assistant out to 20%, 50% and
 then every member, and an LLM judge decides at each step. Scripted members
-(`demos/card-callers`, four of them, signed in like Ellen, two conversations
+(`services/card-callers`, four of them, signed in like Ellen, two conversations
 at a time) give it traffic; every third conversation disputes a payment.
 
 ```bash
@@ -370,7 +370,7 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
 
 - **The card tools act on the member the edge asserts.** Omnia sends the
   email the portal asserted on every tool call (`X-Omnia-User-Email`), and the
-  card system (`demos/mortgage-underwriting/cards.go`) acts on that member's
+  card system (`services/mortgage-underwriting/cards.go`) acts on that member's
   card. A call with no member is refused (401). Omnia forwards that email
   whether or not the member's token was verified, and tells tools nothing about
   which, so the card system trusts the edge exactly as far as edgeTrust does.
@@ -422,7 +422,7 @@ member" in its system prompt: only that caller's notes, never Ellen's. Checked
   **Sessions** and click the row.
 - **A policy change takes effect on the next new session.**
 - **The site is compiled into the binary** (`go:embed all:site`): a change to
-  `demos/demo-sites/site/larkmere-mutual/**` needs the image rebuilt.
+  `services/demo-sites/site/larkmere-mutual/**` needs the image rebuilt.
 - **Deterministic mode is out of date.** `piiChat.deterministic` still replays
   the old SSN-in-chat script; rewrite it before relying on it for a recording.
 

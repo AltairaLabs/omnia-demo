@@ -7,7 +7,7 @@
 # would render a chat panel that answers nothing, which looks like a broken
 # product rather than a disabled demo.
 #
-# The site is embedded in the demo-sites binary (demos/demo-sites), one image
+# The site is embedded in the demo-sites binary (services/demo-sites), one image
 # for every brand, so there is no ConfigMap, no volume and nothing to keep in
 # step at runtime. --site picks Larkmere Mutual's.
 apiVersion: apps/v1

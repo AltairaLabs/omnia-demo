@@ -9,7 +9,7 @@
 # agent in its own workspace (ellens-assistant), and it is not a fourth
 # company in the cast. Its protocol side (keys, User IDs, discovery and the
 # conversations themselves) is the personal-agent service
-# (demos/personal-agent), which these tools call. The model never sees a key,
+# (services/personal-agent), which these tools call. The model never sees a key,
 # a User ID or a Session JWT.
 #
 # The chart ships a COMPILED pack

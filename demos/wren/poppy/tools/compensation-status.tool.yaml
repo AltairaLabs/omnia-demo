@@ -1,7 +1,7 @@
 # The model's descriptor for compensation_status. The ToolRegistry binding
 # (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
 # Served by the wren-account stub's POST /api/account/compensation
-# (demos/mortgage-underwriting/compensation.go), behind the on-behalf-of guard
+# (services/mortgage-underwriting/compensation.go), behind the on-behalf-of guard
 # (obo.go). A read: compensation is paid automatically, and this only reports
 # it.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

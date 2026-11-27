@@ -1,7 +1,7 @@
 {{- if .Values.piiChat.enabled }}
 {{- $ns := .Values.namespace }}
 ---
-# The member assistant's card system (demos/mortgage-underwriting/cards.go):
+# The member assistant's card system (services/mortgage-underwriting/cards.go):
 # look up, freeze and unfreeze the signed-in member's card.
 #
 # No tool takes an argument that names the member. The runtime sends the

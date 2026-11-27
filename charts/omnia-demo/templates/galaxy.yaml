@@ -5,7 +5,7 @@
 {{- $memSA := printf "memory-%s-%s" $ws .Values.galaxy.serviceGroup }}
 {{- $image := include "omnia-demo.image" (dict "root" $ "image" .Values.galaxy.image) }}
 ---
-# The memory Galaxy: a generated corpus (demos/memory-galaxy) of what members
+# The memory Galaxy: a generated corpus (services/memory-galaxy) of what members
 # talk about and what the society knows, across every tier, replayed by the
 # memory-seeder. This MemoryPolicy is the vocabulary it uses; the Workspace's
 # memory service points at it (policyRef, workspace.yaml).

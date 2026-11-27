@@ -6,7 +6,7 @@
 //
 //   - the personal-agent service's tool surface: POST /tools/<name> with the
 //     tool's arguments as the JSON body, answering the same shapes as
-//     demos/personal-agent/server.go ({"error": "..."} with a 4xx on refusal);
+//     services/personal-agent/server.go ({"error": "..."} with a 4xx on refusal);
 //   - the Companies' Poppy agents (Larkmere Mutual, Wrenmoor Energy, and Halvern
 //     Partners as a company Ellen has no account at), as fixed scripts.
 //

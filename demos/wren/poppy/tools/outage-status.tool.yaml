@@ -1,7 +1,7 @@
 # The model's descriptor for outage_status. The ToolRegistry binding
 # (charts/omnia-demo/templates/poppy-wrenmoor-tools.yaml) is kept in step.
 # Served by the Wrenmoor stub's POST /wren/outage-status
-# (demos/mortgage-underwriting/outages.go), which is public and needs no
+# (services/mortgage-underwriting/outages.go), which is public and needs no
 # signed-in customer.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool

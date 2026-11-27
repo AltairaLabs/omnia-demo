@@ -1,7 +1,7 @@
 # The model's descriptor for claim_add_item. The ToolRegistry binding
 # (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
 # Served by the claims-systems stub's POST /api/claims/add-item
-# (demos/mortgage-underwriting/homeclaims.go), behind the on-behalf-of guard
+# (services/mortgage-underwriting/homeclaims.go), behind the on-behalf-of guard
 # (obo.go): only a claim the signed-in member reported is found.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool

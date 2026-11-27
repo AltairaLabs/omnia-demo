@@ -39,8 +39,8 @@ list.
 
 ## How it's wired
 
-- **The portal page:** `demos/demo-sites/site/larkmere-mutual/ui_kits/portal/MyData.jsx`.
-- **The proxy:** `myDataProxy` in `demos/demo-sites/server.go`. It forwards
+- **The portal page:** `services/demo-sites/site/larkmere-mutual/ui_kits/portal/MyData.jsx`.
+- **The proxy:** `myDataProxy` in `services/demo-sites/server.go`. It forwards
   only the page's routes, signs a token for Ellen with the audience
   `larkmere-members`, and passes nothing of the browser's.
 - **The Workspace:** `spec.endUserAuth.oidc` names the portal's issuer and

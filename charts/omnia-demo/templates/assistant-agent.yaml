@@ -67,7 +67,7 @@ spec:
   # Trust the assistant's page as the edge. The facade's external listener
   # rejects an unauthenticated browser, so the page proxies the conversation
   # server-side and asserts who is asking in headers the browser cannot set
-  # (demos/demo-sites/server.go). edgeTrust reads them as-is, as a real
+  # (services/demo-sites/server.go). edgeTrust reads them as-is, as a real
   # deployment does behind an API gateway; anyone who can reach the facade's
   # port can assert any user, so network controls are what make it safe
   # (docs/stand-ins.md, "Front doors"). The defaults are what the sites send

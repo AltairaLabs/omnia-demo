@@ -19,7 +19,7 @@ set -euo pipefail
 # personal-agent-identity, run this again before the next make demos: it
 # creates whichever Secret is missing and leaves the other alone.
 #
-# Two keys, PKCS#8 PEM, as demos/personal-agent/identity.Load reads them:
+# Two keys, PKCS#8 PEM, as services/personal-agent/identity.Load reads them:
 #   es256.pem   ECDSA P-256 (ES256)
 #   ps384.pem   RSA 3072 (PS384)
 # And token.key: 32 random bytes, one line of standard base64 (openssl rand

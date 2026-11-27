@@ -4,7 +4,7 @@
 #
 # The member rang from the signed-in portal, so the edge has already verified
 # them, exactly as for the chat: the card tools act on that member's card and
-# no other (demos/mortgage-underwriting/cards.go). Nothing here is a security
+# no other (services/mortgage-underwriting/cards.go). Nothing here is a security
 # control.
 #
 # No memory_context: a duplex session refuses ambient retrieval (the realtime

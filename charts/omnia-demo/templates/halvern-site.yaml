@@ -3,7 +3,7 @@
 ---
 # Halvern Partners' websites: the public site, the Practice Desk (the internal
 # view of client engagements and the agents deployed at each client) and the
-# design-system reference. The demo-sites binary (demos/demo-sites) with
+# design-system reference. The demo-sites binary (services/demo-sites) with
 # --site halvern-partners, the same image as every other brand's site.
 #
 # Serve it through the catalogue's proxy (catalogue.proxies) at

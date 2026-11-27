@@ -8,7 +8,7 @@
 # OPENAI_API_KEY has no SharePoint or memory tools to retrieve from and will
 # fail the grounded-answer assertions: that is expected, not a kit bug.
 #
-# The expected answers come from the synthetic corpus in sample-docs/gen.go.
+# The expected answers come from the synthetic corpus in services/sharepoint-adapter/sample-docs/gen.go.
 #
 # Fleet run: an ArenaJob naming this config, the rag-hero agent as the default
 # provider, and a Provider for the `selfplay` group (also used as the judge).

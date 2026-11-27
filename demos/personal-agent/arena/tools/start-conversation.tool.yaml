@@ -1,7 +1,7 @@
 # The model's descriptor for start_conversation. The ToolRegistry binding
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/start_conversation
-# (demos/personal-agent/server.go): opens a PAP conversation (§8.3) with the
+# (services/personal-agent/server.go): opens a PAP conversation (§8.3) with the
 # company's first agent and sends the first message, as Ellen's assistant.
 # A message, once sent, cannot be taken back.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

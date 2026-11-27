@@ -4,7 +4,7 @@
 ---
 # Ellen's assistant's page: a phone-shaped chat with her assistant, and a
 # strip of its conversations with the companies. The demo-sites binary
-# (demos/demo-sites) with --site ellens-assistant; the page is embedded in the
+# (services/demo-sites) with --site ellens-assistant; the page is embedded in the
 # one image, so there is no ConfigMap and no volume.
 #
 # STAND-IN (docs/stand-ins.md, "Personal Agent"). It fakes the person's own

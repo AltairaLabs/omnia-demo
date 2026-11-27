@@ -3,7 +3,7 @@
 {{- $domain := required "poppy.domain" .Values.poppy.domain }}
 {{- $acct := .Values.poppy.account }}
 {{- /* The account tools of each Company: the routes its stub serves behind the
-     on-behalf-of guard (demos/mortgage-underwriting/obo.go), the Service that
+     on-behalf-of guard (services/mortgage-underwriting/obo.go), the Service that
      serves them, and the one scope the stub checks on every route. One scope
      per Company, so the customer consents once. */}}
 {{- $companies := dict

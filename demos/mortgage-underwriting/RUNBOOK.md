@@ -39,7 +39,7 @@ kubectl -n <ns> logs deploy/mortgage-income-verify | grep -c 'tool request recei
 ```
 
 **Nothing in the tool refuses anything.** `verifyIncome` in
-`demos/mortgage-underwriting/server.go` never reads `evidence` — it returns a
+`services/mortgage-underwriting/server.go` never reads `evidence` — it returns a
 verdict for any known case. The only component that can refuse is the policy
 broker. Check it directly if asked:
 
@@ -160,7 +160,7 @@ from it, so a pack built without the merge never fires either DSA-114 rule.
 
 - **On kind, to run a local build instead:**
   ```bash
-  docker build -f demos/mortgage-underwriting/Dockerfile -t omnia-income-verify-stub:dev .
+  docker build -f services/mortgage-underwriting/Dockerfile -t omnia-income-verify-stub:dev .
   kind load docker-image omnia-income-verify-stub:dev --name <cluster>
   helm upgrade ... --set mortgageUnderwriting.image.repository=omnia-income-verify-stub \
                    --set mortgageUnderwriting.image.tag=dev

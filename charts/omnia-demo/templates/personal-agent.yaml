@@ -6,7 +6,7 @@
 # The personal-agent service: the protocol side of Ellen's assistant, a
 # Personal Agent under the Personal Agent Protocol (PAP 1.0).
 #
-# STAND-IN (docs/stand-ins.md, "Personal Agent"; demos/personal-agent/main.go).
+# STAND-IN (docs/stand-ins.md, "Personal Agent"; services/personal-agent/main.go).
 #   Fakes: the person's own AI assistant, and the vendor that runs it.
 #   Real system: a consumer Personal Agent run by another company on its own
 #     infrastructure, with its own users and sign-in.

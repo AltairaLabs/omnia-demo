@@ -59,7 +59,7 @@ members must never read. An item with no source_ref (the Galaxy's) is dropped.
 {{- end -}}
 
 {{/*
-The `iss` of a front door's identity provider (demos/demoidp), and the base of
+The `iss` of a front door's identity provider (services/demoidp), and the base of
 its JWKS URL (<issuer>/.well-known/jwks.json): the in-cluster address of its
 Service, which is where Omnia's mint fetches the keys. The install lists each
 in the operator's delegation.trustedIssuers.
@@ -157,7 +157,7 @@ poppy.account.tokenURL, required. Call with the root context.
 {{- end -}}
 
 {{/*
-The account-route args of a stub (demos/mortgage-underwriting, main.go): the
+The account-route args of a stub (services/mortgage-underwriting, main.go): the
 Company's account routes, guarded by the check of the on-behalf-of token
 (obo.go), when Company sign-in is on and this tenant is that Company. Renders
 nothing otherwise. Call with (dict "root" $ "company" "larkmere"|"wrenmoor")

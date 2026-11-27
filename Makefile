@@ -54,12 +54,12 @@ IMAGE_ENV := .images.env
 # name,build context,Dockerfile — the images publish.yml builds, by repository.
 IMAGES := \
   omnia-demo-memory-ingestion,memory-ingestion,memory-ingestion/Dockerfile \
-  omnia-demo-memory-seeder,.,demos/memory-seeder/Dockerfile \
-  omnia-demo-mortgage-underwriting,.,demos/mortgage-underwriting/Dockerfile \
-  omnia-demo-personal-agent,.,demos/personal-agent/Dockerfile \
-  omnia-demo-sharepoint-adapter,.,demos/sharepoint-adapter/Dockerfile \
-  omnia-demo-sites,.,demos/demo-sites/Dockerfile \
-  omnia-demo-analyst-sandbox,demos/analyst-sandbox,demos/analyst-sandbox/Dockerfile
+  omnia-demo-memory-seeder,.,services/memory-seeder/Dockerfile \
+  omnia-demo-mortgage-underwriting,.,services/mortgage-underwriting/Dockerfile \
+  omnia-demo-personal-agent,.,services/personal-agent/Dockerfile \
+  omnia-demo-sharepoint-adapter,.,services/sharepoint-adapter/Dockerfile \
+  omnia-demo-sites,.,services/demo-sites/Dockerfile \
+  omnia-demo-analyst-sandbox,services/analyst-sandbox,services/analyst-sandbox/Dockerfile
 
 .PHONY: demos builder lint images azure-tenant azure-tenant-remove azure-identity azure-poppy azure-memory omnia-values
 

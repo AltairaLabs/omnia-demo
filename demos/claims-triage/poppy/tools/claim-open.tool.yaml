@@ -2,7 +2,7 @@
 # (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step: the
 # description and input schema are the same, because a drifted schema breaks
 # dispatch. Served by the claims-systems stub's POST /api/claims/open
-# (demos/mortgage-underwriting/homeclaims.go), on Larkmere's public host,
+# (services/mortgage-underwriting/homeclaims.go), on Larkmere's public host,
 # behind the on-behalf-of guard (obo.go): it acts as the signed-in member and
 # refuses a request without their exchanged token.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

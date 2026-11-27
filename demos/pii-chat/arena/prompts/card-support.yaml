@@ -7,7 +7,7 @@
 # card tools act on that user's card and no other. So the prompt never asks
 # who the member is, and nothing here is a security control: identity is the
 # edge's job, and which card a tool touches is the card system's
-# (demos/mortgage-underwriting/cards.go). A prompt is guidance.
+# (services/mortgage-underwriting/cards.go). A prompt is guidance.
 #
 # The case-note instruction is load-bearing. NOTHING in Omnia extracts
 # memories from a conversation on its own: memory__remember is model-driven.

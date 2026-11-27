@@ -9,7 +9,7 @@
 # tokens @LARKMERE_DOMAIN@ and @WRENMOOR_DOMAIN@ here, and the chart
 # (templates/assistant-agent.yaml) fills them from knownCompanies, so the pack
 # carries no host of any one install. Ellen's postcode is her Wrenmoor account's (wrenEllen in
-# demos/mortgage-underwriting/wrendata.go).
+# services/mortgage-underwriting/wrendata.go).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
 metadata:

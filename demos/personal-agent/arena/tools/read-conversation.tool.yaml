@@ -1,7 +1,7 @@
 # The model's descriptor for read_conversation. The ToolRegistry binding
 # (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
 # Served by the personal-agent service's POST /tools/read_conversation
-# (demos/personal-agent/server.go): what the conversation's background Reader
+# (services/personal-agent/server.go): what the conversation's background Reader
 # has stored. It never calls the company itself, and never waits: a reply
 # that arrives later wakes the assistant through Ellen's page.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

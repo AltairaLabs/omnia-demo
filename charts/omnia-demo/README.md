@@ -84,10 +84,10 @@ Wrenmoor Energy, the wind and solar supplier, has four agents and a website:
   and `switch_tariff` is refused without the `consent_id` that click creates,
   by the ToolPolicy before dispatch and by the account system after it.
 - `wrenmoorSite` — the public website, the customer portal and the Wrenmoor
-  Hub intranet (`demos/demo-sites`, `--site wrenmoor-energy`). Serve it
+  Hub intranet (`services/demo-sites`, `--site wrenmoor-energy`). Serve it
   through the catalogue at `/wrenmoor-energy`; it needs no rewrites.
 - `halvernSite` — Halvern Partners' public website, Practice Desk and
-  design-system reference (`demos/demo-sites`, `--site halvern-partners`).
+  design-system reference (`services/demo-sites`, `--site halvern-partners`).
   Serve it through the catalogue at `/halvern-partners`; no rewrites.
 
 - `incidentAgent` — the on-call incident agent (chat). It reads alerts, logs
@@ -156,7 +156,7 @@ helm upgrade --install omnia-demo oci://ghcr.io/altairalabs/charts/omnia-demo \
 ### The memory Galaxy
 
 `galaxy.enabled` seeds the workspace's memory with a generated corpus (the
-Larkmere Mutual Galaxy, from [`demos/memory-galaxy`](../../demos/memory-galaxy/))
+Larkmere Mutual Galaxy, from [`services/memory-galaxy`](../../services/memory-galaxy/))
 across all four tiers, sends the institutional tier as a knowledge graph, and
 fits the Galaxy's clusters. It also installs the MemoryPolicy that declares the
 corpus's types and relations (`<workspace>-memory`, or `galaxy.policyName`) and

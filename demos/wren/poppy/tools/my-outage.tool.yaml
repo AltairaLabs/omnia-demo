@@ -1,7 +1,7 @@
 # The model's descriptor for my_outage. The ToolRegistry binding
 # (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
 # Served by the wren-account stub's POST /api/account/outage
-# (demos/mortgage-underwriting/compensation.go), on Wrenmoor's public host,
+# (services/mortgage-underwriting/compensation.go), on Wrenmoor's public host,
 # behind the on-behalf-of guard (obo.go): the customer is the one the
 # exchanged token names, never one named in the conversation.
 apiVersion: promptkit.altairalabs.ai/v1alpha1

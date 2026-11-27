@@ -3,7 +3,7 @@
 # @LARKMERE_DOMAIN@ and @WRENMOOR_DOMAIN@ tokens (here and in the other tools)
 # are filled by the chart from personalAgent.knownCompanies.
 # Served by the personal-agent service's POST /tools/find_company
-# (demos/personal-agent/server.go): PAP discovery (§3) of a domain's
+# (services/personal-agent/server.go): PAP discovery (§3) of a domain's
 # /.well-known/poppy.json. Reads public documents only.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool

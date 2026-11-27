@@ -116,7 +116,7 @@ mortgageUnderwriting:
   enabled: false
 
   # Stub standing in for the case systems and the approved third-party
-  # income-verification supplier. Built from demos/mortgage-underwriting.
+  # income-verification supplier. Built from services/mortgage-underwriting.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
     # Empty: the chart's appVersion.
@@ -397,7 +397,7 @@ piiChat:
   # what makes session-api's ai_disclosure_delivered column mean something.
   portal:
     enabled: false
-    # Built from demos/demo-sites, the one image for every brand's site, run
+    # Built from services/demo-sites, the one image for every brand's site, run
     # with --site larkmere-mutual. The site is embedded in the binary, so
     # there is no ConfigMap and nothing to keep in step at runtime.
     image:
@@ -456,7 +456,7 @@ piiChat:
     # annotations, so the judge can reach a keyless Provider.
     # `make azure-identity` federates it.
     evalWorkerServiceAccount: eval-worker
-    # Scripted callers (demos/card-callers, in the sites image). Scaled to 0
+    # Scripted callers (services/card-callers, in the sites image). Scaled to 0
     # until `make canary` starts them.
     # Stand-in for live traffic: enough for the gate to judge, and no more
     # than gpt-4o's quota takes (150K TPM on the demo deployment), which the agent
@@ -562,7 +562,7 @@ incidentAgent:
   enabled: false
 
   # The on-call back end: alerts, logs, deploys, and the actions on them. Same
-  # image and same Go binary as the mortgage stubs (demos/mortgage-underwriting,
+  # image and same Go binary as the mortgage stubs (services/mortgage-underwriting,
   # wrenmoor.go). State is in memory: a rollback shows in the deploy history
   # until the pod restarts, which puts the seeded incident back for the next
   # take.
@@ -676,7 +676,7 @@ analystWorkbench:
   providerRef: ""
   enabled: false
   # -- The sandbox image: Omnia's codegen sandbox plus Python, pandas and
-  # matplotlib (demos/analyst-sandbox).
+  # matplotlib (services/analyst-sandbox).
   image:
     repository: ghcr.io/altairalabs/omnia-demo-analyst-sandbox
     # Empty: the chart's appVersion.
@@ -744,7 +744,7 @@ wren:
 
   # The account system: Amira's bills, usage, weather, tariffs, and the
   # consent and receipt routes. Same image as the mortgage stubs
-  # (demos/mortgage-underwriting, wren.go). In memory, so a pod restart puts
+  # (services/mortgage-underwriting, wren.go). In memory, so a pod restart puts
   # Amira back on Moor Steady for the next take.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
@@ -776,7 +776,7 @@ wren:
 # ---------------------------------------------------------------------------
 wrenmoorSite:
   enabled: false
-  # Built from demos/demo-sites, the one image for every brand's site.
+  # Built from services/demo-sites, the one image for every brand's site.
   image:
     repository: ghcr.io/altairalabs/omnia-demo-sites
     # Empty: the chart's appVersion.
@@ -850,7 +850,7 @@ catalogue:
 # ---------------------------------------------------------------------------
 # galaxy — the memory Galaxy (Larkmere Mutual)
 #
-# A generated corpus (demos/memory-galaxy) of what members talk about and what
+# A generated corpus (services/memory-galaxy) of what members talk about and what
 # the society knows, across the user, user_for_agent, agent and institutional
 # tiers, with the institutional knowledge graph. The memory-seeder image embeds
 # it; a Job replays it as memory-api's own ServiceAccount, then fits the
@@ -859,7 +859,7 @@ catalogue:
 # ---------------------------------------------------------------------------
 galaxy:
   enabled: false
-  # Directory under demos/memory-seeder/fixtures/.
+  # Directory under services/memory-seeder/fixtures/.
   fixture: larkmere-galaxy
   # AgentRuntimes the corpus writes agent and user_for_agent memories for.
   agents: [pii-chat, claims-triage, mortgage-underwriting]
@@ -1076,7 +1076,7 @@ poppy:
 # consumer Personal Agent run by another company (docs/stand-ins.md, "Personal
 # Agent"). Not a Company: it lives in its own workspace (profile
 # ellens-assistant). Two parts:
-#   - the personal-agent service (demos/personal-agent): the Personal Agent's
+#   - the personal-agent service (services/personal-agent): the Personal Agent's
 #     keys, User IDs, discovery and conversations, with its public identity
 #     documents at https://<host>/agent.json and /jwks.json;
 #   - the assistant agent (AgentRuntime `assistant`, websocket facade), whose

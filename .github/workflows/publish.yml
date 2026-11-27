@@ -6,12 +6,12 @@ on:
     tags: ['v*']
     paths:
       - memory-ingestion/**
-      - demos/memory-seeder/**
-      - demos/mortgage-underwriting/**
-      - demos/personal-agent/**
-      - demos/sharepoint-adapter/**
-      - demos/demo-sites/**
-      - demos/analyst-sandbox/**
+      - services/memory-seeder/**
+      - services/mortgage-underwriting/**
+      - services/personal-agent/**
+      - services/sharepoint-adapter/**
+      - services/demo-sites/**
+      - services/analyst-sandbox/**
       - .github/workflows/publish.yml
   workflow_dispatch:
 
@@ -31,30 +31,30 @@ jobs:
             image: ghcr.io/altairalabs/omnia-demo-memory-ingestion
           - name: memory-seeder
             context: .
-            file: demos/memory-seeder/Dockerfile
+            file: services/memory-seeder/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-memory-seeder
           - name: mortgage-underwriting
             context: .
-            file: demos/mortgage-underwriting/Dockerfile
+            file: services/mortgage-underwriting/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-mortgage-underwriting
           - name: personal-agent
             context: .
-            file: demos/personal-agent/Dockerfile
+            file: services/personal-agent/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-personal-agent
           - name: sharepoint-adapter
             context: .
-            file: demos/sharepoint-adapter/Dockerfile
+            file: services/sharepoint-adapter/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-sharepoint-adapter
           # Every demo company's customer-facing site in one image; the
           # chart picks the brand with --site.
           - name: demo-sites
             context: .
-            file: demos/demo-sites/Dockerfile
+            file: services/demo-sites/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-sites
           # The analyst workbench sandbox: Omnia's codegen sandbox plus Python.
           - name: analyst-sandbox
-            context: demos/analyst-sandbox
-            file: demos/analyst-sandbox/Dockerfile
+            context: services/analyst-sandbox
+            file: services/analyst-sandbox/Dockerfile
             image: ghcr.io/altairalabs/omnia-demo-analyst-sandbox
     steps:
       - uses: actions/checkout@v4

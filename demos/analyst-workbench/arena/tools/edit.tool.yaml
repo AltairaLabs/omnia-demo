@@ -1,7 +1,7 @@
 # The codegen sandbox's own Edit tool, as its MCP server describes it. The
 # runtime serves it from the sandbox (ToolRegistry analyst-workbench-tools);
 # the pack carries the schema the model is shown. Keep in step with the
-# sandbox image (demos/analyst-sandbox).
+# sandbox image (services/analyst-sandbox).
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Tool
 metadata:

@@ -70,7 +70,7 @@ piiChat: { image: { tag: sha-682590d }, portal: { image: { tag: sha-682590d } } 
 incidentAgent: { image: { tag: sha-682590d } }
 dataAnalyst: { image: { tag: sha-682590d } }
 # wren's image is the account stub (wren-account). For the Poppy demo it must
-# serve POST /wren/outage-status (demos/mortgage-underwriting/outages.go); an
+# serve POST /wren/outage-status (services/mortgage-underwriting/outages.go); an
 # image from before that route answers 404 and wrenmoor-outages has no
 # outage to report. demos/personal-agent/RUNBOOK.md, Checks, tests it.
 wren: { image: { tag: sha-682590d } }

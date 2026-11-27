@@ -38,7 +38,7 @@ spec:
   mode: mock
   timeout_ms: 30000
   # Branches on claim_ref so the kit can work the three claims the demo turns
-  # on (the same figures as demos/mortgage-underwriting/claimsdata.go). Default
+  # on (the same figures as services/mortgage-underwriting/claimsdata.go). Default
   # is the claim under the limit; an unknown reference is a not-found.
   mock_template: |
     {{- if eq .claim_ref "LM-40718" -}}

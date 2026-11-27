@@ -37,7 +37,7 @@ Verified live 2026-11-12, and again 2026-11-14 on Omnia main `6359a66ac480`.
 
 ## Gotchas
 
-- **The ops system is a stub** (`demos/mortgage-underwriting/wrenmoor.go`),
+- **The ops system is a stub** (`services/mortgage-underwriting/wrenmoor.go`),
   fresh per pod: restart `deploy/wrenmoor-ops` to undo a rollback between
   takes.
 - More scenarios to try, each with its expected behaviour, are in

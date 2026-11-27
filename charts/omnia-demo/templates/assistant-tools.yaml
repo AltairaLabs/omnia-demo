@@ -6,7 +6,7 @@
 {{- $pa := printf "http://personal-agent.%s:8080/tools" $ns }}
 ---
 # Ellen's assistant's six tools, all on the personal-agent service
-# (demos/personal-agent/server.go), reached in-cluster; the public HTTPRoute
+# (services/personal-agent/server.go), reached in-cluster; the public HTTPRoute
 # never routes /tools/*:
 #
 #   find_company         PAP discovery of a domain (reads public documents)

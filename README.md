@@ -8,10 +8,14 @@ documents its prerequisites and can be enabled or disabled through values.
 
 ## Examples
 
-- [`demos/`](demos/) — PromptArena sources and synthetic back-end services for
-  the demo cast's agents: Larkmere Mutual (mortgage underwriting, claims
-  triage, card support) and Wrenmoor Energy (on-call incident agent, grid data
-  analyst, field-service copilot).
+- [`demos/`](demos/) — PromptArena sources (kits, pack patches, canary evals)
+  and runbooks for the demo cast's agents: Larkmere Mutual (mortgage
+  underwriting, claims triage, card support) and Wrenmoor Energy (on-call
+  incident agent, grid data analyst, field-service copilot).
+- [`services/`](services/) — the synthetic back-end services and stand-ins
+  those agents call: the demo sites, the demo identity provider, the claims,
+  account and case stubs, the Personal Agent, the SharePoint adapter and the
+  memory seeder.
 - [`docs/testing-agents.md`](docs/testing-agents.md) — the PromptArena kits
   that measure every demo agent, and turning a bad live session into a scenario.
 - [`memory-ingestion/`](memory-ingestion/) — a public Azure Blob source

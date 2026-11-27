@@ -58,4 +58,4 @@ kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" 
   it the weather?"* should make it read them (not yet tried).
 - **Without the click, the switch is refused twice:** by the ToolPolicy if the
   call carries no `consent_id`, and by the account system if the id was never
-  issued (`demos/mortgage-underwriting/wren.go`).
+  issued (`services/mortgage-underwriting/wren.go`).

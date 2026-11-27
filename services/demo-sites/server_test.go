@@ -1,0 +1,661 @@
+package main
+
+import (
+	"bufio"
+	"compress/gzip"
+	"context"
+	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/AltairaLabs/omnia-demo/services/demoidp"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func serve(t *testing.T, name, agentURL, backendURL string) *httptest.Server {
+	t.Helper()
+	b, err := lookupBrand(name, member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, agentURL, "", backendURL, nil, endUserPlane{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func get(t *testing.T, url string) (*http.Response, string) {
+	t.Helper()
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := client.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(resp.Body)
+	return resp, string(body)
+}
+
+func TestEveryBrandServesItsPagesAndTheSharedScripts(t *testing.T) {
+	pages := map[string][]string{
+		"larkmere-mutual":  {"/ui_kits/marketing/", "/ui_kits/portal/"},
+		"wrenmoor-energy":  {"/ui_kits/marketing/", "/ui_kits/portal/", "/ui_kits/intranet/"},
+		"halvern-partners": {"/ui_kits/marketing/", "/ui_kits/practice-desk/", "/ui_kits/design-system/", "/tokens/fonts.css", "/assets/larkmere-logo-lockup.svg"},
+		"ellens-assistant": {"/ui_kits/phone/", "/styles.css", "/tokens/colors.css", "/assets/favicon.svg"},
+	}
+	shared := []string{"/react-shim.js", "/vendor/react.production.min.js", "/vendor/react-dom.production.min.js"}
+	for name, paths := range pages {
+		srv := serve(t, name, "http://127.0.0.1:1", "")
+		for _, p := range append(paths, shared...) {
+			if resp, _ := get(t, srv.URL+p); resp.StatusCode != http.StatusOK {
+				t.Errorf("%s %s: status %d", name, p, resp.StatusCode)
+			}
+		}
+	}
+}
+
+func TestBrandsDoNotLeakIntoEachOther(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, srv.URL+"/assets/logo-mark.svg"); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("Larkmere's logo served under Wrenmoor: status %d", resp.StatusCode)
+	}
+}
+
+func TestRootRedirectIsRelative(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	resp, _ := get(t, srv.URL+"/")
+	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "ui_kits/marketing/" {
+		t.Fatalf("root: %d -> %q", resp.StatusCode, resp.Header.Get("Location"))
+	}
+}
+
+func TestJSXIsJavaScript(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	resp, _ := get(t, srv.URL+"/ui_kits/portal/App.jsx")
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/javascript") {
+		t.Fatalf("App.jsx content type %q", ct)
+	}
+}
+
+func TestTextIsGzipped(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+"/vendor/react-dom.production.min.js", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	// A bare Transport, so the client does not ask for and undo gzip itself.
+	resp, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	zr, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatalf("not gzip (encoding %q): %v", resp.Header.Get("Content-Encoding"), err)
+	}
+	body, _ := io.ReadAll(zr)
+	if resp.Header.Get("Content-Encoding") != "gzip" || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/javascript") || len(body) < 100000 {
+		t.Fatalf("encoding %q type %q, %d bytes", resp.Header.Get("Content-Encoding"), resp.Header.Get("Content-Type"), len(body))
+	}
+	if resp.Header.Get("Cache-Control") == "" {
+		t.Fatal("vendored script served without Cache-Control")
+	}
+	// A photo is not recompressed.
+	req, _ = http.NewRequest(http.MethodGet, srv.URL+"/assets/photos/hero-moor.jpg", nil)
+	req.Header.Set("Accept-Encoding", "gzip")
+	resp2, err := (&http.Transport{DisableCompression: true}).RoundTrip(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp2.Body.Close()
+	if resp2.Header.Get("Content-Encoding") != "" {
+		t.Fatal("a jpeg was gzipped")
+	}
+}
+
+func TestUnknownBrand(t *testing.T) {
+	if _, err := lookupBrand("acme", member{}); err == nil {
+		t.Fatal("an unknown site should be an error")
+	}
+}
+
+func TestMemberOverride(t *testing.T) {
+	b, err := lookupBrand("wrenmoor-energy", member{email: "someone@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.who.id != "40021187" || b.who.email != "someone@example.com" {
+		t.Fatalf("override: %+v", b.who)
+	}
+}
+
+// The proxy asserts the site's identity and drops whatever the browser said.
+func TestAssistantProxyAssertsIdentity(t *testing.T) {
+	var got http.Header
+	var path string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, path = r.Header.Clone(), r.URL.Path
+	}))
+	defer agent.Close()
+	srv := serve(t, "wrenmoor-energy", agent.URL, "")
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("x-user-id", "someone-else")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if path != "/ws" || got.Get("x-user-id") != "40021187" || got.Get("x-user-roles") != "customer" {
+		t.Fatalf("path %q, headers %v", path, got)
+	}
+}
+
+func TestAssistantRefusesCrossOrigin(t *testing.T) {
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", "")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("Origin", "https://elsewhere.example")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin: status %d", resp.StatusCode)
+	}
+}
+
+func TestAccountProxy(t *testing.T) {
+	var gotPath, gotUser, gotMethod, gotEmail, gotCookie string
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath, gotUser, gotMethod = r.URL.Path, r.Header.Get("X-Omnia-User-Id"), r.Method
+		gotEmail, gotCookie = r.Header.Get("X-Omnia-User-Email"), r.Header.Get("Cookie")
+		_, _ = io.WriteString(w, "{}")
+	}))
+	defer backend.Close()
+	srv := serve(t, "wrenmoor-energy", "http://127.0.0.1:1", backend.URL)
+
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+consentPath, strings.NewReader(`{"tariff":"moor-flex"}`))
+	req.Header.Set("X-Omnia-User-Id", "someone-else")
+	req.Header.Set("X-Omnia-User-Email", "someone@else.example")
+	req.Header.Set("Cookie", "session=operator")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if gotPath != "/wren/consent" || gotUser != "40021187" || gotMethod != http.MethodPost {
+		t.Fatalf("consent forwarded as %s %s user %q", gotMethod, gotPath, gotUser)
+	}
+	if gotEmail != "" || gotCookie != "" {
+		t.Fatalf("browser identity passed through: email %q cookie %q", gotEmail, gotCookie)
+	}
+
+	if resp, _ := get(t, srv.URL+receiptsPath+"?session=s1"); resp.StatusCode != http.StatusOK || gotPath != "/wren/receipts" {
+		t.Fatalf("receipts: status %d path %q", resp.StatusCode, gotPath)
+	}
+	if resp, _ := get(t, srv.URL+consentPath); resp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("GET consent: status %d", resp.StatusCode)
+	}
+
+	req, _ = http.NewRequest(http.MethodPost, srv.URL+consentPath, strings.NewReader(`{}`))
+	req.Header.Set("Origin", "https://elsewhere.example")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if resp.StatusCode != http.StatusForbidden {
+		t.Fatalf("cross-origin consent: status %d", resp.StatusCode)
+	}
+}
+
+func TestAssistantDropsCookie(t *testing.T) {
+	var gotCookie, gotUser string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotCookie, gotUser = r.Header.Get("Cookie"), r.Header.Get("x-user-id")
+	}))
+	defer agent.Close()
+	srv := serve(t, "wrenmoor-energy", agent.URL, "")
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("Cookie", "session=operator")
+	req.Header.Set("x-user-id", "someone-else")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if gotCookie != "" || gotUser == "someone-else" || gotUser == "" {
+		t.Fatalf("assistant forwarded cookie %q user %q", gotCookie, gotUser)
+	}
+}
+
+// With an issuer, every assistant connection carries a token for the member
+// the site asserts (the browser's own Authorization dropped), and the site
+// serves the issuer's JWKS for the install to trust.
+func TestAssistantForwardsMemberToken(t *testing.T) {
+	var gotAuth string
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+	}))
+	defer agent.Close()
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+assistantPath, nil)
+	req.Header.Set("Authorization", "Bearer from-the-browser")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	tok, ok := strings.CutPrefix(gotAuth, "Bearer ")
+	if !ok || tok == "from-the-browser" || strings.Count(tok, ".") != 2 {
+		t.Fatalf("Authorization forwarded: %q", gotAuth)
+	}
+	if resp, body := get(t, srv.URL+demoidp.JWKSPath); resp.StatusCode != http.StatusOK || !strings.Contains(body, `"RS256"`) {
+		t.Fatalf("jwks: %d %s", resp.StatusCode, body)
+	}
+}
+
+// myDataSite serves Larkmere with My data proxied to mgmt, returning the site
+// and what mgmt last received.
+func myDataSite(t *testing.T) (*httptest.Server, *http.Request) {
+	t.Helper()
+	got := &http.Request{}
+	mgmt := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		*got = *r.Clone(r.Context())
+		_, _ = io.WriteString(w, "{}")
+	}))
+	t.Cleanup(mgmt.Close)
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", iss,
+		endUserPlane{url: mgmt.URL, workspace: "larkmere-mutual", audience: "larkmere-members"}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	t.Cleanup(srv.Close)
+	return srv, got
+}
+
+func do(t *testing.T, method, url string, hdr map[string]string) int {
+	t.Helper()
+	req, _ := http.NewRequest(method, url, strings.NewReader(`{}`))
+	for k, v := range hdr {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	return resp.StatusCode
+}
+
+// My data reaches the member's own end-user routes with a token for the
+// member and the plane's audience; nothing of the browser's passes.
+func TestMyDataForwardsAsTheMember(t *testing.T) {
+	srv, got := myDataSite(t)
+	code := do(t, http.MethodPut, srv.URL+myDataPrefix+"privacy/consent", map[string]string{
+		"Authorization": "Bearer from-the-browser", "Cookie": "session=operator", "X-Omnia-User-Id": "someone-else",
+	})
+	if code != http.StatusOK || got.Method != http.MethodPut ||
+		got.URL.Path != "/api/v1/me/workspaces/larkmere-mutual/privacy/consent" {
+		t.Fatalf("status %d, forwarded %s %s", code, got.Method, got.URL.Path)
+	}
+	if got.Header.Get("Cookie") != "" || got.Header.Get("X-Omnia-User-Id") != "" {
+		t.Fatalf("browser identity passed: %v", got.Header)
+	}
+	tok, ok := strings.CutPrefix(got.Header.Get("Authorization"), "Bearer ")
+	if !ok || tok == "from-the-browser" {
+		t.Fatalf("Authorization %q", got.Header.Get("Authorization"))
+	}
+	claims := jwt.MapClaims{}
+	if _, _, err := jwt.NewParser().ParseUnverified(tok, claims); err != nil {
+		t.Fatal(err)
+	}
+	if claims["sub"] != "4471-889" || claims["aud"] != "larkmere-members" {
+		t.Fatalf("token claims %v", claims)
+	}
+}
+
+// Memories pass only their paging and type filters; nothing names a subject.
+func TestMyDataMemoryQuery(t *testing.T) {
+	srv, got := myDataSite(t)
+	if code := do(t, http.MethodGet, srv.URL+myDataPrefix+"memories?limit=5&virtual_user_id=someone-else", nil); code != http.StatusOK {
+		t.Fatalf("status %d", code)
+	}
+	if got.URL.RawQuery != "limit=5" {
+		t.Fatalf("query %q", got.URL.RawQuery)
+	}
+	if code := do(t, http.MethodDelete, srv.URL+myDataPrefix+"memories/abc-123", nil); code != http.StatusOK ||
+		got.URL.Path != "/api/v1/me/workspaces/larkmere-mutual/memories/abc-123" {
+		t.Fatalf("forget: status %d path %q", code, got.URL.Path)
+	}
+}
+
+// Only My data's routes pass: not the plane's MCP endpoint or opt-outs, not a
+// method a route does not take, not a cross-origin write.
+func TestMyDataRefusals(t *testing.T) {
+	srv, _ := myDataSite(t)
+	for _, c := range []struct {
+		method, path string
+		hdr          map[string]string
+		want         int
+	}{
+		{http.MethodPost, "mcp", nil, http.StatusNotFound},
+		{http.MethodPost, "privacy/opt-out", nil, http.StatusNotFound},
+		{http.MethodDelete, "privacy/consent", nil, http.StatusNotFound},
+		{http.MethodGet, "memories/abc", nil, http.StatusNotFound},
+		{http.MethodDelete, "memories/a%2Fb", nil, http.StatusNotFound},
+		{http.MethodPost, "privacy/erasure", map[string]string{"Origin": "https://elsewhere.example"}, http.StatusForbidden},
+	} {
+		if code := do(t, c.method, srv.URL+myDataPrefix+c.path, c.hdr); code != c.want {
+			t.Errorf("%s %s: status %d, want %d", c.method, c.path, code, c.want)
+		}
+	}
+}
+
+// The issuer's discovery document is served beside its JWKS.
+func TestDiscoveryServed(t *testing.T) {
+	srv, _ := myDataSite(t)
+	if resp, body := get(t, srv.URL+demoidp.DiscoveryPath); resp.StatusCode != http.StatusOK ||
+		!strings.Contains(body, `"jwks_uri":"http://larkmere-portal.test:8080/.well-known/jwks.json"`) {
+		t.Fatalf("discovery: %d %s", resp.StatusCode, body)
+	}
+}
+
+func TestMyDataNeedsIssuer(t *testing.T) {
+	b, _ := lookupBrand("larkmere-mutual", member{})
+	if _, err := newServer(b, "http://127.0.0.1:1", "", "", nil,
+		endUserPlane{url: "http://mgmt", workspace: "w", audience: "a"}, ""); err == nil {
+		t.Fatal("My data without an issuer would forward no credential")
+	}
+}
+
+// With an issuer, the identity headers go only WITH a token for the member: a
+// token that can't be signed refuses the connection, rather than sending the
+// asserted member with nothing to verify them by.
+func TestAssistantRefusesWithoutAToken(t *testing.T) {
+	called := false
+	agent := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+	}))
+	defer agent.Close()
+	iss, err := demoidp.New("http://larkmere-portal.test:8080")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := brands["larkmere-mutual"]
+	b.who.id = "" // demoidp refuses to sign a token for no one
+	h, err := newServer(b, agent.URL, "", "", iss, endUserPlane{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	if code := do(t, http.MethodGet, srv.URL+assistantPath, nil); code != http.StatusBadGateway {
+		t.Fatalf("status %d", code)
+	}
+	if called {
+		t.Fatal("the agent was reached with identity headers and no token")
+	}
+}
+
+func TestAccountRoutesOffWithoutBackend(t *testing.T) {
+	srv := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, srv.URL+receiptsPath); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("receipts without a backend: status %d", resp.StatusCode)
+	}
+}
+
+// The phone line is a second agent behind the same edge: the proxy asserts the
+// same member to it, and serves it at its own path.
+func TestPhoneProxyAssertsIdentity(t *testing.T) {
+	var got http.Header
+	var path string
+	phone := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got, path = r.Header.Clone(), r.URL.Path
+	}))
+	defer phone.Close()
+	b, err := lookupBrand("larkmere-mutual", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", phone.URL, "", nil, endUserPlane{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, srv.URL+phonePath, nil)
+	req.Header.Set("x-user-email", "someone-else@example.com")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if path != "/ws" || got.Get("x-user-email") != b.who.email || got.Get("x-user-id") != b.who.id {
+		t.Fatalf("path %q, headers %v", path, got)
+	}
+}
+
+func TestPhoneOffWithoutAgent(t *testing.T) {
+	srv := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, srv.URL+phonePath); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("phone route with no phone agent: status %d", resp.StatusCode)
+	}
+}
+
+// The page asks whether there is a phone line before it offers a call.
+func TestPhoneStatus(t *testing.T) {
+	b, err := lookupBrand("larkmere-mutual", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "http://127.0.0.1:2", "", nil, endUserPlane{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	on := httptest.NewServer(h)
+	defer on.Close()
+	if resp, _ := get(t, on.URL+phoneStatusPath); resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("phone line on: status %d", resp.StatusCode)
+	}
+	off := serve(t, "larkmere-mutual", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, off.URL+phoneStatusPath); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("phone line off: status %d", resp.StatusCode)
+	}
+}
+
+// Ellen's assistant's page reads the personal-agent service through the site:
+// the snapshot, the updates stream (passed on as it arrives, not buffered)
+// and her own lines to a company. Nothing of the browser's identity passes,
+// and only those routes and methods do.
+func TestAssistantSiteProxiesUpdates(t *testing.T) {
+	var mu sync.Mutex
+	got := map[string]http.Header{}
+	var direct string
+	release := make(chan struct{})
+	pa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		got[r.Method+" "+r.URL.Path] = r.Header.Clone()
+		mu.Unlock()
+		switch r.Method + " " + r.URL.Path {
+		case "GET /api/updates":
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprint(w, `data: {"conversation_id":"cnv_1","company":"Wrenmoor Energy","event":{"type":"working","working":true}}`+"\n\n")
+			w.(http.Flusher).Flush()
+			select { // held open, as the real stream is
+			case <-r.Context().Done():
+			case <-release:
+			}
+		case "GET /api/conversations":
+			_, _ = io.WriteString(w, `[]`)
+		case "POST /api/direct":
+			b, _ := io.ReadAll(r.Body)
+			mu.Lock()
+			direct = string(b)
+			mu.Unlock()
+			_, _ = io.WriteString(w, `{"conversation_id":"cnv_2"}`)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer pa.Close()
+	defer close(release)
+
+	b, err := lookupBrand("ellens-assistant", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", nil, endUserPlane{}, pa.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+	browser := map[string]string{
+		"Cookie": "session=operator", "Authorization": "Bearer from-the-browser",
+		"x-user-id": "someone-else", "X-Omnia-User-Id": "someone-else", "X-Omnia-User-Email": "someone@else.example",
+	}
+
+	// The first update arrives while the stream is still open.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, srv.URL+"/api/updates", nil)
+	for k, v := range browser {
+		req.Header.Set(k, v)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != http.StatusOK || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("updates: %d %q", resp.StatusCode, resp.Header.Get("Content-Type"))
+	}
+	sc := bufio.NewScanner(resp.Body)
+	var line string
+	for sc.Scan() {
+		if line = sc.Text(); strings.HasPrefix(line, "data: ") {
+			break
+		}
+	}
+	_ = resp.Body.Close()
+	if !strings.Contains(line, `"conversation_id":"cnv_1"`) {
+		t.Fatalf("no update streamed through the site: %q (%v)", line, sc.Err())
+	}
+
+	if code := do(t, http.MethodGet, srv.URL+"/api/conversations", browser); code != http.StatusOK {
+		t.Fatalf("conversations: status %d", code)
+	}
+	if code := do(t, http.MethodPost, srv.URL+"/api/direct", browser); code != http.StatusOK {
+		t.Fatalf("direct: status %d", code)
+	}
+	mu.Lock()
+	if direct != `{}` {
+		t.Errorf("direct body %q", direct)
+	}
+	for _, route := range []string{"GET /api/updates", "GET /api/conversations", "POST /api/direct"} {
+		hdr, ok := got[route]
+		if !ok {
+			t.Errorf("%s never reached personal-agent", route)
+			continue
+		}
+		for k := range browser {
+			if hdr.Get(k) != "" {
+				t.Errorf("%s: the browser's %s passed through", route, k)
+			}
+		}
+	}
+	mu.Unlock()
+
+	// Only those routes and methods; no cross-origin take-over.
+	for _, c := range []struct {
+		method, path string
+		hdr          map[string]string
+		want         int
+	}{
+		{http.MethodGet, "/api/direct", nil, http.StatusMethodNotAllowed},
+		{http.MethodPost, "/api/updates", nil, http.StatusMethodNotAllowed},
+		{http.MethodPost, "/api/direct", map[string]string{"Origin": "https://elsewhere.example"}, http.StatusForbidden},
+		{http.MethodPost, "/tools/send_message", nil, http.StatusNotFound},
+	} {
+		if code := do(t, c.method, srv.URL+c.path, c.hdr); code != c.want {
+			t.Errorf("%s %s: status %d, want %d", c.method, c.path, code, c.want)
+		}
+	}
+
+	// Without a personal agent, the routes are off.
+	off := serve(t, "ellens-assistant", "http://127.0.0.1:1", "")
+	if resp, _ := get(t, off.URL+"/api/conversations"); resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("conversations with no personal agent: status %d", resp.StatusCode)
+	}
+}
+
+// The sign-in callback is the personal agent's own public route, which the
+// Company's sign-in page redirects to; sign_in is a tool the assistant agent
+// calls. Neither is the page's: through the site both are 404, and neither
+// reaches personal-agent, whatever the method or path spelling.
+func TestAssistantSiteNeverProxiesSignIn(t *testing.T) {
+	var mu sync.Mutex
+	var reached []string
+	pa := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		reached = append(reached, r.Method+" "+r.URL.Path)
+		mu.Unlock()
+		_, _ = io.WriteString(w, `{}`)
+	}))
+	defer pa.Close()
+
+	b, err := lookupBrand("ellens-assistant", member{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := newServer(b, "http://127.0.0.1:1", "", "", nil, endUserPlane{}, pa.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := httptest.NewServer(h)
+	defer srv.Close()
+
+	for _, c := range []struct{ method, path string }{
+		{http.MethodGet, "/signin/callback?state=s&code=c&iss=https%3A%2F%2Fissuer.example"},
+		{http.MethodGet, "/api/signin/callback?state=s&code=c"},
+		{http.MethodPost, "/tools/sign_in"},
+		{http.MethodPost, "/api/tools/sign_in"},
+		{http.MethodPost, "/api/sign_in"},
+		{http.MethodGet, "/api/updates/../../signin/callback"},
+	} {
+		if code := do(t, c.method, srv.URL+c.path, nil); code != http.StatusNotFound {
+			t.Errorf("%s %s: status %d, want 404", c.method, c.path, code)
+		}
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(reached) != 0 {
+		t.Fatalf("sign-in routes reached personal-agent through the site: %v", reached)
+	}
+}
