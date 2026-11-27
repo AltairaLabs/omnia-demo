@@ -83,7 +83,9 @@ type accountConfig struct {
 func (acct accountConfig) register(mux *http.ServeMux, w *wren) {
 	switch acct.api {
 	case accountAPILarkmere:
-		newHomeClaims(time.Now).register(mux, acct.verifier)
+		// The ledger dates a claim by the verifier's clock, so the token's
+		// time and the claim's reported_on come from one clock.
+		newHomeClaims(acct.verifier.now).register(mux, acct.verifier)
 	case accountAPIWrenmoor:
 		registerWrenAccount(mux, acct.verifier, w)
 	}
