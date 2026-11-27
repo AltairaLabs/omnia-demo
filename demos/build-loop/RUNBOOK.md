@@ -39,6 +39,10 @@ and the deploy. Nothing is replayed. Contracts and companies are fictional.
    `contract-triage-dryrun` and `-seed` fallbacks are kept. Verified
    2026-11-13.
 3. Open the three contracts in `contracts/` ready to paste.
+4. Optional, before a take: `verify/` is a test of this demo, not part of it. Run
+   `bash demos/build-loop/verify/check.sh` (the seed must miss the indemnity)
+   and `config.fixed.arena.yaml` (the beat 4 fix must pass everything). Needs
+   `OPENAI_API_KEY`. Never imported on stage.
 
 ## Dry run 2026-11-13 (what to expect)
 

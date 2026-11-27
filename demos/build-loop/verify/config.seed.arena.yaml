@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# verify/ is a test OF the demo, not part of it: nothing here is shown on
+# stage, and the engineer never imports it. It pins the storyline the RUNBOOK
+# promises.
+#
+# This config proves the SEED half: on the seed prompt, data-protection passes
+# and uncapped-indemnity (stage/) FAILS on its assertions. Arena can't assert
+# an expected failure, so run it through verify/check.sh, which runs this and
+# checks the per-scenario result in the JSON output.
+#
+#   bash demos/build-loop/verify/check.sh
+#
+# Needs OPENAI_API_KEY (gpt-4o is the agent under test).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: contract-triage-verify-seed
+spec:
+  prompt_configs:
+    - id: contract-triage
+      file: ../seed/prompts/contract-triage.prompt.yaml
+  providers:
+    - file: providers/openai.provider.yaml
+  scenarios:
+    - file: ../seed/scenarios/data-protection.scenario.yaml
+    - file: ../stage/uncapped-indemnity.scenario.yaml
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    seed: 42
+    output:
+      dir: out
+      formats: ["json"]
