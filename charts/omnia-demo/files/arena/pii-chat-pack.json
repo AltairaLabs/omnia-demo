@@ -1,28 +1,21 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "compilation": {
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:52:01Z",
+    "schema": "v1"
+  },
+  "description": "Pack containing 1 prompts",
   "id": "pii-chat",
   "name": "pii-chat",
-  "version": "v1.0.0",
-  "description": "Pack containing 1 prompts",
-  "template_engine": {
-    "version": "v1",
-    "syntax": "{{variable}}",
-    "features": [
-      "basic_substitution"
-    ]
-  },
   "prompts": {
     "card_support": {
+      "description": "Larkmere Mutual's member assistant in the signed-in member portal. Helps the member with their card, remembers what they tell it, and records a case note for next time.",
       "id": "card_support",
       "name": "card-support",
-      "description": "Retail-bank card support agent. Verifies a caller's identity before discussing an account, then records a case note for the next agent.",
-      "version": "1.0.0",
-      "system_template": "You are a card support assistant for a retail bank. A cardholder is\ncontacting you about their card.\n\nTone: warm, brief, phone-style. This is a conversation, not a form.\n\nGuidelines:\n- Before you discuss or act on any account, confirm the caller's identity:\n  ask for their Social Security number and their date of birth, then call\n  verify_identity with both.\n- Do not proceed on an unverified account, and never guess or invent either\n  value — ask for whatever you are missing.\n- Once verified, greet them by name, confirm the last four digits of the\n  card on file and its status, and help with what they asked.\n- Never read back more than the last four digits of a card number.\n- When the caller's issue is resolved, record a short case note using\n  memory__remember so whoever picks this account up next has the context:\n  what the caller reported, what you did about it, and how to reach them.\n",
-      "tools": [
-        "verify_identity",
-        "memory__remember",
-        "memory__recall"
-      ],
+      "parameters": {
+        "temperature": 0.3
+      },
       "pipeline": {
         "middleware": [
           {
@@ -34,18 +27,13 @@
           },
           {
             "config": {
-              "retry_policy": {
-                "backoff": "exponential",
-                "initial_delay_ms": 100,
-                "max_retries": 3
-              },
-              "timeout_ms": 30000
+              "retry_attempts": 3,
+              "timeout": 30
             },
             "type": "provider"
           },
           {
             "config": {
-              "collect_all_errors": true,
               "fail_fast": false
             },
             "type": "validator"
@@ -57,57 +45,163 @@
           "validator"
         ]
       },
-      "parameters": {
-        "temperature": 0.3
-      }
+      "system_template": "You are Larkmere Mutual's member assistant, in the member portal. The\nmember you are talking to has already signed in, so you know who they are:\nnever ask for their date of birth, card number or any other proof of\nidentity.\n\nTone: warm, brief, plain English. This is a conversation, not a form.\n\nGuidelines:\n- Use the member's first name. To see their card, call get_card_status.\n- To freeze or unfreeze their card, call freeze_card or unfreeze_card.\n  Only say it is done once the tool says so. If changed is false, it\n  already was.\n- Never unfreeze a card the member has reported lost or stolen. Unfreeze\n  only when they clearly ask; if a message is ambiguous, ask what they\n  want rather than act.\n- You can't see transactions, refund money or change anything else on the\n  account. Say so, and say what happens next, rather than promise an\n  outcome you can't deliver.\n- Never read back more than the last four digits of a card number. If the\n  member types a full card number, you don't need it: don't repeat it.\n- When the member states how they like to be contacted, or another\n  lasting preference, save it on its own with memory__remember, as a\n  preference (category memory:preferences), in one short sentence. Keep\n  places, health and other details out of it. Save only what they actually\n  said they want: a question is not a preference, and don't replace a\n  preference you already know with a guess.\n- When the member's question is answered, record a short case note with\n  memory__remember: what they asked and what you did.\n- Only tell the member you'll remember something once memory__remember\n  says it was saved. If it was refused, say you couldn't save it, and\n  don't suggest you will remember.\n- Use what you already know about the member, below, and don't ask for it\n  again.\n\nWhat you know about this member:\n{{memory_context}}\n",
+      "tools": [
+        "get_card_status",
+        "freeze_card",
+        "unfreeze_card",
+        "memory__remember",
+        "memory__recall"
+      ],
+      "validators": [
+        {
+          "enabled": true,
+          "params": {
+            "allowed": [
+              "the member's Larkmere card: its status, freezing or unfreezing it, a lost or stolen card, a declined payment",
+              "using the card: abroad and when travelling, cash machine withdrawals, fees and charges, limits, replacement cards, payments the member doesn't recognise",
+              "the member's Larkmere account and how they like to be contacted",
+              "what the assistant remembers about the member"
+            ],
+            "description": "Larkmere Mutual's member assistant, in the signed-in member portal. It helps the member with their Larkmere card and account.",
+            "direction": "input",
+            "disallowed": [
+              "investment advice, including which shares, funds or crypto to buy",
+              "tax advice",
+              "legal advice",
+              "anything unrelated to the member's Larkmere card or account"
+            ],
+            "examples": {
+              "allowed": [
+                "Can I take out euros from a cash machine in Lisbon? Will I be charged?",
+                "I've got savings in this account, why was my card declined?",
+                "How quickly can you get a replacement card to me abroad?",
+                "My card got declined at a restaurant in Paris. Is there a problem with it?"
+              ],
+              "disallowed": [
+                "If I put it on my card and buy shares, which ones should I get?",
+                "Will I owe inheritance tax on the money my mum left me?"
+              ]
+            },
+            "message": "I can only help with your Larkmere card and account here. For investment, tax or legal advice, please speak to a qualified adviser.",
+            "on_error": "deny",
+            "on_unknown": "deny",
+            "provider": "guard",
+            "small_talk": "allow"
+          },
+          "type": "topic_policy"
+        }
+      ],
+      "variables": [
+        {
+          "default": "",
+          "description": "What Omnia's memory holds about this member, retrieved for this turn",
+          "name": "memory_context",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "version": "1.0.0"
     }
+  },
+  "template_engine": {
+    "features": [
+      "basic_substitution"
+    ],
+    "syntax": "{{variable}}",
+    "version": "v1"
   },
   "tools": {
-    "verify_identity": {
-      "name": "verify_identity",
-      "description": "Confirm a cardholder's identity from their Social Security number and date of birth before discussing or acting on their account. Returns the customer reference, the cardholder's name, the last four digits of the card on file, and the card's current status.",
+    "freeze_card": {
+      "description": "Freeze the member's card so no new payments go through, for example when it is lost or stolen. Returns the card's last four digits and new status; changed is false if it was already frozen.",
+      "name": "freeze_card",
       "parameters": {
-        "properties": {
-          "dob": {
-            "description": "The cardholder's date of birth in YYYY-MM-DD form.",
-            "type": "string"
-          },
-          "ssn": {
-            "description": "The cardholder's Social Security number, as they gave it, e.g. 123-45-6789.",
-            "type": "string"
-          }
-        },
-        "required": [
-          "ssn",
-          "dob"
-        ],
+        "properties": {},
         "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "card-account"
+        ]
+      }
+    },
+    "get_card_status": {
+      "description": "Look up the member's card: their name, the card's last four digits and its status (active or frozen).",
+      "name": "get_card_status",
+      "parameters": {
+        "properties": {},
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "read",
+        "reversibility": "reversible",
+        "data_classes": [
+          "card-account"
+        ]
+      }
+    },
+    "unfreeze_card": {
+      "description": "Unfreeze the member's card so it works again, for example when they have found it. Returns the card's last four digits and new status; changed is false if it was not frozen.",
+      "name": "unfreeze_card",
+      "parameters": {
+        "properties": {},
+        "type": "object"
+      },
+      "action_scope": {
+        "effect": "write",
+        "reversibility": "reversible",
+        "data_classes": [
+          "card-account"
+        ]
       }
     }
   },
-  "compilation": {
-    "compiled_with": "packc-1.5.2",
-    "created_at": "2026-11-09T15:18:16Z",
-    "schema": "v1"
-  },
+  "version": "v1.0.0",
   "metadata": {
     "governance": {
-      "intended_purpose": "Handle inbound retail card-support conversations: verify the caller's identity, answer questions about the card on file, and record a case note for the next agent.",
+      "intended_purpose": "Help members signed in to the Larkmere member portal with their card: look it up, freeze or unfreeze it, explain what happens next, and remember what the member tells it for next time.",
       "foreseeable_misuse": [
-        "Obtaining another person's account details by talking past identity verification.",
-        "Treating the agent's identity check as sufficient authorisation for a payment or transfer. It confirms who is calling; it authorises nothing."
+        "Getting the assistant to promise a refund, a reversal or the outcome of a dispute. Disputes are decided by Larkmere's disputes team.",
+        "Using the assistant as the identity check. The member is verified by the portal before the conversation starts; the assistant verifies nothing."
       ],
       "autonomy_level": "acts_with_oversight",
       "accountable_owner": "Card Operations",
       "operator_role": "eu-aiact:AIDeployer",
       "risk_classification": "eu-aiact:LimitedRiskAI",
       "intended_deployment_contexts": [
-        "Inbound retail card support, authenticated caller."
+        "Signed-in member portal, authenticated member."
       ],
       "approved_environments": [
         "demo"
       ],
       "requires_ai_disclosure": true
     }
+  },
+  "evals": [
+    {
+      "id": "card-support-actionable-v2",
+      "type": "llm_judge_session",
+      "trigger": "on_session_complete",
+      "params": {
+        "criteria": "You are reviewing a conversation between a bank's card assistant and a member. Judge only whether the member left with something they can act on. Fail the conversation (score 0.0) if ANY assistant reply does one of these: (a) tells the member to contact support, the team, card services or the bank without giving a specific channel (a phone number, an app or website section, or an address); (b) states a bank policy, timescale or fee as fact without having it from a tool result (for example 'no need to tell us you're travelling' or 'we'll get it to you promptly'); (c) answers a different question from the one asked. Refusing an out-of-scope request (investment, tax or legal advice) with a pointer to a qualified adviser is fine. Score 1.0 only if no reply did any of these. Use only 0.0 or 1.0. passed is true only for 1.0."
+      }
+    }
+  ],
+  "requires": {
+    "providers": [
+      {
+        "key": "default",
+        "role": "llm",
+        "required": true
+      },
+      {
+        "key": "guard",
+        "role": "inference",
+        "required": true,
+        "description": "Topic classifier for the scope guardrail (Jev, TypeSafe System One)"
+      }
+    ]
   }
 }

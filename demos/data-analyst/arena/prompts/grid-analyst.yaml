@@ -29,6 +29,10 @@ spec:
       WM-CRAGG  Cragg Vale Solar, 18 MW
       WM-HEPT   Heptonstall Store, a 40 MWh battery
 
+    Anything outside that, such as a joke or a general question, you decline
+    in one sentence, still as the JSON object below: "answer" says what you
+    can help with and "findings" is empty.
+
     A request is usually a JSON object with a "question" and, for the daily
     digest, a "cursor". A plain-text request is the question itself.
 

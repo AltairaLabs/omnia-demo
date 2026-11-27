@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for "Ellen's assistant", the person's side of the Poppy
+# demo: an Omnia agent acting for Ellen Whitcomb that reaches the Companies
+# she has accounts at under the Personal Agent Protocol (PAP 1.0).
+#
+# STAND-IN (docs/stand-ins.md, "Personal Agent"). A consumer Personal Agent
+# is run by another company on its own infrastructure; here it is an Omnia
+# agent in its own workspace (ellens-assistant), and it is not a fourth
+# company in the cast. Its protocol side (keys, User IDs, discovery and the
+# conversations themselves) is the personal-agent service
+# (services/personal-agent), which these tools call. The model never sees a key,
+# a User ID or a Session JWT.
+#
+# The chart ships a COMPILED pack
+# (charts/omnia-demo/files/arena/assistant-pack.json) with the governance
+# block and each tool's action_scope merged in. The AgentRuntime is
+# charts/omnia-demo/templates/assistant-agent.yaml; the tool bindings are
+# assistant-tools.yaml.
+#
+# Regenerate with: hack/build-packs.sh assistant
+#
+# Tests live in config.test.arena.yaml: the same prompt with these tools
+# bound to a stateful fake (demos/personal-agent/arenafake), so this config,
+# and the pack, stay free of test bindings.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: assistant
+spec:
+  prompt_configs:
+    - id: assistant
+      file: prompts/assistant.yaml
+
+  providers:
+    - file: providers/mock.yaml
+
+  # The six tools on the personal-agent service. Starting, sending, closing and
+  # signing in speak to a Company for Ellen; finding and reading do not.
+  tools:
+    - file: tools/find-company.tool.yaml
+    - file: tools/start-conversation.tool.yaml
+    - file: tools/send-message.tool.yaml
+    - file: tools/read-conversation.tool.yaml
+    - file: tools/close-conversation.tool.yaml
+    - file: tools/sign-in.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

@@ -25,7 +25,20 @@ spec:
     {{- toYaml .Values.workspace.roleBindings | nindent 4 }}
   {{- $rsa := .Values.workspace.runtimeServiceAccount }}
   {{- $rid := .Values.workspace.runtimeIdentity }}
-  {{- if or $rsa.name $rid.serviceAccountAnnotations $rid.podLabels }}
+  {{- $ci := .Values.workspace.cloudIdentity }}
+  {{- if $ci.enabled }}
+  {{- $ann := $rid.serviceAccountAnnotations | default dict }}
+  # Workspace cloud identities (Omnia #4052): the workspace's managed identity,
+  # federated once for omnia-identity-<name>, and every agent's default,
+  # including agents made at run time (Try it, Dreaming replays). An agent may
+  # not also have native identity on Azure, so spec.runtime carries none.
+  cloudIdentities:
+    - name: {{ $ci.name }}
+      azure:
+        tenantID: {{ required "workspace.cloudIdentity needs the identity's tenant id (runtimeIdentity.serviceAccountAnnotations azure.workload.identity/tenant-id)" (index $ann "azure.workload.identity/tenant-id") | quote }}
+        clientID: {{ required "workspace.cloudIdentity needs the identity's client id (runtimeIdentity.serviceAccountAnnotations azure.workload.identity/client-id)" (index $ann "azure.workload.identity/client-id") | quote }}
+  defaultCloudIdentity: {{ $ci.name }}
+  {{- else if or $rsa.name $rid.serviceAccountAnnotations $rid.podLabels }}
   # Workload identity for every agent in the workspace, including ones
   # deployed through the API with no pod overrides.
   # - Omnia >= 0.9.0-beta.23 runs each agent as its own <agent>-facade
@@ -49,15 +62,150 @@ spec:
   {{- end }}
   {{- with .Values.workspace.services }}
   services:
-    {{- toYaml . | nindent 4 }}
+    {{- /* With the Galaxy on, every memory service takes its MemoryPolicy
+           unless the values already name one. */}}
+    {{- $services := list }}
+    {{- range . }}
+    {{- $s := deepCopy . }}
+    {{- if and $.Values.galaxy.enabled $s.memory (not $s.memory.policyRef) }}
+    {{- $_ := set $s.memory "policyRef" (dict "name" (include "omnia-demo.galaxyPolicyName" $)) }}
+    {{- end }}
+    {{- /* The card-support canary needs the eval worker, which a pack with no
+           evals of its own (card support 1.0.0) does not bring up. It runs as
+           the canary's ServiceAccount, with workload identity for the judge. */}}
+    {{- if and $.Values.piiChat.enabled $.Values.piiChat.canary.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.evalWorker) }}
+    {{- $_ := set $s "evalWorker" (dict "enabled" true "podOverrides" (dict "serviceAccountName" $.Values.piiChat.canary.evalWorkerServiceAccount "labels" ($.Values.workspace.runtimeIdentity.podLabels | default dict))) }}
+    {{- end }}
+    {{- /* Dreaming on the demo's service group (values: dreaming). */}}
+    {{- $d := $.Values.dreaming }}
+    {{- if and $d.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.dreaming) }}
+    {{- $sel := dict "mode" $d.selection.mode "maxSessions" $d.selection.maxSessions "lookback" $d.selection.lookback "minTurns" $d.selection.minTurns }}
+    {{- with $d.selection.agents }}{{ $_ := set $sel "agents" . }}{{ end }}
+    {{- $dr := dict "enabled" true "schedule" $d.schedule "selection" $sel "providerRef" (dict "name" (required "dreaming.providerRef or llm.providerRef" (default $.Values.llm.providerRef $d.providerRef))) }}
+    {{- with $d.envelope.name }}{{ $_ := set $dr "envelopeRef" (dict "name" .) }}{{ end }}
+    {{- $_ := set $s "dreaming" $dr }}
+    {{- end }}
+    {{- /* Claims triage holds an over-limit settlement for a claims handler
+           (values: claimsTriage.referral): the group needs its referral-api. */}}
+    {{- if and $.Values.claimsTriage.enabled $.Values.claimsTriage.referral.enabled (eq $s.name $.Values.workspace.serviceGroup) (not $s.referral) }}
+    {{- $_ := set $s "referral" (dict) }}
+    {{- end }}
+    {{- $services = append $services $s }}
+    {{- end }}
+    {{- toYaml $services | nindent 4 }}
   {{- end }}
   {{- with .Values.workspace.storage }}
   storage:
     {{- toYaml . | nindent 4 }}
   {{- end }}
+  {{- $kmsID := include "omnia-demo.privacyKMSIdentity" . }}
   {{- with .Values.workspace.privacy }}
   privacy:
     {{- toYaml . | nindent 4 }}
+    {{- if $kmsID }}
+    # Keyless Key Vault for privacy-api (Omnia #4466): it seals the account
+    # tools' exchanged tokens. Its pod runs as privacy-<workspace>, with the
+    # workspace identity's annotations copied from privacy-identity; the cloud
+    # trusts that subject (`make azure-identity`).
+    podOverrides:
+      serviceAccountName: privacy-identity
+      labels:
+        azure.workload.identity/use: "true"
+    {{- end }}
+  {{- end }}
+  {{- $md := .Values.piiChat.portal.myData }}
+  {{- if and .Values.piiChat.enabled .Values.piiChat.portal.enabled $md.enabled }}
+  # The end-user plane (management-api /api/v1/me/workspaces/<name>): members
+  # reach their own consent, memories and erasure with a token from the member
+  # portal, the demo's stand-in identity provider (docs/stand-ins.md). The
+  # audience is the plane's own, never an agent's.
+  endUserAuth:
+    oidc:
+      issuer: {{ include "omnia-demo.issuerURL" (dict "service" "larkmere-portal" "root" .) | quote }}
+      audience: {{ required "piiChat.portal.myData.audience" $md.audience | quote }}
+  {{- end }}
+  {{- if .Values.poppy.enabled }}
+  # A Poppy Company (Personal Agent Protocol). Omnia builds the Company's
+  # poppy.json from it and the agents that join it; poppy-routes.yaml serves it.
+  poppy:
+    companies:
+      - name: default
+        organization:
+          name: {{ default $name .Values.workspace.displayName | quote }}
+          domain: {{ required "poppy.domain" .Values.poppy.domain | quote }}
+        personalAgents:
+          allow:
+            {{- toYaml (required "poppy.allow" .Values.poppy.allow) | nindent 12 }}
+        {{- $auth := .Values.poppy.auth }}
+        {{- if $auth.enabled }}
+        {{- /* Omnia requires scopes and scopeHints to have the same keys. */}}
+        {{- if ne (keys ($auth.scopes | default dict) | sortAlpha | join ",") (keys ($auth.scopeHints | default dict) | sortAlpha | join ",") }}
+        {{- fail "poppy.auth.scopes and poppy.auth.scopeHints must have the same keys" }}
+        {{- end }}
+        # Company sign-in (PAP §3.2): the issuer a Personal Agent signs Ellen in
+        # at, the scopes it may ask for, and how the facades read the access
+        # tokens it issues. The account tools (poppy-account-tools.yaml) need
+        # it.
+        auth:
+          {{- if $auth.gateway.enabled }}
+          {{- $gw := $auth.gateway }}
+          {{- $acct := .Values.poppy.account }}
+          # Omnia's Poppy issuer gateway (Omnia dd2e94540) is the Company's
+          # issuer: management-api serves it on the host of `issuer`
+          # (poppy-routes.yaml routes that host), signs the Personal Agents'
+          # tokens, and sends the customer to sign in at the upstream OIDC
+          # provider. The operator checks it like any issuer and reports
+          # PoppyIssuerGateway and PoppyIssuer.
+          issuer: {{ include "omnia-demo.gatewayIssuer" . | quote }}
+          gateway:
+            upstream:
+              issuer: {{ required "poppy.auth.gateway.upstream.issuer" $gw.upstream.issuer | quote }}
+              clientID: {{ required "poppy.auth.gateway.upstream.clientID" $gw.upstream.clientID | quote }}
+              # Key clientSecret: the upstream application's client secret.
+              clientSecretRef:
+                name: {{ required "poppy.auth.gateway.upstream.clientSecretRef" $gw.upstream.clientSecretRef }}
+              {{- with $gw.upstream.scopes }}
+              {{- if not (has "openid" .) }}
+              {{- fail "poppy.auth.gateway.upstream.scopes must include openid" }}
+              {{- end }}
+              scopes:
+                {{- toYaml . | nindent 16 }}
+              {{- end }}
+            {{- with $gw.accessTokenLifetimeMinutes }}
+            accessTokenLifetimeMinutes: {{ . }}
+            {{- end }}
+            {{- with $gw.refreshTokenLifetimeDays }}
+            refreshTokenLifetimeDays: {{ . }}
+            {{- end }}
+            {{- if $acct.clientID }}
+            # The account tools' exchange client (poppy-account-tools.yaml):
+            # privacy-api exchanges a Personal Agent's token at the gateway for
+            # one whose aud is the Company's account API. Enterprise.
+            exchangeClients:
+              - clientID: {{ $acct.clientID | quote }}
+                clientSecretRef:
+                  name: {{ required "poppy.account.clientSecretRef" $acct.clientSecretRef }}
+                audiences:
+                  - {{ required "poppy.account.audience" $acct.audience | quote }}
+            {{- end }}
+          {{- else }}
+          issuer: {{ required "poppy.auth.issuer (or poppy.auth.gateway.enabled)" $auth.issuer | quote }}
+          {{- end }}
+          scopes:
+            {{- toYaml (required "poppy.auth.scopes" $auth.scopes) | nindent 12 }}
+          scopeHints:
+            {{- toYaml (required "poppy.auth.scopeHints" $auth.scopeHints) | nindent 12 }}
+          accessTokens:
+            {{- /* Omitted when empty, so Omnia's default applies:
+                 https://<organization.domain>. An empty list would be refused
+                 (1-8 entries). */}}
+            {{- with $auth.accessTokens.audiences }}
+            audiences:
+              {{- toYaml . | nindent 14 }}
+            {{- end }}
+            clientIDClaim: {{ $auth.accessTokens.clientIDClaim }}
+            scopeClaim: {{ $auth.accessTokens.scopeClaim }}
+        {{- end }}
   {{- end }}
   {{- with .Values.workspace.costControls }}
   costControls:
@@ -75,4 +223,28 @@ metadata:
     {{- toYaml . | nindent 4 }}
   {{- end }}
 {{- end }}
+{{- end }}
+{{- if (include "omnia-demo.privacyKMSIdentity" .) }}
+---
+# The identity privacy-api takes for Key Vault (workspace.privacy.podOverrides
+# above): only its annotations are used, copied onto privacy-<workspace>.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: privacy-identity
+  namespace: {{ .Values.namespace }}
+  annotations:
+    {{- toYaml .Values.workspace.runtimeIdentity.serviceAccountAnnotations | nindent 4 }}
+automountServiceAccountToken: false
+---
+# Where the Connection's Key Vault key lives. Workload identity supplies the
+# credential, so this holds the vault's address only, no secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.poppy.account.encryption.secretRef.name }}
+  namespace: {{ .Values.namespace }}
+type: Opaque
+stringData:
+  vault-url: {{ .Values.poppy.account.encryption.vaultURL | quote }}
 {{- end }}

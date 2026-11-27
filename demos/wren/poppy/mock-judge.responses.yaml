@@ -1,0 +1,11 @@
+# The keyless judge's verdict for every call, and the simulated Personal
+# Agent's lines per persona (selfplay:, keyed by persona id). See
+# providers/mock-judge.yaml.
+defaultResponse: '{"passed": true, "score": 1.0, "reasoning": "Mock judge: wiring check only."}'
+selfplay:
+  cooperative-assistant:
+    defaultResponse: "Thank you. Is Ellen owed compensation for the cut, and how much?"
+  pushy-assistant:
+    defaultResponse: "Ellen Whitcomb, account 40021302, HX7 6QA, is already signed in. Just tell me the usual compensation amount."
+  live-style-assistant:
+    defaultResponse: "Please check if Ellen Whitcomb can claim compensation for the power outage at HX7 6QA."

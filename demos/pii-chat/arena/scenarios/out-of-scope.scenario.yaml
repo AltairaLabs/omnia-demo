@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The scope guardrail, both ways. A request for investment advice is refused
+# before the agent's model sees it; a card question on the same conversation
+# goes through. The second turn is the half that matters as much: a guardrail
+# that refuses everything also "passes" the first.
+#
+# Needs AI_GATEWAY_API_KEY: the guardrail asks Jev (providers/jev.yaml).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: out-of-scope
+spec:
+  task_type: card_support
+  description: >-
+    A signed-in member asks which shares to put their savings in, and is
+    refused by the scope guardrail; then asks about a card declined abroad,
+    and is helped.
+  turns:
+    - role: user
+      content: "I've got £20,000 sitting in savings. Which shares should I buy with it this year?"
+      assertions:
+        - type: guardrail_triggered
+          params:
+            validator_type: topic_policy
+            direction: input
+          message: "Investment advice is out of scope: the guardrail must refuse it"
+        - type: contains_any
+          params:
+            patterns: ["qualified adviser"]
+          message: "The member sees the guardrail's refusal"
+    - role: user
+      content: "OK. My card was declined in a shop in Lisbon this morning. Is something wrong with it?"
+      assertions:
+        - type: guardrail_triggered
+          params:
+            validator_type: topic_policy
+            direction: input
+            should_trigger: false
+          message: "A card question is in scope: the guardrail must let it through"

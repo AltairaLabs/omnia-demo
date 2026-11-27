@@ -50,15 +50,59 @@ spec:
     maxTokens: {{ $pc.provider.maxTokens }}
 {{- end }}
 {{- end }}
+{{- if $pc.guardrail.enabled }}
+{{- $g := $pc.guardrail }}
+{{- if $g.clusterSecretStore }}
 ---
-# The identity-check backend. One Deployment, not two: this demo has no trust
-# boundary to draw — unlike mortgageUnderwriting, where the split into
-# case-systems and income-verify IS the argument. Here the tool exists so the
-# SSN travels through a tool call as well as a message, and one Service is
-# enough to make that true.
-#
-# Same image as the mortgage stubs, which is why the repository value reads as
-# mortgage-specific.
+# The gateway key, from the platform's secret store. Never in the chart.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ $g.secretName }}
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: {{ $g.clusterSecretStore }}
+  target:
+    name: {{ $g.secretName }}
+  data:
+    - secretKey: {{ $g.key }}
+      remoteRef:
+        key: {{ $g.keyVaultSecret }}
+{{- end }}
+---
+# The scope guardrail's classifier: Jev, TypeSafe's System One model, through
+# the Vercel AI Gateway. role inference: it answers a labelled choice with a
+# probability per label and never writes a reply, so it decides scope for the
+# agent without being the agent. An API key rather than workload identity:
+# inference Providers have no platform credential, and this one is not hosted
+# on Azure.
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: jev
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  type: systemone
+  role: inference
+  baseURL: {{ $g.baseURL }}
+  model: {{ $g.model }}
+  credential:
+    secretRef:
+      name: {{ $g.secretName }}
+      key: {{ $g.key }}
+{{- end }}
+---
+# The card system behind the member assistant (cards.go in the mortgage stubs'
+# image, which is why the repository value reads as mortgage-specific). Named
+# pii-chat-identity from when it was an identity check; the name is kept so the
+# Service and its callers don't churn.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -137,7 +181,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   labels:
     app.kubernetes.io/part-of: {{ .Chart.Name }}
-    app.kubernetes.io/component: card-support
+    app.kubernetes.io/component: member-assistant
 {{- if $pc.deterministic }}
   # The runtime reads these from the AgentRuntime, not from an env var: the
   # operator does stamp OMNIA_MOCK_PROVIDER onto the container, but nothing
@@ -149,6 +193,12 @@ metadata:
 spec:
   promptPackRef:
     name: pii-chat-pack
+{{- if $pc.canary.enabled }}
+    # Pinned, not following the channel: the canary publishes newer versions
+    # of this pack (2.0.0, 2.1.0), and an unpinned agent moves to the highest
+    # stable version the moment one appears. The rollout moves it instead.
+    version: "1.0.0"
+{{- end }}
   toolRegistryRef:
     name: pii-chat-tools
   # The binding that makes the demo work. Without it the agent falls back to the
@@ -168,10 +218,9 @@ spec:
   # path that emits pii_redacted, so it is what moves the redactions counter on
   # /memory-analytics — the session path emits nothing.
   #
-  # NO embedding provider is needed for this. memory-api logs
-  # `providerConfigured: false` and runs the consent classifier in regex-only
-  # mode, which is enough: the demo is about what gets STORED, not about
-  # semantic recall quality.
+  # NO embedding provider is needed for this. The agent names each memory's
+  # consent category, and memory-api's classifier can only make it stricter;
+  # without an embedding Provider that classifier is a keyword list.
   memory:
     enabled: true
     tools:
@@ -180,10 +229,32 @@ spec:
       # subject to the ToolPolicy the broker enforces.
       enabled: true
     retrieval:
-      # Ambient per-turn RAG injection is off: it would pull earlier memories
-      # into the prompt and make each take depend on what previous takes wrote,
-      # which is the opposite of what a scripted capture needs.
-      enabled: false
+      # Ambient retrieval: each turn the runtime puts what memory holds about
+      # the member into the prompt's memory_context variable, the member's
+      # preferences, identity and health always. That is what makes "it
+      # remembers you" work: a preference saved in one conversation is in
+      # context from the first turn of the next, without the model choosing
+      # to call memory__recall.
+      #
+      # It also means a take depends on what earlier takes remembered. Reset
+      # the member between takes by erasing their data (Your data in the
+      # portal, or the RUNBOOK's erasure step), not by turning this off.
+      enabled: {{ $pc.memory.retrieval }}
+      # Semantic and few. The default (keyword, 10) matched any shared document
+      # with "stolen" in it, so a question about a card abroad brought in the
+      # home-burglary claims procedure: noise in the prompt, and a prompt that
+      # changed every turn.
+      strategy: semantic
+      limit: 4
+      # Only what the member told the assistant. Recall reads every tier the
+      # scope can see, so without this the Galaxy's institutional card
+      # guidance ("we will usually correct your account") lands under "What
+      # you know about this member": the wrong label, and a refund promise the
+      # assistant may repeat, which is what demo 9's judge fails. A member's
+      # own memories are user_requested; institutional and agent-tier rows are
+      # not, and a row with no source_type is dropped too.
+      accessFilter:
+        denyCEL: '!(has(metadata.source_type) && metadata.source_type == "user_requested")'
 {{- end }}
   facades:
     - type: websocket
@@ -195,13 +266,14 @@ spec:
   # The facade's external listener rejects an unauthenticated browser — as it
   # should — so the portal proxies the conversation server-side and asserts who
   # is asking in headers the browser cannot set
-  # (demos/demo-sites/server.go, assistantProxy). edgeTrust reads those
+  # (services/demo-sites/server.go, assistantProxy). edgeTrust reads those
   # headers and does not re-verify them, which is the same arrangement a real
   # deployment has behind an API gateway or an Istio RequestAuthentication.
   #
   # This is the honest shape for a demo AND avoids the alternatives: clientKeys
-  # are minted in the dashboard UI and never live in a CR, so they cannot be
-  # chart-managed, and pointing the portal at the management-plane twin would
+  # are minted out of band (Omnia's hack/mint-client-key.sh) and never live in
+  # a CR, so they cannot be chart-managed, and pointing the portal at the
+  # management-plane twin would
   # have a customer-facing page holding an operator credential.
   #
   # The defaults are what the portal sends (x-user-id, x-user-email,
@@ -225,4 +297,27 @@ spec:
       providerRef:
         # Deterministic mode always runs on the demo's own mock Provider.
         name: {{ if $pc.deterministic }}pii-chat-llm{{ else }}{{ include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef) }}{{ end }}
+{{- if $pc.guardrail.enabled }}
+    # The pack's `guard` slot: the classifier its topic_policy guardrail asks.
+    # Bound by slot name, which is what the guardrail's params.provider names.
+    - name: guard
+      role: inference
+      providerRef:
+        name: jev
+{{- end }}
+{{- if $pc.canary.enabled }}
+    # The canary judge, under the name the candidate packs' llm_judge_session
+    # gives as params.provider. The runtime binds it by name and never makes it
+    # the agent's model; the eval worker judges with it (Omnia #3965).
+    - name: judge
+      providerRef:
+        name: {{ default (include "omnia-demo.llmProvider" (dict "root" $ "own" "pii-chat-llm" "demoRef" $pc.providerRef)) $pc.canary.judgeProviderRef }}
+{{- end }}
+{{- if $pc.canary.enabled }}
+  # Realtime evals, for the canary gate. The candidate packs declare the
+  # judge, and the eval worker (which runs llm_judge) scores each session with
+  # the pack it ran, labelled with the session's variant.
+  evals:
+    enabled: true
+{{- end }}
 {{- end }}

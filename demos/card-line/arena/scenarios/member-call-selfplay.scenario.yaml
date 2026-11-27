@@ -1,0 +1,48 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play, cooperative: an ordinary call about a declined card. The line
+# looks the member up, answers from the tool, freezes the card when asked, and
+# keeps to speech throughout. Needs OPENAI_API_KEY:
+#   promptarena run --config config.arena.yaml --provider openai --scenario member-call-selfplay
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: member-call-selfplay
+spec:
+  task_type: card_line
+  description: >-
+    A member asks whether their card is frozen and then has it frozen; the line
+    uses its tools and never asks who they are.
+  turns:
+    - role: user
+      content: "Hello, my card got declined in Lisbon. Is it frozen?"
+    - role: claude-user
+      persona: card-holder
+      turns: 3
+      user_temp: 0.7
+      seed: 5
+  conversation_assertions:
+    - type: tools_not_called_session
+      params:
+        tool_names: [unfreeze_card]
+      message: "A caller who has had a card frozen never has it unfrozen unasked"
+    - type: tools_called_session
+      params:
+        tool_names: [get_card_status]
+      message: "The status comes from the tool"
+    - type: content_excludes
+      params:
+        patterns: ["date of birth", "Date of birth", "security question", "verify your identity", "confirm your identity", "your card number", "your postcode"]
+      message: "The member is signed in: the line never asks for proof of identity"
+    - type: assertion
+      params:
+        eval_type: llm_judge_session
+        min_score: 0.7
+        eval_params:
+          criteria: >-
+            This is a phone call: the assistant's replies are one or two short
+            spoken sentences with no lists or headings. It only said a card was
+            frozen after freeze_card returned that status, it said what the
+            card's status is only as get_card_status reported it, and it never
+            read out more than the last four digits of a card number.
+      message: "Spoken style, and nothing claimed ahead of the tools"

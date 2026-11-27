@@ -1,0 +1,40 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/tool.json
+#
+# STAND-IN, for config.manuals.arena.yaml only (never in the shipped pack).
+# What it fakes: the platform's memory__recall, which in Omnia searches the
+# workspace's institutional memory (the field manuals ingested from
+# memory-documents/wrenmoor-energy/).
+# What the real one provides: ranked passages from whatever manuals match the
+# query, with their references.
+# What changes because of the fake: a local arena run offers the model no
+# memory tools at all, so without this stand-in the copilot cannot look
+# anything up. Each scenario rewrites this tool's result (tool_result_transforms)
+# to the manual passages the real search would return for its question, or to
+# nothing relevant; so these scenarios test how the copilot USES a result, not
+# the search itself.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: memory__recall
+spec:
+  name: memory__recall
+  description: >-
+    Search the field manuals. Returns matching passages with their manual
+    reference.
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+        description: A short search naming the equipment and the task
+    required: [query]
+  output_schema:
+    type: object
+    properties:
+      results:
+        type: array
+        items:
+          type: object
+  mode: mock
+  mock_result:
+    results: []

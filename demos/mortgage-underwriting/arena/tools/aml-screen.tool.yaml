@@ -25,8 +25,10 @@ spec:
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii, sanctions] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    sanctions_hit: false
-    pep_match: false
-    watchlist_ids: []
-    screened_against: "UK HMT, EU, OFAC (synthetic)"
+  # Branches on applicant_ref; see case_fetch. 00588 is the sanctions hit.
+  mock_template: |
+    {{- if eq .applicant_ref "APP-2026-00588" -}}
+    {"sanctions_hit":true,"pep_match":false,"watchlist_ids":["SYN-WL-0007"],"screened_against":"UK HMT, EU, OFAC (synthetic)"}
+    {{- else -}}
+    {"sanctions_hit":false,"pep_match":false,"watchlist_ids":[],"screened_against":"UK HMT, EU, OFAC (synthetic)"}
+    {{- end -}}

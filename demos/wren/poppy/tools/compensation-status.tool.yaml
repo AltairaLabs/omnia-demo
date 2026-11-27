@@ -1,0 +1,40 @@
+# The model's descriptor for compensation_status. The ToolRegistry binding
+# (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
+# Served by the wren-account stub's POST /api/account/compensation
+# (services/mortgage-underwriting/compensation.go), behind the on-behalf-of guard
+# (obo.go). A read: compensation is paid automatically, and this only reports
+# it.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: compensation_status
+spec:
+  name: compensation_status
+  description: >-
+    The compensation the signed-in customer is owed for the power cut on their
+    supply under Wrenmoor's guaranteed standard: the hours off, whether they
+    are eligible, the amount in pence, the rule it was worked out by and its
+    status (owed or not_yet). Paid automatically; this only reports it.
+    Refused until the customer has signed in.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      account_id: { type: string }
+      hours_off: { type: integer }
+      eligible: { type: boolean }
+      amount_pence: { type: integer }
+      rule: { type: string }
+      status: { type: string, enum: [owed, not_yet] }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    account_id: "40021302"
+    hours_off: 14
+    eligible: true
+    amount_pence: 9500
+    rule: "Wrenmoor guaranteed standard: £95 once the supply has been off 12 hours, then £45 for each further full 12 hours, paid automatically within 28 days."
+    status: owed

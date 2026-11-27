@@ -1,0 +1,8 @@
+event.schema.json is copied unmodified from the Personal Agent Protocol
+project, https://github.com/personal-agent-protocol/personal-agent-protocol,
+and is licensed under the Apache License, Version 2.0 (see LICENSE in this
+directory). It describes one conversation event (PAP 1.0, sections 8.5, 8.7,
+8.10 and 8.11). The event field names used in ../reader.go follow it.
+
+Its "$ref" to message.schema.json refers to a sibling schema in that project,
+which is not vendored here.

@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member SIGNED IN: where a claim stands comes from
+# claim_status, called first, with no sign-in talk and no payment promise.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-claim-status
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A signed-in member's claim status is read with claim_status.
+  turns:
+    - role: user
+      content: "Where does Ellen's claim LM-41001 stand?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_status]
+          message: "Status is the member's account: call claim_status"
+        - type: regex
+          params:
+            pattern: "(?i)reported"
+          message: "Give the status the tool returned"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "Nothing was refused, so there must be no sign-in talk"
+        - type: regex
+          params:
+            pattern: "(?i)will (be paid|pay out|receive £)"
+            expect_match: false
+          message: "Never promise payment"

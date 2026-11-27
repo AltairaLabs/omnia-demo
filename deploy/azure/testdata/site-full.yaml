@@ -1,0 +1,84 @@
+# Every field, with synthetic values.
+subscription: 00000000-0000-0000-0000-000000000000
+location: westeurope
+identityResourceGroup: rg-identities
+identityNamePrefix: mi-demo
+aks:
+  resourceGroup: rg-aks
+  name: aks-demo
+  kubeContext: kind-demo
+postgres:
+  host: pg.example.com
+  adminLogin: pgadmin
+  adminPassword:
+    secret:
+      name: pg-admin
+      key: password
+foundry:
+  endpoint: https://foundry.example.com
+  accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/foundry
+  region: swedencentral
+  providers:
+    - name: gpt
+      role: llm
+      model: gpt-4o
+      default: true
+voice:
+  endpoint: https://voice.example.com
+  accountId: /subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-ai/providers/Microsoft.CognitiveServices/accounts/voice
+  region: swedencentral
+  providers:
+    - name: voice
+      role: tts
+      model: neural
+nfs:
+  storageAccount: stdemo
+  shareName: content
+  storageClass: azurefile-nfs
+  size: 10Gi
+  rootClaim: content-root
+dns:
+  subscription: 00000000-0000-0000-0000-000000000000
+  resourceGroup: rg-dns
+  zone: demo.example.com
+  gatewayIP: 203.0.113.10
+gateway:
+  name: omnia
+  namespace: omnia
+  sectionName: https
+dashboardHost: dashboard.demo.example.com
+omnia:
+  namespace: omnia
+  valuesRoot: ""
+keyVault:
+  name: kv-demo
+  resourceGroup: rg-kv
+ownerGroups:
+  - 00000000-0000-0000-0000-000000000001
+poppy:
+  upstream:
+    issuer: https://idp.example.com/
+  companies:
+    larkmere-mutual:
+      clientID: client-larkmere
+      clientSecretName: larkmere-upstream
+    wrenmoor-energy:
+      clientID: client-wrenmoor
+      clientSecretName: wrenmoor-upstream
+guardrail:
+  clusterSecretStore: store-demo
+  key: gateway-api-key
+memory:
+  storageAccount: stdocs
+  resourceGroup: rg-docs
+images:
+  registry: demoreg
+  loginServer: demoreg.azurecr.io
+  subscription: 00000000-0000-0000-0000-000000000000
+builder:
+  chart: oci://registry.example.com/charts/omnia-arena-builder
+  version: 0.0.0
+  sandboxImage:
+    repository: registry.example.com/sandbox
+    tag: dev
+    digest: sha256:abc

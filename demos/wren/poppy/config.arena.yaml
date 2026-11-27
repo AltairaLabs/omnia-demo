@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for wrenmoor-outages, Wrenmoor Energy's Company Agent: the
+# agent a customer's Personal Agent talks to over the Personal Agent Protocol
+# (the AgentRuntime's poppy facade, charts/omnia-demo/templates/poppy-company-agent.yaml).
+#
+# The SIGNED-OUT pack, shipped unless Company sign-in is on. With
+# poppy.auth.enabled the chart ships config.signin.arena.yaml's pack instead,
+# which adds the customer's own outage and compensation.
+#
+# A separate agent from Wren, not a facade on it: Wren works on the signed-in
+# customer's account and needs the portal for its consent card, and a poppy
+# facade needs Redis context, which Wren does not have.
+#
+# The chart ships a COMPILED pack
+# (charts/omnia-demo/files/arena/wrenmoor-outages-pack.json) with the
+# governance block and each tool's action_scope merged in.
+#
+# Regenerate with: hack/build-packs.sh wrenmoor-outages
+#
+# Tests (scenarios/, personas/; none of it reaches the pack):
+#   real run, needs OPENAI_API_KEY in the environment:
+#     promptarena run --config config.arena.yaml --provider openai --ci
+#   keyless mock run (scripted replies that play a correct desk, a judge
+#   that always passes: it checks the wiring, not the model):
+#     promptarena run --config config.arena.yaml --provider mock \
+#       --override-provider openai-mini=mock-judge --ci
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: wrenmoor-outages
+spec:
+  prompt_configs:
+    - id: outages
+      file: prompts/wrenmoor-outages.yaml
+
+  providers:
+    - file: providers/mock.yaml
+    # Real runs: --provider openai (gpt-4o, the agent under test). openai-mini
+    # (gpt-4o-mini) is the simulated Personal Agent and the judge; group
+    # selfplay keeps it out of the run matrix. Both need OPENAI_API_KEY.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+      group: selfplay
+    # Keyless stand-in for openai-mini (--override-provider
+    # openai-mini=mock-judge): see its header.
+    - file: providers/mock-judge.yaml
+      group: selfplay
+
+  # Tests only; none of this is in the compiled pack. The other party is
+  # Ellen's Personal Agent (an AI writing for her), never Ellen herself.
+  scenarios:
+    - file: scenarios/desk-postcode-outage.scenario.yaml
+    - file: scenarios/desk-no-outage-on-record.scenario.yaml
+    - file: scenarios/desk-compensation-needs-signin.scenario.yaml
+    - file: scenarios/desk-danger.scenario.yaml
+    - file: scenarios/desk-out-of-scope.scenario.yaml
+    - file: scenarios/desk-pushy-selfplay.scenario.yaml
+
+  self_play:
+    personas:
+      - file: personas/cooperative-assistant.persona.yaml
+      - file: personas/pushy-assistant.persona.yaml
+    roles:
+      - id: personal-agent
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
+
+  # One public read: the outage feed by postcode. Nothing here reads or
+  # changes a customer's account. Not get_weather: the stub serves it only for
+  # the signed-in customer, and with no identity it falls back to Amira's
+  # account, which would leak one customer into another's conversation.
+  tools:
+    - file: tools/outage-status.tool.yaml
+
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

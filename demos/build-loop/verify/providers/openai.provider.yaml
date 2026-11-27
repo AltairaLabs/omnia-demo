@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# The agent under test, on a real model for local runs. verify/ is a test of
+# the demo, not part of it. Needs OPENAI_API_KEY in the environment.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: openai
+spec:
+  id: openai
+  type: openai
+  model: gpt-4o
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 800

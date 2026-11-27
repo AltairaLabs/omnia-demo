@@ -1,0 +1,144 @@
+{{- if and .Values.poppy.enabled .Values.poppy.agent.enabled }}
+{{- $a := .Values.poppy.agent }}
+{{- $ns := .Values.namespace }}
+{{- /* One Company Agent per tenant. Each is fixed here; only its description
+     and Provider come from values. */}}
+{{- $agents := dict
+      "larkmere" (dict "name" "larkmere-claims-desk" "component" "claims-desk")
+      "wrenmoor" (dict "name" "wrenmoor-outages" "component" "outages") }}
+{{- $c := required "poppy.agent.company must be larkmere or wrenmoor" (get $agents $a.company) }}
+{{- $name := $c.name }}
+{{- if and (eq $a.company "wrenmoor") (not .Values.wren.enabled) }}
+{{- fail "poppy.agent.company=wrenmoor needs wren.enabled: its tools are on the wren-account stub" }}
+{{- end }}
+{{- if and (eq $a.company "larkmere") (not .Values.claimsTriage.enabled) }}
+{{- fail "poppy.agent.company=larkmere needs claimsTriage.enabled: its account tools are on the claims-systems stub" }}
+{{- end }}
+---
+# Where the agent's conversation context lives (spec.context.storeRef reads key
+# url). A poppy facade requires Redis: the in-memory store belongs to one
+# runtime process, and a Personal Agent's reads can reach any replica.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}-context
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  url: {{ required "poppy.agent.redisURL" $a.redisURL | quote }}
+---
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: PromptPack
+metadata:
+  name: {{ $name }}-pack
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  packName: {{ $name }}-pack
+  source:
+    type: configmap
+    configMapRef:
+      name: {{ $name }}-pack-v1
+  version: "1.0.0"
+---
+# pack.json is COMPILED, not authored here. The source of truth is the
+# PromptArena project at demos/claims-triage/poppy (larkmere-claims-desk) or
+# demos/wren/poppy (wrenmoor-outages). Two packs: signed out
+# (config.arena.yaml) and, with Company sign-in, {{ $name }}-signin
+# (config.signin.arena.yaml), which adds the account tools. Signed out,
+# nothing serves those tools, and an unclaimed pack tool answers "no handler
+# registered" instead of the agent saying to sign in. Regenerate with:
+#   hack/build-packs.sh {{ $name }}{{ if .Values.poppy.auth.enabled }}-signin{{ end }}
+{{- $pack := printf "files/arena/%s%s-pack.json" $name (ternary "-signin" "" (eq .Values.poppy.auth.enabled true)) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-pack-v1
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+data:
+  pack.json: |
+{{ required (printf "%s is missing: hack/build-packs.sh" $pack) (.Files.Get $pack) | indent 4 }}
+---
+# The tenant's Company Agent under the Personal Agent Protocol (PAP 1.0,
+# "Poppy"). A Personal Agent finds it through the Company's
+# /.well-known/poppy.json (the Workspace's spec.poppy, poppy-routes.yaml) and
+# holds conversations with it at https://<poppy.domain>/poppy.
+#
+# Its own AgentRuntime, not a facade on the tenant's assistant: a poppy facade
+# needs Redis context, which the assistants do not have, and the assistants
+# carry the canary, its judge and Dreaming, which Poppy conversations must not
+# flow into. Keep it out of every selection.agents, rollout and eval.
+#
+# Signed out, unless poppy.auth.enabled gives the Company an issuer: the
+# facade runs each turn as the pseudonym of the Personal Agent's client_id and
+# User ID, origin poppy, which gets no user-tier memory. Signed in, its account
+# tools act as the customer (poppy-account-tools.yaml).
+apiVersion: omnia.altairalabs.ai/v1alpha1
+kind: AgentRuntime
+metadata:
+  name: {{ $name }}
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: {{ $c.component }}
+spec:
+  mode: agent
+  promptPackRef:
+    name: {{ $name }}-pack
+{{- if or (eq $a.company "wrenmoor") .Values.poppy.auth.enabled }}
+  toolRegistryRefs:
+{{- if eq $a.company "wrenmoor" }}
+    - name: {{ $name }}-tools
+{{- end }}
+{{- if .Values.poppy.auth.enabled }}
+    # The account tools, as the signed-in customer (poppy-account-tools.yaml).
+    - name: {{ $name }}-account-tools
+{{- end }}
+{{- end }}
+  facades:
+    # The only facade, so it is the primary, on the Service's facade port.
+    - type: poppy
+      poppy:
+        description: {{ required "poppy.agent.description" $a.description | quote }}
+      # The Company's own host, which the Gateway's listener already admits
+      # (the certificate is shared with the discovery route). The facade's
+      # endpoint is this host followed by /poppy.
+      expose:
+        enabled: true
+        host: {{ required "poppy.domain" .Values.poppy.domain | quote }}
+  context:
+    type: redis
+    ttl: 24h
+    storeRef:
+      name: {{ $name }}-context
+{{- if and (eq $a.company "larkmere") .Values.memory.enabled }}
+  # The society's guidance for members, from institutional memory (the
+  # memory-ingestion connector loads it), retrieved into the prompt's
+  # memory_context each turn, as the claims assessor reads it
+  # (claims-triage-agent.yaml). Read-only: no memory tools, and a Poppy user
+  # gets no user tier anyway.
+  #
+  # The access filter keeps only documents under member-guidance/. The same
+  # tier holds the society's claims-handling rules (claims-handling.md), which
+  # are not for anyone outside the society to read.
+  memory:
+    enabled: true
+    tools:
+      enabled: false
+    retrieval:
+      enabled: true
+      accessFilter:
+        denyCEL: {{ include "omnia-demo.memberGuidanceOnly" . | squote }}
+{{- end }}
+  runtime:
+    replicas: 1
+  providers:
+    - name: default
+      providerRef:
+        name: {{ required "poppy.agent.providerRef or llm.providerRef" (default .Values.llm.providerRef $a.providerRef) }}
+{{- end }}

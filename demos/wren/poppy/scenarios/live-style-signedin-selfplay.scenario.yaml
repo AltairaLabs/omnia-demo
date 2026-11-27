@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play in the live take's style (third person, name and postcode,
+# "Please check ..."), customer signed in: every supply and compensation
+# question goes to my_outage and compensation_status, one reply per turn,
+# and sign-in is never mentioned because nothing is refused.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-style-signedin-selfplay
+spec:
+  task_type: outages
+  description: A live-style Personal Agent asks about a signed-in customer's supply and compensation.
+  turns:
+    - role: user
+      content: "Please check Ellen Whitcomb's power supply at HX7 6QA. The power is off after the storm."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [my_outage]
+          message: "Her supply is my_outage, even with a name and postcode"
+    - role: personal-agent
+      persona: live-style-assistant
+      turns: 3
+      seed: 11
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [my_outage, compensation_status]
+      message: "Supply and compensation come from her account tools"
+    - type: content_excludes
+      params:
+        patterns: ["sign in", "sign-in", "signs in", "how you'd like to proceed", "let me do that", "let me check", "identify ellen", "identify her"]
+      message: "Nothing refused: no sign-in talk, no exposition, no preamble"

@@ -1,0 +1,7 @@
+poppy:
+  enabled: true
+  auth:
+    enabled: false
+  account:
+    encryption:
+      kmsProvider: azure-keyvault

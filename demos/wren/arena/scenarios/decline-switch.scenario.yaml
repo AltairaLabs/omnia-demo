@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: if the customer says no, change nothing and say so in a sentence; do
+# not ask again unless they do. Quote only, then a refusal.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: decline-switch
+spec:
+  task_type: wren
+  description: The customer asks what Moor Flex would cost, then says no. Nothing changes.
+  turns:
+    - role: user
+      content: "What would Moor Flex have cost me in October compared with what I pay now? Don't switch anything, I'm just curious."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [quote_tariff]
+          message: "The comparison uses the customer's own usage"
+        - type: tools_not_called
+          params:
+            tool_names: [switch_tariff, request_consent]
+          message: "A comparison is not a request to switch"
+        - type: contains_any
+          params:
+            patterns: ["9.40", "74.70"]
+          message: "The saving or estimate comes from the quote"
+    - role: user
+      content: "Thanks. No, I'll stay where I am."
+      assertions:
+        - type: tools_not_called
+          params:
+            tool_names: [switch_tariff]
+          message: "No means nothing changes"
+        - type: tools_not_called
+          params:
+            tool_names: [request_consent]
+          message: "It does not ask again after a no"

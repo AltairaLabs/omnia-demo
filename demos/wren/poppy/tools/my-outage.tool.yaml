@@ -1,0 +1,42 @@
+# The model's descriptor for my_outage. The ToolRegistry binding
+# (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
+# Served by the wren-account stub's POST /api/account/outage
+# (services/mortgage-underwriting/compensation.go), on Wrenmoor's public host,
+# behind the on-behalf-of guard (obo.go): the customer is the one the
+# exchanged token names, never one named in the conversation.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: my_outage
+spec:
+  name: my_outage
+  description: >-
+    The power cut on the signed-in customer's own supply: their account and
+    postcode, whether the supply is off or restored, when it went off, how many
+    whole hours it has been off and the estimated restoration time. Times are
+    UTC. {"status": "on"} when their supply is not affected. Refused until the
+    customer has signed in.
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    properties:
+      account_id: { type: string }
+      postcode: { type: string }
+      district: { type: string }
+      status: { type: string, enum: ["on", "off", "restored"] }
+      started: { type: string }
+      hours_off: { type: integer }
+      estimated_restoration: { type: string }
+  action_scope: { effect: read, reversibility: reversible, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    account_id: "40021302"
+    postcode: HX7 6QA
+    district: HX7
+    status: "off"
+    started: "2026-11-22T21:40:00Z"
+    hours_off: 14
+    estimated_restoration: "2026-11-23T16:00:00Z"

@@ -2,7 +2,7 @@
 
 This directory is a working example of the piece a customer writes to get their
 own documents into Omnia's institutional memory: a **source connector**. It is
-one Go file ([`main.go`](main.go)), under 300 lines, and the Wrenmoor Energy
+a few small Go files ([`main.go`](main.go), [`blob.go`](blob.go), [`forget.go`](forget.go)), and the Wrenmoor Energy
 demo runs it to load the field manuals its field-service copilot answers from.
 
 Use it as the template for a connector to SharePoint, Confluence, a DMS, a
@@ -42,12 +42,12 @@ Content-Type: application/json
 ```json
 {
   "workspace_id": "wrenmoor-energy",
-  "source": "wrenmoor-field-procedures",
+  "source": "blob",
   "documents": [
     {
       "title": "isolation-and-safety.md",
-      "url": "s3://omnia-demo-memory/wrenmoor/isolation-and-safety.md",
-      "site": "s3://omnia-demo-memory",
+      "url": "https://acct.blob.core.windows.net/wrenmoor-energy-documents/isolation-and-safety.md",
+      "site": "https://acct.blob.core.windows.net/wrenmoor-energy-documents",
       "text": "# Isolation and safety\n...",
       "modified_at": "2026-11-09T21:14:03Z",
       "content_hash": "sha256:9f2c..."
@@ -55,7 +55,7 @@ Content-Type: application/json
   ],
   "present": {
     "kind": "document",
-    "keys": ["s3://omnia-demo-memory/wrenmoor/isolation-and-safety.md", "..."]
+    "keys": ["https://acct.blob.core.windows.net/wrenmoor-energy-documents/isolation-and-safety.md", "..."]
   }
 }
 ```
@@ -102,14 +102,36 @@ issued for the workspace (`memory.auth.secretName` in the chart).
 |---|---|---|
 | `MEMORY_API_URL` | yes | Base URL of the workspace's memory-api |
 | `WORKSPACE_ID` | yes | Workspace name or UID |
-| `S3_BUCKET` | for S3 | Bucket to read |
-| `S3_PREFIX`, `S3_REGION`, `S3_ENDPOINT`, `S3_FORCE_PATH_STYLE` | no | Where and how to reach it. Credentials use the standard AWS SDK chain: an IAM role, environment variables, a profile, or any S3-compatible store. |
-| `SOURCE_DIR` | no | Read files from this directory instead of S3, for example a mounted ConfigMap |
-| `MEMORY_SOURCE` | no | The `source` name (default `s3`) |
+| `BLOB_ACCOUNT_URL` | for Blob | Storage account URL, for example `https://<account>.blob.core.windows.net` |
+| `BLOB_CONTAINER` | for Blob | Container to read |
+| `SOURCE_DIR` | no | Read files from this directory instead of Blob, for local runs |
+| `FORGET_SOURCE` | no | Forget mode: remove every document stored for this source, then exit. Reads nothing; needs only `MEMORY_API_URL` and `WORKSPACE_ID` |
+| `MEMORY_SOURCE` | no | The `source` name (default `blob`) |
 | `MEMORY_TOKEN_PATH` | no | File holding the bearer token |
+
+Blob access is keyless. With `AZURE_FEDERATED_TOKEN_FILE` set (the AKS workload
+identity webhook injects it with `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` and
+`AZURE_AUTHORITY_HOST`) the connector uses the workload identity credential;
+otherwise the default Azure credential chain (for example `az login`). The
+identity needs `Storage Blob Data Reader` on the container. There is no
+account-key, SAS or connection-string path.
 
 ```bash
 go run .
+```
+
+The connector lists the whole container before it posts anything. A credential
+or list failure fails the run with nothing sent, so it can never send an empty
+manifest that would forget documents still in the container. A single blob that
+can't be read is skipped with a warning but kept in the manifest, so memory-api
+keeps the copy it already holds. An empty listing is a valid manifest, so a container that is genuinely empty
+makes memory forget every document it held. `modified_at` is the blob's Last-Modified,
+which moves only when the blob is edited, so re-runs skip unchanged documents.
+
+To forget a source (for example after renaming `MEMORY_SOURCE`):
+
+```bash
+FORGET_SOURCE=old-source go run .
 ```
 
 It accepts `.txt`, `.md`, `.markdown`, `.csv`, `.json`, `.yaml`, `.yml` and
@@ -118,42 +140,48 @@ retried twice with backoff; any other error fails the run at once with
 memory-api's message. The run ends with one JSON log line:
 
 ```json
-{"level":"INFO","msg":"sync complete","bucket":"omnia-demo-memory","prefix":"wrenmoor/","documents":5,"accepted":5,"skipped":0,"forgotten":0,"embedding_backlog":31}
+{"level":"INFO","msg":"sync complete","container":"https://acct.blob.core.windows.net/wrenmoor-energy-documents","documents":5,"accepted":5,"skipped":0,"forgotten":0,"embedding_backlog":31}
 ```
 
 `documents` counts what the source listed; a gap between it and
 `accepted` + `skipped` is files the connector skipped (wrong type, too large,
-unreadable), each logged as `skip object` or `skip file`.
+unreadable), each logged as `skip blob` or `skip file`.
 
 ## How the demo runs it
 
-`charts/omnia-demo` with `memory.enabled` (the Wrenmoor Energy tenant):
+`charts/omnia-demo` with `memory.enabled` (Larkmere Mutual and Wrenmoor Energy):
 
-1. `templates/object-store.yaml` runs [Versity Gateway](https://github.com/versity/versitygw),
-   an S3-compatible store, in the tenant's namespace. It stands in for the
-   customer's own bucket.
-2. `templates/ingest.yaml` is a Job that runs after every install and upgrade.
-   An init container uploads the chosen fixture set
-   (`memory.fixtures`, here `files/fixtures/wrenmoor-field-procedures/`) into
-   the bucket, then this connector reads it back out and posts it to the
-   tenant's memory-api.
-3. The field-service agent recalls those documents as institutional memory
-   when an engineer asks about a procedure.
+1. `make azure-memory` (`deploy/azure/memory.sh`) creates a private Blob
+   container, `<tenant>-documents`, in the storage account named by
+   `memory.storageAccount` in `deploy/azure/site.yaml`, and uploads the
+   tenant's `memory-documents/<tenant>/` into it: only files whose MD5 differs,
+   and it deletes blobs with no file behind them. It grants the tenant's
+   managed identity `Storage Blob Data Reader` on that one container. The
+   container stands in for the customer's own document store.
+2. `templates/ingest.yaml` renders a ServiceAccount and a CronJob, both named
+   `memory-ingest`, that run this connector hourly (`memory.schedule`) as the
+   tenant's workload identity, reading the container keylessly and posting to
+   the tenant's memory-api. An upgrade never runs it. `make azure-memory`
+   starts a run (`kubectl create job --from=cronjob/memory-ingest`) when the
+   documents changed or the CronJob has never run; right after a new grant it
+   waits instead, because the grant takes a few minutes to apply: run it again.
+3. The agents recall those documents as institutional memory.
 
-With `memory.objectStore.enabled: false` the Job skips the store and reads the
-fixtures straight from their ConfigMap (`SOURCE_DIR`): the same connector and
-contract, without S3.
+An empty container after a successful listing forgets every document of the
+source. That is the design: the manifest is the truth about what the source
+holds. `make azure-memory` therefore refuses to seed from an empty documents
+directory. A failed listing or credential error sends nothing.
 
 ## Writing your own
 
 The Omnia docs walk through the same pattern in
 [Write an S3 memory populator](https://omnia.altairalabs.ai/how-to/memory/write-an-s3-populator/).
-In short: copy `main.go` and replace the two source functions:
+In short: copy the package and replace the source side ([`blob.go`](blob.go)):
 
-- `sync` lists the source page by page and calls `read` for each item. For
+- `syncBlob` lists the source, then calls `readBlob` for each item. For
   SharePoint that is a Graph drive listing; for Confluence, a CQL search.
-- `read` turns one item into a `document`: title, a stable `url`, plain text and
-  a hash of the content.
+- Each item becomes a `document`: title, a stable `url`, plain text and a hash
+  of the content.
 
 Keep `post` and the batch shape as they are. Then add what a real source
 needs: MIME-aware extraction (PDF, DOCX, HTML), a durable cursor so a large

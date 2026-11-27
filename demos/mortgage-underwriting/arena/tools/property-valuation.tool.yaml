@@ -23,8 +23,14 @@ spec:
   action_scope: { effect: read, reversibility: reversible, data_classes: [property] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    valuation_gbp: 285000
-    method: "AVM, desktop"
-    confidence_band: "high"
-    ltv_percent: 80.0
+  # Branches on case_ref; see case_fetch.
+  mock_template: |
+    {{- if eq .case_ref "APP-2026-00417" -}}
+    {"valuation_gbp":397000,"method":"AVM, desktop","confidence_band":"medium - physical inspection recommended","ltv_percent":87.8}
+    {{- else if eq .case_ref "APP-2026-00588" -}}
+    {"valuation_gbp":300000,"method":"AVM, desktop","confidence_band":"high","ltv_percent":75.0}
+    {{- else if eq .case_ref "APP-2026-00640" -}}
+    {"valuation_gbp":270000,"method":"AVM, desktop","confidence_band":"high","ltv_percent":77.8}
+    {{- else -}}
+    {"valuation_gbp":285000,"method":"AVM, desktop","confidence_band":"high","ltv_percent":80.0}
+    {{- end -}}

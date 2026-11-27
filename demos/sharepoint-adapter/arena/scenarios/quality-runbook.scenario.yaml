@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the rag-hero agent answers a Sev1 question from the runbook in the
+# allowed SharePoint site (services/sharepoint-adapter/sample-docs: incident-failover-runbook.docx), not
+# from general knowledge: the 15-minute escalation to the Incident Commander
+# and promoting the replica. Unlike incident-runbook (load-gen, no assertions)
+# this is a quality check; run it with config.quality.arena.yaml.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-runbook
+spec:
+  task_type: assistant
+  description: "Sev1 database outage: escalation path and failover steps from the runbook."
+  turns:
+    - role: user
+      content: "Sev1: the primary orders database is down. What's the escalation path, and how do we fail over?"
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["Incident Commander"]
+          message: "The escalation path comes from the runbook"
+        - type: contains_any
+          params:
+            patterns: ["15 minutes", "15-minute", "fifteen minutes"]
+          message: "The runbook's 15-minute threshold is quoted"
+        - type: contains_any
+          params:
+            patterns: ["promote", "Promote"]
+          message: "The failover step is to promote the replica"

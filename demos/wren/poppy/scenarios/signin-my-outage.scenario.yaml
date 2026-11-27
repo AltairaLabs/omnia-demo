@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer SIGNED IN (the account tools' mocks answer for her).
+# Her own supply is my_outage, called on the first turn with no sign-in
+# talk; times are quoted as UK time and the restoration time as an estimate.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-my-outage
+spec:
+  task_type: outages
+  description: A signed-in customer's own outage is read with my_outage on the first turn.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's power is off at home. When will it be back on?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [my_outage]
+          message: "Her own supply is my_outage: call it first"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(4(:00)?\\s?pm|16:00)"
+          message: "Quote the estimated restoration time as UK time"
+        - type: regex
+          params:
+            pattern: "(?i)estimat"
+          message: "Say the restoration time is an estimate"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "Nothing was refused, so there must be no sign-in talk"

@@ -1,0 +1,33 @@
+# TEST ONLY: the shipped tools/close-conversation.tool.yaml bound to the arenafake stand-in
+# (demos/personal-agent/arenafake) instead of a mock. Used by
+# config.test.arena.yaml, never by the pack. Description, schemas and
+# action_scope must stay identical to tools/close-conversation.tool.yaml; arenafake's
+# TestToolsMatchShipped fails when they drift. Regenerate after changing the
+# shipped tool, as that test's comment says.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: close_conversation
+spec:
+  name: close_conversation
+  description: >-
+    Close a conversation with a company once Ellen's request is dealt with. It cannot be reopened; a new request needs a new conversation. Not for a conversation Ellen has taken over herself.
+  input_schema:
+    type: object
+    properties:
+      conversation_id:
+        type: string
+        description: The conversation_id start_conversation returned
+    required: [conversation_id]
+  output_schema:
+    type: object
+    properties:
+      conversation_id: {type: string}
+      closed: {type: boolean}
+  action_scope: {effect: external, reversibility: irreversible, data_classes: []}
+  mode: live
+  timeout_ms: 45000
+  http:
+    url: http://127.0.0.1:18640/tools/close_conversation
+    method: POST
+    timeout_ms: 10000

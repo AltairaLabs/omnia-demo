@@ -1,0 +1,105 @@
+{{- if and .Values.personalAgent.enabled .Values.personalAgent.page.enabled }}
+{{- $pa := .Values.personalAgent }}
+{{- $ns := .Values.namespace }}
+---
+# Ellen's assistant's page: a phone-shaped chat with her assistant, and a
+# strip of its conversations with the companies. The demo-sites binary
+# (services/demo-sites) with --site ellens-assistant; the page is embedded in the
+# one image, so there is no ConfigMap and no volume.
+#
+# STAND-IN (docs/stand-ins.md, "Personal Agent"). It fakes the person's own
+# app, signed in as Ellen. A real one is the assistant vendor's app with its
+# own sign-in. Here the catalogue's dashboard sign-in is in front of it
+# (catalogue.proxies, at /ellens-assistant), and anyone past that acts as
+# Ellen, as anyone who can open the member portal acts as its member.
+#
+# It is the EDGE for the assistant agent: it proxies the chat socket to the
+# facade, asserting Ellen in the edgeTrust headers with a token it signs for
+# her (--issuer-url). It also proxies the page's routes (/api/conversations,
+# /api/updates, /api/direct) to personal-agent, never /tools/*, forwarding
+# nothing of the browser's. The personal-agent NetworkPolicy admits it by
+# the component label below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: assistant-page
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+    app.kubernetes.io/component: {{ $pa.pageComponent }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: assistant-page
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: assistant-page
+        app.kubernetes.io/part-of: {{ .Chart.Name }}
+        # The label personal-agent's NetworkPolicy admits. Without it the
+        # strip stays empty and "Talk to them yourself" fails.
+        app.kubernetes.io/component: {{ $pa.pageComponent }}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # Numeric, because runAsNonRoot alone cannot be verified against a
+        # distroless image whose USER is the NAME "nonroot".
+        runAsUser: 65532
+        runAsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: page
+          image: {{ include "omnia-demo.image" (dict "root" $ "image" $pa.page.image) }}
+          imagePullPolicy: {{ $pa.page.image.pullPolicy }}
+          args:
+            - --site
+            - ellens-assistant
+            # The assistant's facade (edgeTrust opens it to the page's
+            # identity headers).
+            - --agent-url
+            - http://assistant.{{ $ns }}:8080
+            # Ellen's identity provider at her assistant: a signed token for
+            # her on each conversation, so it has a verified user. The install
+            # must list this issuer in delegation.trustedIssuers, as it lists
+            # the portals' (docs/stand-ins.md, "Front doors").
+            - --issuer-url
+            - {{ include "omnia-demo.issuerURL" (dict "service" "assistant-page" "root" $) }}
+            - --personal-agent-url
+            - http://personal-agent.{{ $ns }}:8080
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "10m"
+              memory: "32Mi"
+            limits:
+              cpu: "100m"
+              memory: "64Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: assistant-page
+  namespace: {{ $ns }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+spec:
+  selector:
+    app.kubernetes.io/name: assistant-page
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+{{- end }}

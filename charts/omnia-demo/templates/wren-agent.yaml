@@ -24,7 +24,7 @@ spec:
 # Wrenmoor Energy's account system, as Wren and the customer portal see it:
 # Amira's bills, half-hourly usage, local weather, tariff quotes and switches,
 # plus the consent and receipt routes the portal calls through demo-sites.
-# Same image as the mortgage stubs (demos/mortgage-underwriting, wren.go).
+# Same image as the mortgage stubs (services/mortgage-underwriting, wren.go).
 #
 # ONE replica, and it must stay one: consents, receipts and the account's
 # tariff are in memory, so a consent recorded on one pod would be unknown to
@@ -60,6 +60,9 @@ spec:
         - name: stub
           image: {{ include "omnia-demo.image" (dict "root" $ "image" $w.image) }}
           imagePullPolicy: {{ $w.image.pullPolicy }}
+          {{- /* With Company sign-in: the signed-in customer's outage and
+                 compensation, on the public host (poppy-account-tools.yaml). */}}
+          {{- with include "omnia-demo.accountAPIArgs" (dict "root" $ "company" "wrenmoor") | trim }}{{ . | nindent 10 }}{{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -123,7 +126,7 @@ spec:
   # Trust the Wrenmoor Energy site as the edge. The facade's external listener
   # rejects an unauthenticated browser, so the site proxies the conversation
   # server-side and asserts who is asking in headers the browser cannot set
-  # (demos/demo-sites/server.go). edgeTrust reads them as-is, as a real
+  # (services/demo-sites/server.go). edgeTrust reads them as-is, as a real
   # deployment does behind an API gateway. The defaults are what the site
   # sends (x-user-id, x-user-email, x-user-roles).
   externalAuth:

@@ -32,3 +32,20 @@ notes/
 
 # Compiled PromptPack JSON from markdown sources (generated during Helm chart build)
 **/*.compiled.json
+
+# Your Omnia install's inputs (deploy/azure/site.example.yaml is the template)
+deploy/azure/site.yaml
+
+# The last `make images` dev build (Makefile)
+.images.env
+
+# A test-only site file holding a deployment's real values, for the render
+# comparison in deploy/azure (TestRenderedTenantsUnchanged). Never commit it.
+deploy/azure/testdata/site-ours.yaml
+
+# Arena configs with a deploy: profile for one install (promptarena deploy
+# login writes the endpoint and workspace into them). Keep them local.
+*.local.arena.yaml
+
+# Local plan and spec docs (superpowers). Not for the public repo.
+docs/superpowers/

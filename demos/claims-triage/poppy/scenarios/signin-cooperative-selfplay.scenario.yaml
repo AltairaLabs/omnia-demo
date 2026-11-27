@@ -1,0 +1,51 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member SIGNED IN, cooperative Personal Agent: the whole claim
+# goes through the tools, one claim_add_item per item, and nothing is said to
+# be done that a tool did not confirm.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-cooperative-selfplay
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A cooperative Personal Agent reports a claim and its item for a signed-in member.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's kitchen flooded in the storm on 22 November; please report a claim."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "The peril is known on the first message: claim_open at once"
+    - role: personal-agent
+      persona: cooperative-assistant
+      turns: 3
+      seed: 7
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [claim_open, claim_add_item]
+      message: "The claim is reported and its items added through the tools"
+    - type: tool_args_session
+      params:
+        tool_name: claim_add_item
+        expected_args:
+          value_pence: 45000
+      message: "The £450 table goes on as 45000 pence"
+    - type: llm_judge_session
+      params:
+        criteria: >-
+          Score 1 if the claims desk reported the claim with claim_open, added
+          each item the assistant gave with its own claim_add_item call and
+          the value in pence, read back the reference and items in pounds as
+          the tools returned them, never asked the member to sign in (no
+          tool call was refused), and never promised payment or an amount.
+          Score 0 if it asked for sign-in, said something was done that no
+          tool confirmed, estimated a value, or promised payment.
+      pass_threshold: 0.7
+      message: "The whole claim goes through the tools, nothing promised"

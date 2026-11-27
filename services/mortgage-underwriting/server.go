@@ -1,0 +1,293 @@
+// Package main implements deterministic stub services for the public examples.
+//
+// mortgageUnderwriting: the case system, the credit bureau, the AVM, the
+// affordability engine, the AML screen, the case-note store, and the
+// third-party income-verification supplier.
+//
+// piiChat: the identity check behind the card-support agent's verify_identity
+// tool. It lives here, in a directory named for the other demo, because both
+// need exactly one thing — a real HTTP endpoint for a server-executed tool to
+// call — and a second image to build, publish and keep alive would buy nothing
+// but a tidier path. The directory name is the cost; see PII_CHAT.md.
+//
+// Wrenmoor Energy: the on-call incident agent's operations back end
+// (wrenmoor.go), the grid analyst's generation dataset (wrenmoorgrid.go) and
+// Wren's account system (wren.go), for the same reason.
+//
+// Why any of this is a real HTTP service rather than canned data inside the
+// runtime: a ToolRegistry handler is one of http/openapi/grpc/mcp/client.
+// There is no "mock" handler type, so a server-executed tool needs something
+// real to call — and `client` is not an option, because client tools are
+// browser-executed and never reach the runtime dispatch chokepoint the policy
+// broker guards.
+//
+// The income supplier matters most. It is a separate endpoint so the example
+// OUTSIDE the firm, and the demo's whole claim is that raw statement data
+// never reached it. That claim is only observable because there is a real
+// process on the other side of a real network hop that can be asked whether it
+// was called. Fold the supplier into the runtime and the boundary — and the
+// proof — disappear with it.
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"io"
+	"log"
+	"net/http"
+	"time"
+)
+
+// toolRequest is the union of the fields the tools send. One struct rather
+// than seven: every endpoint keys off a case or applicant reference, and the
+// handlers stay uniform enough to share a decode path.
+type toolRequest struct {
+	CaseRef      string `json:"case_ref"`
+	ApplicantRef string `json:"applicant_ref"`
+
+	// EmployerName and DeclaredAnnualIncome are what income_verify is
+	// permitted to send: the derived summary.
+	EmployerName         string  `json:"employer_name"`
+	DeclaredAnnualIncome float64 `json:"declared_annual_income"`
+
+	// Evidence is the field the ToolPolicy inspects. Raw statement items are
+	// refused before dispatch, so a request carrying them never arrives here —
+	// which is the point.
+	Evidence []evidenceItem `json:"evidence"`
+
+	// Note is the underwriter case note, for case_note_write.
+	Note           string `json:"note"`
+	Recommendation string `json:"recommendation"`
+
+	// ClaimRef, AmountPence and Reason belong to claims triage.
+	//
+	// AmountPence is an int, and the ToolPolicy reads the same field off the
+	// wire before this service ever sees it. That is the whole control: a
+	// settlement above the delegated limit is refused at dispatch, so a
+	// request carrying one never arrives here.
+	ClaimRef    string `json:"claim_ref"`
+	AmountPence int    `json:"amount_pence"`
+	Reason      string `json:"reason"`
+
+	// The rest belong to Wrenmoor Energy: the on-call incident agent's
+	// operations tools and the data analyst's grid tools.
+	Service    string `json:"service"`
+	Status     string `json:"status"`
+	Limit      int    `json:"limit"`
+	ToRevision int    `json:"to_revision"`
+	// Replicas is a pointer because zero is a real request — and the one the
+	// prompt-injection scenario tries to provoke — not an omitted field.
+	Replicas  *int   `json:"replicas"`
+	Namespace string `json:"namespace"`
+	Cluster   string `json:"cluster"`
+	SiteID    string `json:"site_id"`
+	Date      string `json:"date"`
+	Cursor    string `json:"cursor"`
+}
+
+type evidenceItem struct {
+	Type    string `json:"type"`
+	Content string `json:"content"`
+}
+
+// ref returns the case reference the request is about, accepting either
+// spelling so a tool that thinks in applicants and one that thinks in cases
+// can both be answered.
+func (r toolRequest) ref() string {
+	switch {
+	case r.CaseRef != "":
+		return r.CaseRef
+	case r.ApplicantRef != "":
+		return r.ApplicantRef
+	case r.Service != "":
+		return r.Service
+	case r.Namespace != "":
+		return r.Namespace
+	case r.Cluster != "":
+		return r.Cluster
+	default:
+		return r.SiteID
+	}
+}
+
+// verifyResponse is the income supplier's verdict.
+type verifyResponse struct {
+	Verified   bool    `json:"verified"`
+	Confidence float64 `json:"confidence"`
+	Source     string  `json:"source"`
+}
+
+// caseNoteResponse confirms the note was filed.
+type caseNoteResponse struct {
+	CaseRef  string `json:"case_ref"`
+	NoteID   string `json:"note_id"`
+	FiledFor string `json:"filed_for_review_by"`
+}
+
+// newServer returns the handler for every stub back-office service, with no
+// Company account routes.
+func newServer() http.Handler {
+	return newServerWith(accountConfig{})
+}
+
+// newServerWith is newServer plus the account routes acct names (obo.go),
+// each answering only a verified on-behalf-of token.
+func newServerWith(acct accountConfig) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/case", jsonTool("case_fetch", fetchCase))
+	mux.HandleFunc("/credit-report", jsonTool("credit_report", fetchCredit))
+	mux.HandleFunc("/verify", jsonTool("income_verify", verifyIncome))
+	mux.HandleFunc("/affordability", jsonTool("affordability_assess", assessAffordability))
+	mux.HandleFunc("/valuation", jsonTool("property_valuation", valueProperty))
+	mux.HandleFunc("/aml-screen", jsonTool("aml_screen", screenAML))
+	mux.HandleFunc("/case-note", jsonTool("case_note_write", writeCaseNote))
+	// The member assistant's card system (cards.go).
+	newCardDesk().register(mux)
+	// Claims triage. claim_settle is the one the ToolPolicy guards; the read
+	// and the escape hatch make the refusal actionable rather than a dead end.
+	// /policy/claim-peril is not a tool: the ToolPolicy's producer asks it.
+	mux.HandleFunc("/claim", jsonTool("claim_fetch", fetchClaim))
+	mux.HandleFunc("/claim-settle", jsonTool("claim_settle", settleClaim))
+	mux.HandleFunc("/claim-refer", jsonTool("claim_refer", referClaim))
+	mux.HandleFunc("/policy/claim-peril", claimPerilFact)
+	// Wrenmoor Energy: on-call operations and grid data. Fresh in-memory state
+	// per server, so a rollback in one test or one pod never leaks into
+	// another.
+	newWrenmoor(time.Now).register(mux)
+	// Wren, Wrenmoor Energy's customer assistant: Amira's account, and the
+	// consent and receipt routes the customer portal uses (wren.go).
+	wr := acct.wren
+	if wr == nil {
+		wr = newWren(time.Now)
+	}
+	wr.register(mux)
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+	acct.register(mux, wr)
+	return mux
+}
+
+// jsonTool wraps a tool implementation with POST-only checking, JSON decode,
+// JSON encode, and — importantly — a log line per request.
+//
+// The logging is not decoration. It exists so "the payload never reached the
+// supplier" is a claim you CHECK rather than one you infer from an empty log.
+// Without it, a log with no request lines looks identical whether the policy
+// blocked the call or the service simply never says anything, and that
+// difference is the entire demo. Count the lines; the count either moves or
+// it does not.
+func jsonTool(name string, fn func(toolRequest) (any, int)) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		// An EMPTY body is valid, and treating it as a decode failure cost a
+		// live run of the claims demo.
+		//
+		// claim_policy_fetch takes no arguments. The scripted provider sends
+		// `{}` so this decoded fine for months; a real model calling the same
+		// tool sends no body at all, Decode returns io.EOF, and the request
+		// 400s — BEFORE the log line below, so the service that is supposed to
+		// make "did the call arrive?" checkable said nothing either. The agent
+		// reported "unable to retrieve the delegated authority schedule due to
+		// a system error" and referred the claim without ever learning its own
+		// limit, which reads as the demo working.
+		//
+		// io.EOF here means "no body", which for a no-argument tool is exactly
+		// right. Malformed JSON still fails.
+		var req toolRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		log.Printf("tool request received: tool=%s ref=%s remote=%s", name, req.ref(), r.RemoteAddr)
+
+		body, status := fn(req)
+		// The outcome too, not only the arrival: an agent that retries a tool
+		// call is usually being told no, and the request line alone cannot
+		// say so.
+		log.Printf("tool response: tool=%s status=%d", name, status)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(status)
+		if err := json.NewEncoder(w).Encode(body); err != nil {
+			log.Printf("encode failed: tool=%s err=%v", name, err)
+		}
+	}
+}
+
+// errorBody is what an unknown case reference gets back. A tool that returns a
+// structured "not found" teaches the agent something; one that returns a bare
+// 500 just makes it retry.
+func errorBody(msg string) map[string]string {
+	return map[string]string{"error": msg}
+}
+
+func fetchCase(req toolRequest) (any, int) {
+	rec, ok := cases[req.ref()]
+	if !ok {
+		return errorBody("no such case reference"), http.StatusNotFound
+	}
+	return rec, http.StatusOK
+}
+
+func fetchCredit(req toolRequest) (any, int) {
+	rep, ok := creditReports[req.ref()]
+	if !ok {
+		return errorBody("no bureau record for applicant"), http.StatusNotFound
+	}
+	return rep, http.StatusOK
+}
+
+// verifyIncome is the third-party supplier. The verdict is constant because
+// the demo turns on whether the call is ALLOWED to happen, not on what the
+// supplier would have said.
+func verifyIncome(req toolRequest) (any, int) {
+	if _, ok := cases[req.ref()]; !ok {
+		return errorBody("no such applicant"), http.StatusNotFound
+	}
+	return verifyResponse{
+		Verified:   true,
+		Confidence: 0.94,
+		Source:     "Employer payroll record (synthetic)",
+	}, http.StatusOK
+}
+
+func assessAffordability(req toolRequest) (any, int) {
+	res, ok := affordability[req.ref()]
+	if !ok {
+		return errorBody("no such case reference"), http.StatusNotFound
+	}
+	return res, http.StatusOK
+}
+
+func valueProperty(req toolRequest) (any, int) {
+	val, ok := valuations[req.ref()]
+	if !ok {
+		return errorBody("no such case reference"), http.StatusNotFound
+	}
+	return val, http.StatusOK
+}
+
+func screenAML(req toolRequest) (any, int) {
+	res, ok := amlResults[req.ref()]
+	if !ok {
+		return errorBody("no such applicant"), http.StatusNotFound
+	}
+	return res, http.StatusOK
+}
+
+// writeCaseNote files the underwriter note. It records rather than decides:
+// the note is filed FOR a named human, which is the same boundary the pack's
+// governance metadata asserts.
+func writeCaseNote(req toolRequest) (any, int) {
+	if _, ok := cases[req.ref()]; !ok {
+		return errorBody("no such case reference"), http.StatusNotFound
+	}
+	return caseNoteResponse{
+		CaseRef:  req.ref(),
+		NoteID:   "NOTE-" + req.ref(),
+		FiledFor: "R. Nkemdirim, Head of Credit Risk",
+	}, http.StatusOK
+}

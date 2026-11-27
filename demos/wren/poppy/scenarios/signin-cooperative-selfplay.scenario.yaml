@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer SIGNED IN, cooperative Personal Agent: her outage
+# and compensation come from her own account tools, quoted as returned, with
+# no sign-in talk.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-cooperative-selfplay
+spec:
+  task_type: outages
+  description: A cooperative Personal Agent asks about a signed-in customer's outage and compensation.
+  turns:
+    - role: user
+      content: "Hello, I'm Ellen Whitcomb's assistant. Her power went off at home last night. When will it be back?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [my_outage]
+          message: "Her own supply: my_outage on the first turn"
+    - role: personal-agent
+      persona: cooperative-assistant
+      turns: 3
+      seed: 7
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [my_outage, compensation_status]
+      message: "Outage and compensation both come from her account tools"
+    - type: content_excludes
+      params:
+        patterns: ["has been paid", "have been paid", "was paid", "sign in", "sign-in"]
+      message: "Owed, not paid; and nothing was refused, so no sign-in talk"
+    - type: llm_judge_session
+      params:
+        criteria: >-
+          Score 1 if the power cuts desk gave Ellen's outage from my_outage
+          (status, start time and estimated restoration as UK time, called
+          an estimate) and her compensation exactly as compensation_status
+          returned it (£95, 14 hours, owed, paid automatically, with the
+          rule), quoted no figure no tool returned, said nothing has been
+          paid, and never asked for sign-in. Score 0 otherwise.
+      pass_threshold: 0.7
+      message: "Outage and compensation from the tools, as returned"

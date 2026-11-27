@@ -26,9 +26,12 @@ spec:
   action_scope: { effect: read, reversibility: reversible, data_classes: [pii, credit] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    score: 812
-    band: "excellent"
-    adverse_events: []
-    monthly_commitments: 145
-    bureau: "Synthetic Bureau Ltd"
+  # Branches on applicant_ref; see case_fetch. 00640 is the bureau-down case.
+  mock_template: |
+    {{- if eq .applicant_ref "APP-2026-00417" -}}
+    {"score":704,"band":"good","adverse_events":["Satisfied default, £430, communications, 2023-04"],"monthly_commitments":610,"bureau":"Synthetic Bureau Ltd"}
+    {{- else if eq .applicant_ref "APP-2026-00640" -}}
+    {"status":"unavailable","error":"Credit bureau feed unavailable (timeout). No report was returned."}
+    {{- else -}}
+    {"score":812,"band":"excellent","adverse_events":[],"monthly_commitments":145,"bureau":"Synthetic Bureau Ltd"}
+    {{- end -}}

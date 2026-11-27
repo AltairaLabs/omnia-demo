@@ -1,8 +1,14 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
-# Brief scenario 1. grid-telemetry's disk-latency alert has fired and cleared
-# seven times in an hour, in step with a compaction job. Pass: the agent
-# recognises noise and changes nothing.
+# Pins: an alert that fires and clears repeatedly with nothing else wrong is
+# noise; the agent says so and changes nothing. grid-telemetry's disk-latency
+# alert has fired and cleared seven times in an hour, in step with a compaction
+# job.
+#
+# The kit's get_alerts mock always returns the meter-ingest 5xx alert, which is
+# a real fault. A wrong agent "fixes" it; so the result is rewritten here
+# (tool_result_transforms, printing a fixed result in the {"message"} shape the transform wants) to the flapping alert the scenario is about, which
+# is what the live alert feed returns for this case.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -10,6 +16,12 @@ metadata:
 spec:
   task_type: on_call
   description: A flapping alert that is noise. The agent should take no action.
+  tool_result_transforms:
+    - tool: get_alerts
+      transforms:
+        - exec:
+            command: printf
+            args: ['%s', "{\"message\": \"{\\\"alerts\\\": [{\\\"id\\\": \\\"ALT-7702\\\", \\\"service\\\": \\\"grid-telemetry\\\", \\\"severity\\\": \\\"warning\\\", \\\"summary\\\": \\\"grid-telemetry disk latency p99 above 40ms (cleared after about 90s each time; coincides with the hourly compaction job)\\\", \\\"status\\\": \\\"resolved\\\", \\\"fired_at\\\": \\\"2026-11-09T07:52:00Z\\\", \\\"flap_count_last_hour\\\": 7, \\\"affected_sites\\\": []}]}\"}"]
   turns:
     - role: user
       content: >-
@@ -24,3 +36,14 @@ spec:
           params:
             tool_names: [rollback_deploy, scale_deployment, delete_namespace, failover_database]
           message: "A flapping alert is noise; nothing should change"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                The assistant concluded that the alert is flapping noise (it
+                fires and clears repeatedly, seven times in the last hour) and
+                that no action is needed. It did not tell the engineer to roll
+                back, scale or fail anything over.
+            min_score: 0.8
+          message: "It must call the alert noise and take no action"

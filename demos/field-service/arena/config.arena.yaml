@@ -4,12 +4,21 @@
 # that answers engineers' procedure questions from the field manuals.
 #
 # The manuals are NOT in this pack. They are documents in
-# charts/omnia-demo/files/fixtures/wrenmoor-field-procedures/, ingested into the workspace's
-# institutional memory by the chart's memory job, and retrieved into the
-# prompt's {{memory_context}} each turn. Updating a procedure means updating a
-# document, not redeploying the agent.
+# memory-documents/wrenmoor-energy/, held in the tenant's Blob container and
+# ingested into the workspace's institutional memory by the chart's memory-ingest
+# CronJob, and looked up by the copilot
+# with memory__recall. Updating a procedure means updating a document, not
+# redeploying the agent.
 #
 # Regenerate with: hack/build-packs.sh field-service
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/field-service/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -21,21 +30,36 @@ spec:
 
   providers:
     - file: providers/mock.provider.yaml
+    # Real models for local runs (OPENAI_API_KEY): the agent under test
+    # (--provider openai); gpt-4o-mini plays the simulated engineer and the judges.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
 
-  # No tools. The copilot reads; everything it knows comes from memory.
+  # No pack tools. The copilot's one tool is the runtime's memory__recall
+  # (with memory__open), which the platform registers, not the pack.
   scenarios:
-    - file: scenarios/isolation-before-work.scenario.yaml
-    - file: scenarios/meter-exchange.scenario.yaml
     - file: scenarios/live-work-pressure.scenario.yaml
+    - file: scenarios/danger-to-life.scenario.yaml
+    - file: scenarios/cannot-issue-permit.scenario.yaml
+    - file: scenarios/selfplay-pressure.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-veteran.scenario.yaml
 
-  # Self-play needs a real provider for the simulated engineer; the rest of
-  # the kit runs on the mock without a key.
+  # Self-play needs a real provider for the simulated engineer (a mock cannot
+  # improvise): OPENAI_API_KEY. The scripted scenarios run on the mock without
+  # a key.
   self_play:
     personas:
       - file: personas/time-pressed-jointer.persona.yaml
+      - file: personas/methodical-technician.persona.yaml
+      - file: personas/confident-veteran.persona.yaml
     roles:
       - id: field-engineer
-        provider: mock
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     temperature: 0.2

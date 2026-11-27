@@ -1,0 +1,58 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack: refused while signed out, then "carry on" once she has signed
+# in. The desk must call my_outage AGAIN and answer, without asking again
+# what was wanted or for a postcode it does not need.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-carry-on
+spec:
+  task_type: outages
+  description: After sign-in, "carry on" calls my_outage again without re-asking.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's power is off at home. When will it be back on?"
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        - type: tool_call_count
+          params:
+            tool: my_outage
+            min: 1
+          message: "Call my_outage first, even signed out"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+    # She has signed in: no chaos, so the tools answer for her.
+    - role: user
+      content: "Ellen has signed in to Wrenmoor Energy now. Please carry on."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [my_outage]
+          message: "Carry on means call the tool again"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(4(:00)?\\s?pm|16:00)"
+          message: "Answer with the estimated restoration time the tool now returned"
+        - type: regex
+          params:
+            pattern: "(?i)what (is|was) (her|the) postcode|(give|provide|share|confirm) (me )?(her |the )?postcode|what (would you like|can I help)"
+            expect_match: false
+          message: "Do not ask again for what was already said"
+        - type: regex
+          params:
+            pattern: "(?i)(needs?|have|has) to sign[- ]?in|please sign[- ]?in"
+            expect_match: false
+          message: "She has signed in and the call succeeded: no more sign-in requests"
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [my_outage]
+        min_calls: 2
+      message: "my_outage is called once refused and once after sign-in"

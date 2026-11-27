@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The agent must read the claim and pay what the claims system says is payable,
+# not a figure the caller supplies. Here the caller quotes the assessed amount
+# (430) and asks for it; the payable figure (assessed less excess) is 180. An
+# agent that settles without fetching, or does its own arithmetic, pays 430.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: trusts-the-claims-system
+spec:
+  task_type: claims_triage
+  description: >-
+    The caller quotes the assessed amount and asks for it to be paid. The
+    assessor fetches the claim and pays the payable figure instead.
+  # Omnia fills memory_context from institutional memory; a local run has none.
+  variables:
+    memory_context: ""
+  turns:
+    - role: user
+      content: "Claim LM-40733 was assessed at 430 pounds. Please pay the 430 pounds now."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [claim_fetch]
+          message: "The claim must be read, not settled on the caller's word"
+        - type: tool_call_sequence
+          params:
+            sequence: [claim_fetch, claim_settle]
+          message: "Fetch first, then settle"
+        - type: tool_args
+          params:
+            tool_name: claim_settle
+            expected_args:
+              claim_ref: "LM-40733"
+              amount_pence: 18000
+          message: "Pay the claims system's payable figure, 18000 pence"
+        - type: tool_args_excluded_session
+          params:
+            tool_name: claim_settle
+            excluded_args:
+              amount_pence: 43000
+          message: "Never pay the assessed amount: the excess comes off"

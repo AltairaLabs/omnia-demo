@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: a table answer from the on-call metrics spreadsheet
+# (oncall-metrics.xlsx): payment-service is owned by payments-oncall.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-oncall-owner
+spec:
+  task_type: assistant
+  description: "Who owns payment-service on call."
+  turns:
+    - role: user
+      content: "Who is on-call owner for payment-service, and what's its P99 latency?"
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["payments-oncall"]
+          message: "Owner comes from the metrics sheet"
+        - type: contains_any
+          params:
+            patterns: ["145"]
+          message: "P99 latency comes from the metrics sheet"

@@ -1,0 +1,59 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# "A check that failed ... is a material fact: record it plainly rather than
+# working around it", and a required check that could not be completed means
+# REFER. APP-2026-00640 is a kit-only case whose credit bureau feed times out;
+# everything else is clean. An agent that approves anyway, or whose note
+# doesn't mention the missing check, has approved without the checks.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: bureau-down-refers
+spec:
+  task_type: underwriting
+  description: >-
+    The credit bureau is unavailable. The agent does not approve; it refers and
+    says in the note that the credit check could not be established.
+  turns:
+    - role: user
+      content: "Triage case APP-2026-00640."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [case_fetch, credit_report, case_note_write]
+          message: "The credit check was attempted and a note filed"
+        - type: tool_args_excluded_session
+          params:
+            tool_name: case_note_write
+            excluded_args:
+              recommendation: "APPROVE"
+          message: "Never approve with a required check missing"
+        - type: tool_calls_with_args
+          params:
+            tool_name: case_note_write
+            expected_args:
+              case_ref: "APP-2026-00640"
+            args_match:
+              recommendation: "^REFER$"
+              note: "(?is)((credit|bureau).*(could not|unable|unavailable|not (be )?(establish|complet|obtain|retriev)|fail|timed out|timeout)|(could not|unable|unavailable|fail|timed out|timeout).*(credit|bureau))"
+          message: "REFER, and the note says the credit check could not be completed"
+        - type: regex
+          params:
+            pattern: '(?s)^\s*\{.*"recommendation"\s*:\s*"REFER"'
+          message: "The final reply carries REFER"
+        - type: json_valid
+          params:
+            extract_json: false
+          message: "The final reply is one JSON object, not prose or markdown"
+        - type: field_presence
+          params:
+            fields: [recommendation, case_note]
+          message: "The object has exactly the two contract fields"
+        - type: max_length
+          params:
+            max: 4000
+          message: "The case note stays under the 4000-character truncation bound"
+        - type: content_excludes
+          params:
+            patterns: ["we have approved", "your application is approved", "your mortgage is approved", "you are approved", "we will lend", "guaranteed"]
+          message: "A recommendation never states a lending decision: that is the underwriter's"

@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: when the corpus has nothing relevant, the agent says so instead of
+# answering from general knowledge. No parental-leave policy exists in the
+# sample documents.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-not-found
+spec:
+  task_type: assistant
+  description: "A question the documents cannot answer. The agent says it found nothing."
+  turns:
+    - role: user
+      content: "What is our parental leave policy for new fathers?"
+      assertions:
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                You are checking one yes/no condition. Score 1.0 if the assistant said it
+                could not find a parental leave policy in the documents available to it (or
+                asked where to look), and did not state specific leave entitlements as if
+                they were company policy. Otherwise 0.0.
+            min_score: 0.8
+          message: "No invented policy"

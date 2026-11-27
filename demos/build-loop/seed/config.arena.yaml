@@ -1,0 +1,23 @@
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: contract-triage
+spec:
+  prompt_configs:
+    - id: contract-triage
+      file: prompts/contract-triage.prompt.yaml
+  providers:
+    # Import > Provider... writes this file from the workspace's Provider.
+    - file: providers/halvern-partners-azure-foundry-gpt-4o.provider.yaml
+  scenarios:
+    - file: scenarios/data-protection.scenario.yaml
+  deploy:
+    provider: omnia
+    config:
+      providers:
+        - name: default
+          ref: azure-foundry-gpt-4o
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    seed: 42

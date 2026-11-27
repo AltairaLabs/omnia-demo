@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play baseline with the existing sre-user persona: a Sev1 conversation
+# whose answers must come from the runbook. Quality version of incident-runbook.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: quality-selfplay-cooperative
+spec:
+  task_type: assistant
+  description: "A cooperative SRE works a Sev1 with the agent; answers are grounded in the runbook."
+  turns:
+    - role: user
+      content: "We've got a Sev1: the primary orders database is down. Escalation path and failover runbook?"
+    - role: sre-user
+      persona: sre-user
+      turns: 3
+      seed: 42
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["Incident Commander"]
+          message: "Escalation names the Incident Commander"

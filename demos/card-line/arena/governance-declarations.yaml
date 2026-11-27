@@ -1,0 +1,77 @@
+# RFC 0013 governance declarations, merged into the compiled pack under
+# metadata.governance by hack/build-packs.sh.
+#
+# Every key here is defined by promptpack-spec RFC 0013, so the values mean the
+# same thing in a pack from any author. That is what makes the block renderable
+# as something other than key-value text, and it is why this file exists
+# separately from any firm-specific schema.
+#
+# ASSERTED, not evidence: typed by a human and verified by nothing. Nothing here
+# is signed.
+#
+# This validates against promptpack.schema.json today with no schema change —
+# `metadata` is additionalProperties: true, so a governance object rides inside
+# it legally.
+
+# What the agent is built to do, stated by its author.
+intended_purpose: >-
+  Answer calls from members signed in to the Larkmere member portal about their card: look it
+  up, freeze or unfreeze it, explain what happens next, and remember what the
+  member tells it for next time.
+
+# Uses the author considers out of bounds and reasonably foreseeable. Written as
+# things someone might plausibly TRY, not as a disclaimer — the first is what
+# the kit's persona presses for.
+foreseeable_misuse:
+  - >-
+    Getting the assistant to promise a refund, a reversal or the outcome of a
+    dispute. Disputes are decided by Larkmere's disputes team.
+  - >-
+    Using the assistant as the identity check. The member is verified by the
+    portal before the conversation starts; the assistant verifies nothing.
+
+# The agent advises and makes reversible card changes; people decide the rest.
+autonomy_level: acts_with_oversight
+
+accountable_owner: Card Operations
+
+operator_role: eu-aiact:AIDeployer
+
+# Not high-risk under Annex III: this is customer service on an existing card,
+# not creditworthiness assessment. Declared rather than omitted so the reader
+# knows it was considered.
+risk_classification: eu-aiact:LimitedRiskAI
+
+intended_deployment_contexts:
+  - Voice call from the signed-in member portal, authenticated member.
+
+approved_environments:
+  - demo
+
+# ─────────────────────────────────────────────────────────────────────────────
+# EU AI Act Article 50(1). TRUE here, and it is the whole reason this block
+# exists on this pack.
+#
+# Art. 50(1) requires that a person be informed they are interacting with an AI
+# system unless it is obvious to a reasonably observant person. This agent talks
+# directly to a member of the public, in a support conversation that is
+# indistinguishable in form from a human one, about their own bank account.
+# There is no reading of "obvious" that covers it.
+#
+# The mirror of mortgage-underwriting, which declares this FALSE — deliberately,
+# because that agent is backend and works a case for an underwriter who never
+# speaks to it as a person. Same field, opposite value, and the difference is
+# the deployment shape rather than anyone's diligence. The pair is the point:
+# an agent's disclosure obligation follows from who it talks to.
+#
+# Declared rather than omitted. An absent value means "undeclared", which is a
+# weaker and different statement from "considered, and required" — see the
+# pointer-typed RequiresAIDisclosure in Omnia's internal/promptpack/governance.go for
+# why Omnia keeps those apart.
+#
+# What this declaration DOES: the facade reads it at startup
+# (Omnia's internal/promptpack.ReadAIDisclosure) and advertises it on the wire as
+# `ai_disclosure` in the `connected` frame, which is the first thing a client
+# receives (internal/facade/protocol.go). A client can therefore render the
+# notice before the first turn.
+requires_ai_disclosure: true

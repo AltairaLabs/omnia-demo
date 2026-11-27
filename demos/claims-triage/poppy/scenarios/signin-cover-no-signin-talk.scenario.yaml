@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack: a general cover question needs no tool, and no call was
+# refused, so the desk must not tell the member to sign in. Pins "never say
+# the member needs to sign in unless a tool call was refused".
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-cover-no-signin-talk
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A general cover question is answered with no sign-in talk.
+  turns:
+    - role: user
+      content: "In general, what does home insurance cover after a storm, and what should Ellen do first?"
+      assertions:
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "No tool call was refused, so there must be no sign-in talk"
+        - type: regex
+          params:
+            pattern: "(?i)photo|video"
+          message: "First steps include photographing the damage"
+        - type: regex
+          params:
+            pattern: "(?i)(she is|she's|you are|you're) (fully )?covered"
+            expect_match: false
+          message: "Do not confirm her own cover"

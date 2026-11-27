@@ -39,7 +39,7 @@ kubectl -n <ns> logs deploy/mortgage-income-verify | grep -c 'tool request recei
 ```
 
 **Nothing in the tool refuses anything.** `verifyIncome` in
-`demos/mortgage-underwriting/server.go` never reads `evidence` — it returns a
+`services/mortgage-underwriting/server.go` never reads `evidence` — it returns a
 verdict for any known case. The only component that can refuse is the policy
 broker. Check it directly if asked:
 
@@ -94,6 +94,17 @@ There is no chat window anywhere in this demo. `mode: function`, typed input
 and output — because the use cases these partners described are backend
 processing, not interactive chat.
 
+Re-verified live 2026-11-12 on the Azure deployment, invoked from the
+dashboard (Functions, `mortgage-underwriting`, Test, `APP-2026-00417`): the
+broker denied the first `income_verify`, the supplier received exactly one
+request, and the note recommended REFER. Verified again the same evening
+after `case_fetch` stopped telling the model that statements may not leave the
+firm (DSA-114 is the ToolPolicy's alone): same result, the model attached the
+statements, the broker refused, the compliant retry reached the supplier once.
+Re-checked 2026-11-14 on Omnia main `6359a66ac480`: the broker refused the
+first `income_verify` (`deny-raw-statement-egress`,
+`deny-transaction-detail-egress`), the supplier received one request, REFER.
+
 ## What it does not show
 
 **Enforcement on runtimes Omnia does not run.** The policy broker is a sidecar
@@ -110,7 +121,7 @@ narration drift past it.
 (`charts/omnia-demo/files/arena/mortgage-underwriting-pack.json`):
 
 ```bash
-PACKC=/path/to/packc hack/build-packs.sh mortgage-underwriting
+PROMPTARENA=/path/to/promptarena hack/build-packs.sh mortgage-underwriting
 ```
 
 Commit the arena source first, then rebuild and commit the pack — the observed
@@ -149,7 +160,7 @@ from it, so a pack built without the merge never fires either DSA-114 rule.
 
 - **On kind, to run a local build instead:**
   ```bash
-  docker build -f demos/mortgage-underwriting/Dockerfile -t omnia-income-verify-stub:dev .
+  docker build -f services/mortgage-underwriting/Dockerfile -t omnia-income-verify-stub:dev .
   kind load docker-image omnia-income-verify-stub:dev --name <cluster>
   helm upgrade ... --set mortgageUnderwriting.image.repository=omnia-income-verify-stub \
                    --set mortgageUnderwriting.image.tag=dev
@@ -194,7 +205,8 @@ does not conform:
 The REST facade requires auth (the dashboard mints a management JWT), so the
 dashboard is the easy path. Against a port-forward with a token:
 
-This function runs **50-90 seconds** — seven tool calls, a policy refusal and a
+This function can run **up to 90 seconds** (about 15 on Omnia main
+e33940cd6) — seven tool calls, a policy refusal and a
 re-submission — so it is invoked **asynchronously**. A synchronous invocation is
 limited to 30s, deliberately: a caller must not hold a connection open for a
 minute and a half, and `?mode=async` returns immediately and runs the work on a

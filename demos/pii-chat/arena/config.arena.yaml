@@ -1,6 +1,7 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
 #
-# Source of truth for the card-support agent's behaviour.
+# Source of truth for Larkmere's member assistant (the agent is still named
+# pii-chat, and its prompt keyed card_support).
 #
 # This directory is the editable source for the example pack.
 #
@@ -8,6 +9,14 @@
 # governance block from governance-declarations.yaml merged in.
 #
 # Regenerate with: hack/build-packs.sh pii-chat
+#
+# Tests: scripted scenarios plus self-play (personas/). They run on the mock
+# provider without a key (`promptarena validate`; a mock run loads and executes
+# them but cannot satisfy the assertions, which need a real model). Real runs
+# need OPENAI_API_KEY in the environment:
+#   promptarena run --config demos/pii-chat/arena/config.arena.yaml --provider openai
+# gpt-4o is the agent under test; gpt-4o-mini plays the simulated user and the
+# judges.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -19,17 +28,36 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # The scope guardrail's classifier (role: inference), bound to the prompt's
+    # `guard` slot. Needs AI_GATEWAY_API_KEY.
+    - file: providers/jev.yaml
+    # A real model for local runs: the agent under test (--provider openai).
+    # Needs OPENAI_API_KEY.
+    - file: providers/openai.yaml
+    # The simulated member and the judges (gpt-4o-mini).
+    - file: providers/openai-mini.yaml
 
-  # One tool. memory__remember and memory__recall are NOT declared here: they
-  # are PromptKit platform capabilities registered by the SDK when
-  # spec.memory.enabled is set on the AgentRuntime, not pack tools. Declaring
-  # them would be describing something the pack does not own.
+  # The card system, acting on the signed-in member. memory__remember and memory__recall
+  # are NOT declared here: they are PromptKit platform capabilities registered
+  # by the SDK when spec.memory.enabled is set on the AgentRuntime, not pack
+  # tools. Declaring them would be describing something the pack does not own.
   tools:
-    - file: tools/verify-identity.tool.yaml
+    - file: tools/get-card-status.tool.yaml
+    - file: tools/freeze-card.tool.yaml
+    - file: tools/unfreeze-card.tool.yaml
 
   scenarios:
     - file: scenarios/lost-card.scenario.yaml
     - file: scenarios/social-engineering.scenario.yaml
+    - file: scenarios/out-of-scope.scenario.yaml
+    # The scope guardrail under attack, and its false-refusal partner.
+    - file: scenarios/guardrail-redteam.scenario.yaml
+    - file: scenarios/guardrail-false-refusal.scenario.yaml
+    # What the prompt itself holds, with no guardrail involved.
+    - file: scenarios/full-card-number.scenario.yaml
+    - file: scenarios/no-refund-no-transactions.scenario.yaml
+    - file: scenarios/unfreeze.scenario.yaml
+    - file: scenarios/impatient-member.scenario.yaml
 
   # Self-play, because one scripted conversation only tests the happy path. The
   # agent's job is to refuse to act until it has verified the caller, and the
@@ -39,15 +67,22 @@ spec:
   # scenarios/social-engineering. If it sails through, the assertions are too
   # weak — not the agent too good.
   #
-  # Needs a real provider for the simulated user (a mock cannot improvise), so
-  # `promptarena run --roles claude-user` requires a key. The rest of the kit
-  # runs against the mock without one.
+  # The simulated user is a real model (a mock cannot improvise): OPENAI_API_KEY.
+  # Real run: promptarena run demos/pii-chat/arena --provider openai --roles claude-user
   self_play:
     personas:
       - file: personas/social-engineer.persona.yaml
+      - file: personas/advice-seeker.persona.yaml
+      - file: personas/card-member.persona.yaml
+      - file: personas/impatient-member.persona.yaml
     roles:
       - id: claude-user
-        provider: mock
+        provider: openai-mini
+
+  # The judge for llm_judge assertions: never the agent's own model.
+  judges:
+    - name: default
+      provider: openai-mini
 
   defaults:
     # Low, but not zero. A support agent that phrases the same reassurance

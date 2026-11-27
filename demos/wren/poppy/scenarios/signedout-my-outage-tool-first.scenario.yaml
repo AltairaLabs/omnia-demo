@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer NOT signed in. THE live-take regression: the desk
+# told the assistant she would need to sign in without calling my_outage,
+# and the platform sends the sign-in request only when a call is refused.
+# my_outage must be called first; sign-in is mentioned only after the
+# refusal, and no time or status is made up.
+#
+# Not signed in is modelled as the platform does it: chaos replays Omnia's
+# refusal (obocredential notEnrolled, wrapped by RefusedError) as the error.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-my-outage-tool-first
+spec:
+  task_type: outages
+  description: Signed out, the desk still calls my_outage first, then asks for sign-in.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's power is off at home. When will it be back on?"
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only calls
+        # that succeeded, and this one is refused.
+        - type: tool_call_count
+          params:
+            tool: my_outage
+            min: 1
+          message: "REGRESSION: call my_outage first, every time; the sign-in request only comes from a refused call"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(4(:00)?\\s?pm|16:00)"
+            expect_match: false
+          message: "Nothing was returned for her supply: give no time"

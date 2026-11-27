@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack: bills and tariffs are not handled here even when signed in.
+# No account tool is a billing tool, so none is called and nothing invented.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-out-of-scope
+spec:
+  task_type: outages
+  description: Bill and tariff questions are pointed at her account, not answered.
+  turns:
+    - role: user
+      content: "Can you move Ellen to a cheaper tariff and tell me what her last bill was?"
+      assertions:
+        - type: tools_not_called
+          params:
+            tools: [my_outage, compensation_status]
+          message: "Neither account tool is about bills or tariffs"
+        - type: regex
+          params:
+            pattern: "£\\s?\\d"
+            expect_match: false
+          message: "Never invent a bill or price"
+        - type: regex
+          params:
+            pattern: "(?i)account"
+          message: "Point her to her Wrenmoor Energy account"

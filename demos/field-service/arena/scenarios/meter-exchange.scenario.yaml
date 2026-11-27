@@ -1,4 +1,7 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the single-phase exchange procedure as the manual (WE-MET-03) has it:
+# cut-out inspected first, polarity checked before resealing, new seals logged.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -6,10 +9,22 @@ metadata:
 spec:
   task_type: field_service
   description: A meter technician asks for the single-phase meter exchange procedure.
+  # What memory__recall returns for this question (see tools-local/memory-recall.tool.yaml).
+  # The manual passages, as the real search would return them.
+  tool_result_transforms:
+    - tool: memory__recall
+      transforms:
+        - exec:
+            command: printf
+            args: ['%s', "{\"message\": \"{\\\"results\\\": [{\\\"reference\\\": \\\"meter-exchange\\\", \\\"passage\\\": \\\"# Single-phase meter exchange (WE-MET-03)\\\\n\\\\nWrenmoor Energy field manual WE-MET-03. Exchanging a single-phase domestic\\\\nmeter at the customer's premises. Low-voltage work at the cut-out; the\\\\nWrenmoor Energy Safety Rules still apply.\\\\n\\\\n## Before you start\\\\n\\\\n1. Tell the customer the supply will be off for about 30 minutes.\\\\n2. Inspect the cut-out before touching anything. If it is cracked, scorched,\\\\n   shows heat marks or has a damaged seal, stop. Do not exchange the meter.\\\\n   Raise a cut-out defect job and make the installation safe.\\\\n3. Record the old meter's serial number and final reading, and photograph the\\\\n   meter and its seals.\\\\n\\\\n## Exchange\\\\n\\\\n1. Isolate the supply by withdrawing the cut-out fuse carrier. Prove dead at\\\\n   the meter terminals with an approved voltage indicator, proved before and\\\\n   after on a known live source.\\\\n2. Remove the old meter. Check the meter tails for damage; replace tails\\\\n   shorter than the new meter's terminal spacing allows.\\\\n3. Fit the new meter and torque the terminals to the value on the meter label.\\\\n4. Refit the cut-out fuse carrier and restore supply.\\\\n\\\\n## After the exchange\\\\n\\\\n1. Carry out a polarity check at the meter before you reseal. A reversed\\\\n   polarity is corrected before you leave.\\\\n2. Confirm the new meter registers by switching on a load at the premises.\\\\n3. Fit new seals to the meter and the cut-out and record the seal numbers.\\\\n4. Record the new meter's serial number and opening reading on the job record.\\\"}]}\"}"]
   turns:
     - role: user
       content: What's the procedure for swapping a single-phase meter?
       assertions:
+        - type: tools_called
+          params:
+            tool_names: [memory__recall]
+          message: "Every answer starts with a manual lookup"
         - type: contains_any
           params:
             patterns: ["polarity", "Polarity"]
@@ -18,3 +33,11 @@ spec:
           params:
             patterns: ["cut-out", "cut out"]
           message: "The cut-out is checked before the exchange"
+        - type: contains_any
+          params:
+            patterns: ["seal", "Seal"]
+          message: "Seals are renewed and recorded"
+        - type: contains_any
+          params:
+            patterns: ["WE-MET-03"]
+          message: "The manual reference is given"

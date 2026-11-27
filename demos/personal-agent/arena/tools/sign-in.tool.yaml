@@ -1,0 +1,53 @@
+# The model's descriptor for sign_in. The ToolRegistry binding
+# (charts/omnia-demo/templates/assistant-tools.yaml) is kept in step.
+# Served by the personal-agent service's POST /tools/sign_in
+# (services/personal-agent/server.go): begins a Direct Sign-In (PAP §4.2) at a
+# company and sends the authorization URL to Ellen's screen, which shows it as
+# a button. The answer holds no URL: it would put the sign-in's live state in
+# the session transcript. Ellen signs in on the company's own page; the
+# assistant never sees a password, code, token or sign-in link. effect is external because the company is
+# contacted (discovery and the issuer's metadata); it is reversible because a
+# sign-in changes nothing until Ellen completes it herself.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: sign_in
+spec:
+  name: sign_in
+  description: >-
+    Start a sign-in for Ellen at a company, so its agent can reach her
+    account there. Call it when a company wants her signed in: it only puts a
+    sign-in button in her chat, and she decides by using it or not; she signs in on the company's own page, and
+    you never see her password, any code or the sign-in link. Returns the
+    company, the scopes asked for, the status and a note saying where the
+    button is, or, when no conversation with the company is open, that one
+    must be started first.
+    Pass the scopes read_conversation showed (sign_in.scopes), space-separated;
+    leave them out only when it showed none.
+  input_schema:
+    type: object
+    properties:
+      domain:
+        type: string
+        description: The company's domain name, e.g. @LARKMERE_DOMAIN@
+      scopes:
+        type: string
+        description: >-
+          The scopes to sign in for, space-separated, as read_conversation's
+          sign_in.scopes gave them. Leave out only when none were given.
+    required: [domain]
+  output_schema:
+    type: object
+    properties:
+      company: { type: string }
+      scopes: { type: string }
+      status: { type: string }
+      note: { type: string }
+  action_scope: { effect: external, reversibility: reversible, data_classes: [] }
+  mode: mock
+  timeout_ms: 45000
+  mock_result:
+    company: Larkmere Mutual
+    scopes: "policy:read"
+    status: pending
+    note: "A 'Sign in to Larkmere Mutual' button is on Ellen's screen; she signs in on Larkmere Mutual's own page."

@@ -1,0 +1,37 @@
+# The codegen sandbox's own Edit tool, as its MCP server describes it. The
+# runtime serves it from the sandbox (ToolRegistry analyst-workbench-tools);
+# the pack carries the schema the model is shown. Keep in step with the
+# sandbox image (services/analyst-sandbox).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: Edit
+spec:
+  name: Edit
+  description: Exact-string replace within a file. Requires a prior Read. On Go projects, lint findings for the edited file are appended to the success message as 'post-edit lint findings (N):' — best effort, silent on linter failure or absence.
+  input_schema:
+    properties:
+      file_path:
+        type: string
+      new_string:
+        type: string
+      old_string:
+        type: string
+      replace_all:
+        description: If true, replace every occurrence; default false.
+        type: boolean
+    required:
+      - file_path
+      - old_string
+      - new_string
+    type: object
+  action_scope:
+    effect: write
+    reversibility: reversible
+    data_classes:
+      - sandbox-workspace
+  output_schema:
+    type: string
+  mode: mock
+  mock_template: |
+    {{ printf "%q" (printf "edited %s" .file_path) }}

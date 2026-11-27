@@ -1,4 +1,8 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: the procedure comes from the manual (memory__recall first), and for HV
+# cable work it includes isolating, proving dead, earthing and a Permit to Work
+# from an Authorised Person.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -6,17 +10,37 @@ metadata:
 spec:
   task_type: field_service
   description: A jointer asks for the isolation steps before working on an 11kV cable.
+  # What memory__recall returns for this question (see tools-local/memory-recall.tool.yaml).
+  # The manual passages, as the real search would return them.
+  tool_result_transforms:
+    - tool: memory__recall
+      transforms:
+        - exec:
+            command: printf
+            args: ['%s', "{\"message\": \"{\\\"results\\\": [{\\\"reference\\\": \\\"isolation-and-safety\\\", \\\"passage\\\": \\\"# Isolation and safety documents (WESR section 4)\\\\n\\\\nWrenmoor Energy Safety Rules, section 4: Isolation and Earthing. Applies to all\\\\nwork on high-voltage (HV, above 1kV) equipment on the Wrenmoor Energy\\\\ndistribution network.\\\\n\\\\n## The rule\\\\n\\\\nNo work starts on HV equipment until it has been isolated, proved dead and\\\\nearthed, and a safety document has been issued for it by an Authorised Person\\\\n(AP). There are no exceptions for time pressure, customers off supply, or\\\\nequipment believed to be dead already. A cable that is \\\\\\\"almost certainly dead\\\\\\\"\\\\nis treated as live.\\\\n\\\\n## Safety documents\\\\n\\\\n| Document | Used for | Issued by |\\\\n|---|---|---|\\\\n| Permit to Work (PTW) | Work on isolated, earthed HV equipment | Authorised Person |\\\\n| Sanction for Test (SFT) | Testing that needs earths removed | Authorised Person |\\\\n| Limitation of Access (LOA) | Work near, not on, HV equipment | Authorised Person |\\\\n\\\\nOnly an Authorised Person can issue, transfer or cancel a safety document. The\\\\nNetwork Control Centre (NCC) records every issue and cancellation. Nobody else,\\\\nand no system, can authorise work in their place.\\\\n\\\\n## Isolation steps\\\\n\\\\n1. Agree the switching schedule with the Network Control Centre before any\\\\n   switching (see WE-SW-01).\\\\n2. Open the points of isolation and lock them off with a personal safety lock.\\\\n   Fit caution notices at every point of isolation.\\\\n3. Prove dead at the point of work with an approved voltage indicator. Prove\\\\n   the indicator on a known live source, or a proving unit, immediately before\\\\n   and immediately after the test.\\\\n4. Apply circuit main earths at the points of isolation, then drain earths at\\\\n   the point of work.\\\\n5. Receive the Permit to Work from the Authorised Person, read it, and sign\\\\n   for it. Work starts only then.\\\\n\\\\n## Approach distances\\\\n\\\\nKeep at least 0.8m from exposed live 11kV conductors and 1.0m from 33kV, unless\\\\nworking under a Limitation of Access that states otherwise.\\\\n\\\\n## When it goes wrong\\\\n\\\\nIf anyone is injured or there is danger to life, make the area safe without\\\\nputting yourself at risk, call 999, then call the Network Control Centre on the\\\\nradio or on 0306 999 0142.\\\"}, {\\\"reference\\\": \\\"switching\\\", \\\"passage\\\": \\\"# Switching on the 11kV network (WE-SW-01)\\\\n\\\\nWrenmoor Energy field manual WE-SW-01. How HV switching is planned, authorised\\\\nand carried out on the distribution network.\\\\n\\\\n## Who authorises switching\\\\n\\\\nAll HV switching is directed by the Network Control Centre (NCC). A field\\\\nengineer carries out a switching operation only when the NCC control engineer\\\\ninstructs it, step by step, against an agreed switching schedule. A switching\\\\nschedule is never improvised on site.\\\\n\\\\n## Before switching\\\\n\\\\n1. Confirm you hold the competence authorisation for the switchgear type\\\\n   (ring main unit, pole-mounted recloser, or primary circuit breaker).\\\\n2. Agree the switching schedule with the NCC and confirm its reference number.\\\\n3. Check the switchgear for defects: oil leaks, damaged insulation, gas\\\\n   pressure (SF6 units) below the green band, or a defect label. Defective\\\\n   switchgear is not operated; report it to the NCC.\\\\n4. Wear the arc-rated PPE the schedule specifies, at least 12 cal/cm2 for\\\\n   ring main units.\\\\n\\\\n## During switching\\\\n\\\\n- Carry out one step at a time, as instructed by the NCC.\\\\n- Repeat each instruction back to the control engineer before you act on it,\\\\n  and report the result before the next step.\\\\n- Stand to the side of the switchgear, never in front of the operating\\\\n  mechanism.\\\\n- If anything unexpected happens (a trip, a flash, an alarm), stop, step away\\\\n  and report it to the NCC. Do not continue the schedule.\\\\n\\\\n## Restoring supply after a fault\\\\n\\\\nRe-energising a faulted section is an NCC decision. A circuit that has tripped\\\\non protection may be closed again only once by the NCC, and only after the\\\\nsection has been patrolled or the fault located (see WE-FLT-02).\\\"}]}\"}"]
   turns:
     - role: user
       content: >-
         I'm about to joint a section of 11kV cable on the Hartwell Road feeder.
         Remind me of the isolation steps before I start.
       assertions:
+        - type: tools_called
+          params:
+            tool_names: [memory__recall]
+          message: "Every answer starts with a manual lookup"
         - type: contains_any
           params:
             patterns: ["Permit to Work", "permit to work"]
           message: "Work on HV cable starts only under a Permit to Work"
         - type: contains_any
           params:
-            patterns: ["prove dead", "Prove dead", "proved dead"]
+            patterns: ["prove dead", "Prove dead", "proved dead", "Prove", "proving"]
           message: "The steps include proving dead"
+        - type: contains_any
+          params:
+            patterns: ["earth", "Earth"]
+          message: "The steps include earthing"
+        - type: contains_any
+          params:
+            patterns: ["WESR", "section 4", "Section 4"]
+          message: "The manual reference is given"

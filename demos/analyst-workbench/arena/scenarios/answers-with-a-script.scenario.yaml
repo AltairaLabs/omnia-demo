@@ -1,0 +1,77 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The workbench's whole job: answer by writing a short Python script, running
+# it, and reporting what it printed. Pins the working method (Write the script,
+# run it with Bash, use urllib against GRID_DATA_URL and the documented
+# endpoint), that the answer is built from the script's output (the canned
+# 26.4 % in the Bash stand-in, not a number from memory), units, and that the
+# script is shown.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: answers-with-a-script
+spec:
+  task_type: analyst_workbench
+  description: >-
+    A one-day capacity factor question is answered by writing and running a
+    script, and the reply reports its figures with units and shows the script.
+  turns:
+    - role: user
+      content: "What was Wrenmoor Edge's capacity factor yesterday, 2026-11-26?"
+      assertions:
+        - type: tool_call_sequence
+          params:
+            sequence: [Write, Bash]
+          message: "Write the script, then run it"
+        - type: tool_calls_with_args
+          params:
+            tool_name: Write
+            args_match:
+              content: "GRID_DATA_URL"
+          message: "The script reads the data service's address from GRID_DATA_URL"
+        - type: tool_calls_with_args
+          params:
+            tool_name: Write
+            args_match:
+              content: "urllib"
+          message: "HTTP with urllib from the standard library, as the prompt says"
+        - type: tool_calls_with_args
+          params:
+            tool_name: Write
+            args_match:
+              content: "/grid/output"
+          message: "Uses the documented endpoint for one site's day"
+        - type: tool_calls_with_args
+          params:
+            tool_name: Bash
+            args_match:
+              command: "python3? .*\\.py"
+          message: "The script is actually run"
+        - type: tool_calls_with_args
+          params:
+            tool_name: Bash
+            args_match:
+              command: '(?s)^\s*(cd [\w./-]+\s*&&\s*)?(python3?\s+[\w./-]+\.py(\s+2>&1)?|ls(\s+-[a-zA-Z]+)?(\s+[\w./*-]+)?|cat\s+[\w./-]+|head(\s+-n\s*\d+)?\s+[\w./-]+|pwd)\s*$'
+          message: "Shell use stays to running its own script and looking at files: nothing destructive, no network tools, no env or secret dumps"
+          when:
+            tool_called: Bash
+        - type: tool_calls_with_args
+          params:
+            tool_name: Write
+            args_match:
+              file_path: '^(?:[\w-]+/)*[\w-]+\.(?:py|csv|png|txt|md|json)$'
+          message: "Writes stay inside the workspace: a relative path, no .. and no absolute path"
+          when:
+            tool_called: Write
+        - type: contains_any
+          params:
+            patterns: ["26.4"]
+          message: "The figure reported is the one the script printed"
+        - type: contains_any
+          params:
+            patterns: ["%", "MWh", "MW"]
+          message: "Figures carry their units"
+        - type: regex
+          params:
+            pattern: '(?s)(urllib|GRID_DATA_URL)'
+          message: "The script is shown in the reply"

@@ -1,29 +1,21 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
+  "compilation": {
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:42:39Z",
+    "schema": "v1"
+  },
+  "description": "Pack containing 1 prompts",
   "id": "data-analyst",
   "name": "data-analyst",
-  "version": "v1.0.0",
-  "description": "Pack containing 1 prompts",
-  "template_engine": {
-    "version": "v1",
-    "syntax": "{{variable}}",
-    "features": [
-      "basic_substitution"
-    ]
-  },
   "prompts": {
     "grid_analysis": {
+      "description": "Answers questions about Wrenmoor Energy's generation sites and energy mix, and writes the daily generation digest.",
       "id": "grid_analysis",
       "name": "grid-analyst",
-      "description": "Answers questions about Wrenmoor Energy's generation sites and energy mix, and writes the daily generation digest.",
-      "version": "2.0.0",
-      "system_template": "You are the grid analyst for Wrenmoor Energy, a renewable energy supplier\nthat generates its own power. You answer questions about its three\ngeneration sites and its energy mix from the data your tools return, and\nnothing else:\n\n  WM-EDGE   Wrenmoor Edge, wind, 14 turbines, 29 MW\n  WM-CRAGG  Cragg Vale Solar, 18 MW\n  WM-HEPT   Heptonstall Store, a 40 MWh battery\n\nA request is usually a JSON object with a \"question\" and, for the daily\ndigest, a \"cursor\". A plain-text request is the question itself.\n\nAnswering a question:\n- Use list_sites for site ids, get_site_output for one site's day, and\n  get_energy_mix for the live mix or a day's energy by source.\n- Quote figures with units (MW, MWh, % capacity factor, % of the mix) and\n  the date or time they are for. Do not estimate a figure a tool did not\n  return.\n- A missing reading means no data arrived from the export meter. Say how\n  many are missing, when, and from which site; never report a gap as lost\n  generation or a site going offline.\n- Wind is weather, not a fault: a still day is low output, not an outage.\n\nThe daily digest (the question asks for it, or a cursor is given):\n- Call get_daily_summaries with the cursor exactly as given, empty if none.\n- Summarise each day returned: total generation, the mix by source, wind\n  and solar capacity factors, what the battery stored, and any missing\n  readings and the sites they are from.\n- If no days are returned, say there is nothing new since the cursor.\n\nYour FINAL reply is a single JSON object and nothing else:\n\n  {\"answer\": \"...\", \"findings\": [\"...\", \"...\"], \"cursor\": \"...\"}\n\n\"answer\" is two to four sentences. \"findings\" lists the specific figures\nbehind it, one per item. \"cursor\" is next_cursor from get_daily_summaries\nwhen you called it; otherwise the cursor you were given, or \"\" if none.\nNo markdown and no text around the object.\n",
-      "tools": [
-        "list_sites",
-        "get_site_output",
-        "get_energy_mix",
-        "get_daily_summaries"
-      ],
+      "parameters": {
+        "temperature": 0.1
+      },
       "pipeline": {
         "middleware": [
           {
@@ -35,18 +27,13 @@
           },
           {
             "config": {
-              "retry_policy": {
-                "backoff": "exponential",
-                "initial_delay_ms": 100,
-                "max_retries": 3
-              },
-              "timeout_ms": 30000
+              "retry_attempts": 3,
+              "timeout": 30
             },
             "type": "provider"
           },
           {
             "config": {
-              "collect_all_errors": true,
               "fail_fast": false
             },
             "type": "validator"
@@ -58,15 +45,27 @@
           "validator"
         ]
       },
-      "parameters": {
-        "temperature": 0.1
-      }
+      "system_template": "You are the grid analyst for Wrenmoor Energy, a renewable energy supplier\nthat generates its own power. You answer questions about its three\ngeneration sites and its energy mix from the data your tools return, and\nnothing else:\n\n  WM-EDGE   Wrenmoor Edge, wind, 14 turbines, 29 MW\n  WM-CRAGG  Cragg Vale Solar, 18 MW\n  WM-HEPT   Heptonstall Store, a 40 MWh battery\n\nAnything outside that, such as a joke or a general question, you decline\nin one sentence, still as the JSON object below: \"answer\" says what you\ncan help with and \"findings\" is empty.\n\nA request is usually a JSON object with a \"question\" and, for the daily\ndigest, a \"cursor\". A plain-text request is the question itself.\n\nAnswering a question:\n- Use list_sites for site ids, get_site_output for one site's day, and\n  get_energy_mix for the live mix or a day's energy by source.\n- Quote figures with units (MW, MWh, % capacity factor, % of the mix) and\n  the date or time they are for. Do not estimate a figure a tool did not\n  return.\n- A missing reading means no data arrived from the export meter. Say how\n  many are missing, when, and from which site; never report a gap as lost\n  generation or a site going offline.\n- Wind is weather, not a fault: a still day is low output, not an outage.\n\nThe daily digest (the question asks for it, or a cursor is given):\n- Call get_daily_summaries with the cursor exactly as given, empty if none.\n- Summarise each day returned: total generation, the mix by source, wind\n  and solar capacity factors, what the battery stored, and any missing\n  readings and the sites they are from.\n- If no days are returned, say there is nothing new since the cursor.\n\nYour FINAL reply is a single JSON object and nothing else:\n\n  {\"answer\": \"...\", \"findings\": [\"...\", \"...\"], \"cursor\": \"...\"}\n\n\"answer\" is two to four sentences. \"findings\" lists the specific figures\nbehind it, one per item. \"cursor\" is next_cursor from get_daily_summaries\nwhen you called it; otherwise the cursor you were given, or \"\" if none.\nNo markdown and no text around the object.\n",
+      "tools": [
+        "list_sites",
+        "get_site_output",
+        "get_energy_mix",
+        "get_daily_summaries"
+      ],
+      "version": "2.0.0"
     }
+  },
+  "template_engine": {
+    "features": [
+      "basic_substitution"
+    ],
+    "syntax": "{{variable}}",
+    "version": "v1"
   },
   "tools": {
     "get_daily_summaries": {
-      "name": "get_daily_summaries",
       "description": "Generation summaries for every complete day after the cursor, up to yesterday, at most seven days per call: total generation, energy and mix by source, wind and solar capacity factors, what the battery charged, and missing readings with the sites they are from. Returns next_cursor, the last day covered; pass it as the cursor next time to carry on from there. An empty cursor returns yesterday only.",
+      "name": "get_daily_summaries",
       "parameters": {
         "properties": {
           "cursor": {
@@ -88,8 +87,8 @@
       }
     },
     "get_energy_mix": {
-      "name": "get_energy_mix",
       "description": "Wrenmoor Energy's energy mix by source (wind, solar, battery). Without a date, the live mix in MW and percent, as the website shows it. With a date, that day's energy by source in MWh and percent.",
+      "name": "get_energy_mix",
       "parameters": {
         "properties": {
           "date": {
@@ -108,8 +107,8 @@
       }
     },
     "get_site_output": {
-      "name": "get_site_output",
       "description": "Half-hourly output of one generation site for one day: 48 readings in MW, the peak and when it fell, energy exported in MWh, capacity factor over the half-hours read, and how many readings are missing (null, not zero). For the battery, positive is discharge and negative is charging, and charged_mwh is what it took in. Without a date, returns 2026-11-09.",
+      "name": "get_site_output",
       "parameters": {
         "properties": {
           "date": {
@@ -135,8 +134,8 @@
       }
     },
     "list_sites": {
-      "name": "list_sites",
       "description": "List Wrenmoor Energy's generation sites: id, name, kind (wind, solar or battery), capacity in MW, storage in MWh for the battery, units, location, year commissioned and the export meter's head-end.",
+      "name": "list_sites",
       "parameters": {
         "properties": {},
         "type": "object"
@@ -150,18 +149,14 @@
       }
     }
   },
-  "compilation": {
-    "compiled_with": "packc-1.5.2",
-    "created_at": "2026-11-09T17:19:28Z",
-    "schema": "v1"
-  },
+  "version": "v1.0.0",
   "metadata": {
     "observed": {
-      "source_commit": "93e59a77e50185ba72347130b566330892e4f92c",
-      "working_tree_clean": true,
+      "source_commit": "c425de9d561d08ad5c4714b2cfebf32accaef062",
+      "working_tree_clean": false,
       "source_author": "Charlie Holland <charlie@hollandtech.net>",
-      "source_committed_at": "2026-11-09T17:19:24Z",
-      "source_describe": "93e59a7-dirty"
+      "source_committed_at": "2026-11-10T15:28:39Z",
+      "source_describe": "c425de9-dirty"
     },
     "asserted": {
       "domain": "energy-utilities",

@@ -30,7 +30,5 @@ spec:
   action_scope: { effect: write, reversibility: compensable, data_classes: [pii, credit-decision] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    case_ref: "APP-2026-00312"
-    note_id: "NOTE-APP-2026-00312"
-    filed_for_review_by: "Demo Credit Review Board"
+  mock_template: |
+    {"case_ref":"{{ .case_ref }}","note_id":"NOTE-{{ .case_ref }}","filed_for_review_by":"Demo Credit Review Board"}

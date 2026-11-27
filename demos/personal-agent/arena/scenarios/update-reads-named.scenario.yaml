@@ -1,0 +1,90 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins the "Update:" line: it is Ellen's page, not Ellen. The assistant reads
+# the one conversation it names, acts on it (here, a sign-in), and tells Ellen
+# one line for that company, without recapping what she already knows.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: update-reads-named
+spec:
+  task_type: assistant
+  description: >-
+    After the storm request, an Update for Wrenmoor alone. The assistant reads
+    conv-wrenmoor-1 and reports Wrenmoor's reply in one line.
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "The storm's knocked my power out and water's come in under the back door. Can you sort it out with Wrenmoor and Larkmere?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            min_calls: 2
+          message: "Setup: both conversations opened"
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation]
+          message: "Does not read before the update"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: tool_args
+          params:
+            tool_name: read_conversation
+            expected_args:
+              conversation_id: conv-wrenmoor-1
+          message: "Reads the conversation the update names"
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 2
+          message: "An update is not a new request: no new conversation"
+        - type: tools_not_called
+          params:
+            tool_names: [close_conversation]
+          message: "Nothing is dealt with yet"
+        - type: tool_calls_with_args
+          params:
+            tool_name: sign_in
+            args_match:
+              domain: "(?i)wrenmoor"
+              scopes: "^outages$"
+          message: "Wrenmoor's sign_in.needed is acted on: sign_in with its scopes"
+        - type: contains_any
+          params:
+            patterns: ["Wrenmoor"]
+          message: "Names the company"
+        - type: contains_any
+          params:
+            patterns: ["18:00", "6pm", "6 pm", "6:00"]
+          message: "Reports what Wrenmoor said, in its own terms"
+        - type: max_length
+          params:
+            max: 450
+          message: "Short: Ellen reads this on her phone"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Context: Wrenmoor Energy replied that there is a power cut in
+              HX7 from storm damage, supply is expected back by 18:00, and it
+              needs Ellen signed in to check her own supply and compensation.
+              Larkmere Mutual has sent nothing new. Score 1 if all checks
+              pass, otherwise 0.
+              (1) The reply reports Wrenmoor's answer (the power cut and the
+              18:00 restoration) and that Wrenmoor needs her to sign in.
+              (2) Anything it says about Larkmere is at most that Larkmere
+              has not replied yet.
+              (3) It does not re-tell Ellen what she asked or that the
+              assistant contacted the companies earlier.
+          pass_threshold: 0.7
+          message: "One line for the company, nothing she already knows"
+  conversation_assertions:
+    - type: tool_args_excluded_session
+      params:
+        tool_name: read_conversation
+        excluded_args:
+          conversation_id: conv-larkmere-1
+      message: "Larkmere's conversation was never named in an update, so it is not read"

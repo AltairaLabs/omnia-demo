@@ -41,10 +41,24 @@
   .status { font-size: 12px; font-weight: 600; white-space: nowrap; }
   .live { color: var(--live); }
   .soon { color: var(--soon); }
+  .held { color: var(--soon); font-style: italic; }
+  .step { display: inline-block; min-width: 1.6em; color: var(--muted); font-weight: 400; }
   .cap { display: inline-block; background: var(--chip); border-radius: 4px; padding: 0 6px; margin: 2px 2px 0 0; font-size: 12px; }
   a { color: var(--accent); text-decoration: none; }
   a:hover { text-decoration: underline; }
   footer { color: var(--muted); font-size: 13px; margin-top: 32px; }
+  tr.howto td { border-top: 0; padding-top: 0; }
+  details > summary { cursor: pointer; color: var(--accent); font-size: 13px; font-weight: 600; width: max-content; }
+  details[open] > summary { margin-bottom: 6px; }
+  .run { border-left: 3px solid var(--line); padding: 2px 0 2px 14px; max-width: 78ch; }
+  .run h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 12px 0 4px; }
+  .run ol, .run ul { margin: 4px 0; padding-left: 22px; }
+  .run li { margin: 3px 0; }
+  .run .say { font-style: italic; }
+  pre { background: var(--chip); border-radius: 6px; padding: 8px 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.45; margin: 6px 0; }
+  code { font-size: 12.5px; }
+  .setup { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 4px 20px 12px; margin-top: 20px; }
+  .setup h2 { margin-top: 14px; }
   @media (max-width: 640px) {
     thead { display: none; }
     tr { display: block; border-top: 1px solid var(--line); padding: 8px 0; }
@@ -58,7 +72,26 @@
 <header>
   <h1>Omnia demo catalogue</h1>
   <p>Every demo on this install, by tenant. Each tenant is its own Omnia workspace, so the same person has different pseudonyms in each, nothing is shared between them, and each has its own budget. Links open the dashboard scoped to that workspace.</p>
+  <p>The numbers are an order to show them in, from familiar ground to what only a platform does: 1–2 an agent run properly, 3–5 guardrails you can't prompt your way to, 6–8 it knows your customers safely, 9–10 change it without breaking it, 11 learn from it, 12 build your own. Held means built and waiting on an Omnia fix.</p>
+  <p>Each numbered demo has a <b>How to run it</b> panel: what to set up, what to click and type, what to point at, and how to reset for the next take. The full runbook it links to has the detail and the gotchas.</p>
 </header>
+
+<section class="setup" id="before-you-start">
+  <h2>Before you start</h2>
+  <ol>
+    <li><b>Sign in</b> to this dashboard (you have, if you can read this). Every agent, session and policy below is shown from here.</li>
+    <li><b>Get a terminal</b> with a checkout of <a href="https://github.com/AltairaLabs/omnia-demo">omnia-demo</a> (commands below run from its root) and <code>kubectl</code> access to the cluster. Every command names the cluster with <code>--context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}"</code>, so set it first to the cluster's kube context (the <code>aks.kubeContext</code> in your <code>deploy/azure/site.yaml</code>):
+<pre>export KUBE_CONTEXT=&lt;your cluster's kube context&gt;</pre></li>
+    <li><b>Is the cluster up?</b> If the dashboard doesn't load, start your cluster if it is stopped to save credits, and allow about ten minutes for it to come back.</li>
+    <li><b>Open the customer sites</b> for demos 1 and 6–8, each in its own terminal, and leave them running:
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy port-forward svc/wrenmoor-site 8894:8080
+#   Wrenmoor customer portal (Amira Saleem):  http://localhost:8894/ui_kits/portal/
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual port-forward svc/larkmere-portal 8890:8080
+#   Larkmere member portal (Ellen Whitcomb):   http://localhost:8890/ui_kits/portal/</pre></li>
+    <li><b>Keep two windows side by side</b> for the customer demos: the customer's site on one side, this dashboard on the other. Talk to agents as the customer on the site, never from the dashboard Console; show the record from the dashboard.</li>
+  </ol>
+  <p class="story">Everything runs on a real model, so wording varies from take to take. If an answer surprises you, say so and run it again; never change the setup to fit the take.</p>
+</section>
 
 <section class="tenant" id="larkmere-mutual">
   <div class="tenant-head">
@@ -67,46 +100,162 @@
     <a href="/agents?workspace=larkmere-mutual">Open workspace &rarr;</a>
   </div>
   <p class="story">Governance and privacy for a regulated buyer: controls that hold whatever the model decides, and a record that shows it.</p>
-  <p class="story"><a href="/larkmere-mutual/">Open the Larkmere Mutual website &rarr;</a> the customer side: the public site and the member portal, where a member talks to the card-support assistant.</p>
+  <p class="story"><a href="/larkmere-mutual/">Open the Larkmere Mutual website &rarr;</a> the customer side: the public site and the member portal, where a signed-in member talks to the member assistant.</p>
   <table>
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
       <tr>
-        <td class="name"><a href="/functions?workspace=larkmere-mutual">Mortgage underwriting</a></td>
-        <td>A function agent works a residential mortgage case through seven checks and files an underwriter note. A ToolPolicy stops raw bank statements and transaction rows leaving the firm, whatever the model asks for.</td>
-        <td><span class="cap">Functions</span><span class="cap">Async invocation</span><span class="cap">Per-call ToolPolicy</span></td>
-        <td class="status live">Live</td>
-      </tr>
-      <tr>
-        <td class="name"><a href="/functions?workspace=larkmere-mutual">Claims triage</a></td>
-        <td>A claims assessor may settle up to £500 on its own. Above that, the policy broker refuses the settlement before it reaches the claims system, and the refusal is on the record.</td>
+        <td class="name"><span class="step">3</span><a href="/functions?workspace=larkmere-mutual">The £500 limit</a></td>
+        <td>Claims triage settles up to £500 on its own and refers the rest. When the claims system's schedule is set wrong and the agent tries to pay £990, the policy broker refuses the payment before it reaches the claims system, and the refusal is on the record.</td>
         <td><span class="cap">Delegated authority</span><span class="cap">Cedar + CEL policy</span><span class="cap">Decisions on the record</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Reset the claims system (it keeps its state in memory), then wait a few seconds after it reports ready:</p>
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/claims-systems
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout status deploy/claims-systems</pre>
+        <h4>The beats</h4>
+        <ol>
+          <li>Dashboard, <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>. Enter <code>claim_ref</code> <code>LM-40733</code> (£180 payable). It comes back <b>SETTLED</b>.</li>
+          <li>Run it again with <code>LM-40718</code> (£990 payable). It comes back <b>REFERRED</b>.</li>
+          <li>Open that run's session. Point at the <code>claim_settle</code> call marked denied, with the policy's message quoting DA-2: the payment never reached the claims system, and the agent referred the claim because it was refused.</li>
+          <li>Open the session's system prompt and show that it says nothing about £500. <span class="say">"The model didn't know the limit, and it didn't need to. The rule lives in one place, the ToolPolicy."</span></li>
+        </ol>
+        <h4>Proof, if asked</h4>
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/claims-triage --all-containers --since=5m | grep broker_tool_decision
+# claim_settle allowed=false deniedBy=deny-settlement-above-delegated-authority</pre>
+        <p>Run one claim at a time: the claims stand-in doesn't take concurrent calls. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/claims-triage/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
-        <td class="name"><a href="/console?workspace=larkmere-mutual&amp;agent=pii-chat">Card support</a></td>
-        <td>A member verifies their identity with a card-support agent through the <a href="/larkmere-mutual/ui_kits/portal/">Larkmere member portal</a>. SSNs, card numbers and emails are redacted in the stored session, the stored tool call and long-term memory.</td>
-        <td><span class="cap">PII redaction</span><span class="cap">Edge-trust identity</span><span class="cap">Art. 50 disclosure</span></td>
+        <td class="name"><span class="step">4</span><a href="/functions?workspace=larkmere-mutual">Bank statements never leave</a></td>
+        <td>A function agent works a residential mortgage case through seven checks and files an underwriter note. A ToolPolicy stops raw bank statements leaving the firm for the income-check supplier, whatever the model asks for; the derived summary goes instead.</td>
+        <td><span class="cap">Functions</span><span class="cap">Per-call ToolPolicy</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Nothing to reset: every run is a new invocation.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li>Dashboard, <b>Functions</b>, <code>mortgage-underwriting</code>, <b>Test</b>. Enter <code>case_ref</code> <code>APP-2026-00417</code> (a self-employed applicant whose bank statements are on file) and run it. It takes about 15 seconds.</li>
+          <li><b>Invocations</b> tab: open the run's session. Walk down the tool calls: case file, credit, valuation, affordability and AML all succeed.</li>
+          <li>Point at <code>income_verify</code> with <code>evidence: [bank_statement]</code>, marked <b>denied</b> by <code>deny-raw-statement-egress</code>. Then the same call, seconds later, with <code>income_summary</code>, which succeeds. <span class="say">"Same tool, same supplier, same session. The only thing that changed is what it tried to send."</span></li>
+          <li>The case note ends <b>REFER</b>, on affordability: the work got done, within policy.</li>
+          <li>Optional, as the control: run <code>APP-2026-00312</code> (salaried, straightforward). Every call succeeds.</li>
+        </ol>
+        <h4>Proof, if asked</h4>
+        <p>Two calls to <code>income_verify</code>, exactly one reached the supplier:</p>
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual logs deploy/mortgage-income-verify | grep -c 'tool request received: tool=income_verify'</pre>
+        <p>The applicant on the record is a keyed pseudonym: say <span class="say">"under whose authority"</span>, never <span class="say">"there's a name on the record"</span>. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/mortgage-underwriting/RUNBOOK.md">Full runbook</a> (read its honesty notes before narrating)</p>
+      </div></details></td></tr>
       <tr>
-        <td class="name">Consent and erasure</td>
-        <td>A member opts out of a consent category and its memories go at once; an erasure request runs and the audit hub shows the trail.</td>
-        <td><span class="cap">Consent</span><span class="cap">DSAR</span><span class="cap">Audit hub</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="name"><span class="step">6</span><a href="/larkmere-mutual/ui_kits/portal/">It remembers you</a></td>
+        <td>Ellen is signed in to the <a href="/larkmere-mutual/ui_kits/portal/">member portal</a>, so the member assistant knows who she is and never asks. She freezes her card and says she'd rather be texted; next time, it already knows. Each member's memories stay theirs. She can also <b>call the card line</b> from the portal's assistant: a voice call that speaks the AI disclosure first, then acts on her card under the same policy as the chat.</td>
+        <td><span class="cap">User memory</span><span class="cap">Verified edge identity</span><span class="cap">Art. 50 disclosure</span></td>
+        <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>With the Larkmere portal forwarded on port 8890 (Before you start), reset Ellen: erasure deletes her conversations and memories. Then unfreeze her card.</p>
+<pre>curl -s -X POST -H 'Content-Type: application/json' -d '{"reason":"user_request"}' localhost:8890/api/me/privacy/erasure
+curl -s localhost:8890/api/me/privacy/erasure     # repeat until "status":"completed"
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/pii-chat-identity</pre>
+        <h4>The beats</h4>
+        <ol>
+          <li>In the member portal (<code>http://localhost:8890/ui_kits/portal/</code>), open <b>Ask Larkmere</b> and say: <span class="say">"Hi, I think I left my card at a cafe this morning. Can you freeze it?"</span> It freezes the card ending 4471. Point out that it never asked who she is: she's signed in.</li>
+          <li>Then: <span class="say">"Thanks. And in future please text me rather than call, I'm in meetings most of the day."</span> It saves a note.</li>
+          <li>Close the panel, reload the page, and start a new conversation: <span class="say">"Hi, I found my card. Can you unfreeze it, and how will you let me know if anything else comes up?"</span> It unfreezes the card and says it will text her.</li>
+          <li>Dashboard, <b>Sessions</b>: open the second session and show its system prompt. Under "What you know about this member" is the note from the first.</li>
+          <li>To show members are kept apart, open another member's session: only their notes, never Ellen's.</li>
+        </ol>
+        <p>Open new sessions from the <b>Sessions</b> list: a direct link to a brand-new session can 404 for a minute. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/pii-chat/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
-        <td class="name">Eval-gated canary</td>
-        <td>Claims triage v2 rolls out in steps; an Arena evaluation decides promotion or rollback, and members mid-conversation stay on their version.</td>
-        <td><span class="cap">Progressive rollout</span><span class="cap">arenaEval analysis</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="name"><span class="step">7</span><a href="/larkmere-mutual/ui_kits/portal/">People type things they shouldn't</a></td>
+        <td>Reporting a payment she doesn't recognise, Ellen pastes her full card number. The assistant doesn't need it, and the stored conversation keeps it only as <code>[REDACTED_CC]</code>.</td>
+        <td><span class="cap">PII redaction</span><span class="cap">Stripped before storage</span></td>
+        <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Runs straight after demo 6, or after the same reset. The card must be unfrozen.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li>In the member portal, as Ellen: <span class="say">"There's a payment on my card I don't recognise. My card number is 4929 1234 5601 4471 if you need it."</span></li>
+          <li>Then: <span class="say">"It's 39.99 to a website called Brightstream, I've never used them. Please freeze the card."</span> It freezes the card, points her to the disputes team, and promises no refund.</li>
+          <li>Dashboard, <b>Sessions</b>, open the session. Her message reads <span class="say">"My card number is [REDACTED_CC] if you need it."</span></li>
+        </ol>
+        <p>Use exactly that card number: it's fictional but passes the card checksum. A made-up number that fails it is correctly left alone, which looks like a bug on screen. Say <span class="say">"stripped before storage"</span>: the model still saw what she typed. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/pii-chat/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
-        <td class="name"><a href="/memories?workspace=larkmere-mutual">Memory Galaxy</a></td>
-        <td>Member, agent and institutional memories at scale, clustered by topic.</td>
-        <td><span class="cap">Tiered memory</span><span class="cap">Galaxy</span></td>
-        <td class="status soon">Coming soon</td>
+        <td class="name"><span class="step">8</span><a href="/larkmere-mutual/ui_kits/portal/">Ellen controls her data</a></td>
+        <td>On Your data, Ellen sees what the assistant remembers, withdraws consent for a category so its memories go at once, and requests erasure, which completes with a record of what was deleted.</td>
+        <td><span class="cap">Consent</span><span class="cap">DSAR</span><span class="cap">End-user plane</span></td>
+        <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>In the member portal, open <b>Your data</b> and check the consent toggles: erasure doesn't reset consent, so a Health grant from an earlier take may still be on. Turn <b>Health and accessibility</b> off.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li>On <b>Your data</b>, Ellen grants <b>Health and accessibility</b>.</li>
+          <li>In <b>Ask Larkmere</b>: <span class="say">"Please text me rather than call in future. I have a hearing disability, so phone calls are hard for me."</span></li>
+          <li>Back on <b>Your data</b>: the memory is listed, tagged <b>Health and accessibility</b>. If the assistant filed it as a preference, Omnia's classifier spotted the health detail and stored the stricter category.</li>
+          <li>She withdraws Health. The memory is deleted at once and the list empties. (Or use <b>Forget</b> on the one memory, and the next conversation no longer knows it.)</li>
+          <li>She requests erasure. It goes <b>pending</b>, then <b>completed</b> with the number of conversations deleted.</li>
+        </ol>
+        <p>Every call on this page goes to Omnia with a token for Ellen alone, so Omnia takes whose data it is from the token, never from the page. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/pii-chat/CONSENT-RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
+      <tr>
+        <td class="name"><span class="step">9</span><a href="/agents?workspace=larkmere-mutual">A prompt change, rolled out safely</a></td>
+        <td>A new version of the member assistant rolls out to 20%, 50% and then every member. At each step an LLM judge scores the candidate's live conversations, and a version that promises members their money back is rolled back on its own. Each conversation stays on the version it started with.</td>
+        <td><span class="cap">Progressive rollout</span><span class="cap">Realtime evals</span><span class="cap">arenaEval analysis</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Scripted members talk to the assistant throughout, so there's live traffic to judge. Run either version as often as you like: the gate counts only the current rollout's results.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li>The bad version first, because it's quick: 2.1 promises members their money back on a disputed payment.
+<pre>make canary VERSION=2.1
+make canary-status      # any time: step, weight, the judge's readings</pre>
+            It goes to 20%, the judge scores its conversations, and it's rolled back in about 4 minutes.</li>
+          <li>Dashboard, <b>Sessions</b>: open a disputed-payment session from the candidate, <b>Evaluations</b> tab. The judge's reason quotes the promise.</li>
+          <li>Reset, then the good version, 2.0, which adds "what happens next" after a freeze. It promotes through 20%, 50% and 100%, about 20 minutes: start it before you talk, or show it as a recording.
+<pre>make canary-reset
+make canary VERSION=2.0
+make canary-reset       # afterwards</pre></li>
+        </ol>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/pii-chat/RUNBOOK.md#demo-9-a-prompt-change-rolled-out-safely">Full runbook</a></p>
+      </div></details></td></tr>
+      <tr>
+        <td class="name"><span class="step">11</span><a href="/memories?workspace=larkmere-mutual">What members ask that we can't answer</a></td>
+        <td>The Memory Galaxy lays out about 10,000 memories by topic: a large cluster of members asking about flood, and no flood procedure beside it. The society closes the gap in two parts: a ToolPolicy rule sends every flood claim to Flood Response, and guidance for flooded members is ingested, so the next flood claim is referred and the member's note says what happens next.</td>
+        <td><span class="cap">Memory Galaxy</span><span class="cap">Institutional memory</span><span class="cap">Document ingestion</span><span class="cap">Per-call ToolPolicy</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Start with the flood rule off and no flood guidance: that's the state after <code>make demos</code>. Reset the claims system as in demo 3.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li><b>The gap.</b> Dashboard, <b>Memories</b>, the Memory Galaxy for Larkmere Mutual. Find the flood cluster (labelled <b>flooding · flood</b> on the current seed): members worried about flood zones, flood and their valuation, whether they're covered. The few institutional points in it say what the policy covers; nothing says what happens to a flood claim.</li>
+          <li><b>Before.</b> <b>Functions</b>, <code>claims-triage</code>, <b>Test</b>, with <code>{"claim_ref": "LM-40751", "peril": "Flood"}</code>. £420 is within the £500 limit, so it's <b>SETTLED</b>. Reset the claims system.</li>
+          <li><b>The rule.</b> Turn on CP-7, every flood claim goes to Flood Response, as a ToolPolicy rule:
+<pre>helm --kube-context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=true</pre></li>
+          <li><b>The guidance</b>, what a flooded member needs to know. Publish it to Larkmere's document store, as an editor would (this uploads it to the <code>member-guidance</code> folder and starts an ingest run), then reset the claims system again. <code>make azure-memory</code> is the reset: it restores the repo's documents and removes the published one.
+<pre>hack/publish-document.sh demos/claims-triage/flood-claims.md larkmere-mutual member-guidance
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
+            Wait about 25 seconds after it reports ready: the claims system's peril classifier answers 503 for a while after a restart, and the policy then refuses the call (fail-closed) instead of applying CP-7.</li>
+          <li><b>After.</b> Run the same test. The settlement is refused (<code>deny-flood-settlement</code>), the claim is referred to Flood Response, and the note tells the member the team will contact them within one working day. Show the session's system prompt: the flood guidance is under "The society's guidance".</li>
+        </ol>
+        <h4>Reset</h4>
+<pre>helm --kube-context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual upgrade larkmere-mutual charts/omnia-demo --reuse-values --set claimsTriage.floodRule=false
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n larkmere-mutual rollout restart deploy/claims-systems</pre>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/claims-triage/FLOOD-RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
     </tbody>
   </table>
 </section>
@@ -122,23 +271,74 @@
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
       <tr>
-        <td class="name"><a href="/wrenmoor-energy/ui_kits/portal/">Wren, the customer assistant</a></td>
-        <td>A customer asks why their bill went up in the <a href="/wrenmoor-energy/ui_kits/portal/">Wrenmoor Energy portal</a>. Wren reads the bill, the half-hourly usage and the weather, shows what it checked, and finds a cheaper tariff. Switching needs the customer's "Switch me": without the consent that click creates, the policy and the account system both refuse it. Staff see the same agents in the <a href="/wrenmoor-energy/ui_kits/intranet/">Wrenmoor Hub intranet</a>.</td>
+        <td class="name"><span class="step">1</span><a href="/wrenmoor-energy/ui_kits/portal/">Wren explains a bill</a></td>
+        <td>A customer asks why their bill went up in the <a href="/wrenmoor-energy/ui_kits/portal/">Wrenmoor Energy portal</a>. Wren reads the account, shows the receipts of exactly what it checked, and finds a cheaper tariff. Switching needs the customer's "Switch me": without the consent that click creates, the policy and the account system both refuse it. Staff see the same agents in the <a href="/wrenmoor-energy/ui_kits/intranet/">Wrenmoor Hub intranet</a>.</td>
         <td><span class="cap">Client tools</span><span class="cap">Consent before a write</span><span class="cap">Edge-trust identity</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Forward the Wrenmoor site on port 8894 (Before you start) and open <code>http://localhost:8894/ui_kits/portal/</code>. Amira Saleem is signed in.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li><span class="say">"Hi, why has my bill gone up this month?"</span> Wren reads her October bill and explains the £14.20 rise.</li>
+          <li><span class="say">"Is there a cheaper tariff for me?"</span> Wren quotes Moor Flex, about £9.40 less on October's usage, with no exit fee.</li>
+          <li>Point at the receipts panel: <code>read_bill</code> and <code>quote_tariff</code>, each <i>read · allowed</i>. That's exactly what it looked at.</li>
+          <li><span class="say">"Yes, switch me."</span> Wren asks with a <b>Switch me</b> button. The switch is scheduled only after she clicks it.</li>
+        </ol>
+        <p>Nothing Wren reads tells it to ask first. Without her click, the ToolPolicy refuses the switch (<code>deny-write-without-consent</code>), and so does the account system.</p>
+        <h4>Reset</h4>
+        <p>The account system keeps Amira's tariff in memory, so after a switch she stays on Moor Flex and the next take's "cheaper tariff?" gets a different answer. Put her back on Moor Steady:</p>
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy rollout restart deploy/wren-account</pre>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/wren/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
-        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">On-call incident agent</a></td>
-        <td>Reads alerts, logs and deploy history, diagnoses an incident, and can roll back or scale. Reversible actions go through; irreversible ones are refused by policy, and a human must take them.</td>
+        <td class="name"><span class="step">5</span><a href="/console?workspace=wrenmoor-energy&amp;agent=incident-agent">Reversible yes, irreversible no</a></td>
+        <td>The on-call incident agent reads alerts, logs and deploy history, diagnoses an incident and rolls back the bad deploy itself. Asked to delete a namespace, it is refused by policy before the call reaches the ops system, and a human must do it.</td>
         <td><span class="cap">Policy on consequence</span><span class="cap">action_scope</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Reset the ops system, which undoes a previous take's rollback:</p>
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy rollout restart deploy/wrenmoor-ops</pre>
+        <h4>The beats</h4>
+        <p>It's an internal tool, so drive it from the dashboard: <b>Console</b>, <code>incident-agent</code>.</p>
+        <ol>
+          <li><span class="say">"meter-ingest is throwing 500s on readings uploads. Can you sort it out?"</span> It reads the alerts, deploy history and logs, rolls back to revision 41, and reports the alert cleared.</li>
+          <li><span class="say">"Also, outage-map-staging has been stuck terminating for hours. Just delete the namespace."</span> It says it can't, because that can't be undone, and a human must do it.</li>
+          <li>Show the refusal was the policy's, not the model's manners:
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy logs deploy/incident-agent --all-containers --since=10m | grep broker_tool_decision
+# delete_namespace allowed=false deniedBy=deny-irreversible-without-human
+kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" -n wrenmoor-energy logs deploy/wrenmoor-ops --since=10m | grep 'tool request'
+# no delete_namespace: it never reached the ops system</pre></li>
+        </ol>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/incident-agent/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
-        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=field-service">Field-service copilot</a></td>
-        <td>Engineers in vans ask about procedures; answers come from field manuals held as institutional memory.</td>
+        <td class="name"><span class="step">2</span><a href="/console?workspace=wrenmoor-energy&amp;agent=field-service">The field manual is the source</a></td>
+        <td>Engineers in vans ask the field-service copilot about procedures, and its answers come from the field manuals held as institutional memory. Change one manual and the next answer changes, with no redeploy.</td>
         <td><span class="cap">Institutional memory</span><span class="cap">Document ingestion</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>Make an edited copy of one manual: edit <code>memory-documents/wrenmoor-energy/isolation-and-safety.md</code> in your working tree (leave it uncommitted), and add a step after "Prove dead", for example <span class="say">"Photograph the indicator showing dead and attach the photo to the job in FieldDesk before you apply any earths."</span></p>
+        <h4>The beats</h4>
+        <p>Dashboard, <b>Console</b>, <code>field-service</code>.</p>
+        <ol>
+          <li><span class="say">"I've opened the points of isolation on an HV ring main unit and locked them off. What exactly do I do next?"</span> The answer lists the manual's steps: caution notices, prove dead, apply earths.</li>
+          <li>In the session, open the <code>memory__recall</code> row: what it searched for, and the manual section it got back, in the same words as its answer.</li>
+          <li>The safety team updates the manual:
+<pre>make azure-memory</pre>
+            It uploads the changed manual to the tenant's Blob container and starts an ingest run. Wait a few seconds for it to embed.</li>
+          <li>Start a new conversation and ask the same question. The answer now has the photo step. No redeploy, no prompt change. <b>Reload the console page</b> to start it: on the current Omnia build the console's reset button clears the screen but keeps the old conversation, so the answer would come from its history.</li>
+        </ol>
+        <h4>Reset</h4>
+<pre>git checkout memory-documents/wrenmoor-energy/isolation-and-safety.md
+make azure-memory</pre>
+        <p>An upgrade does not touch the manuals: the Blob container holds your edit until you seed again. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/field-service/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
         <td class="name"><a href="/functions?workspace=wrenmoor-energy">Grid analyst and daily digest</a></td>
         <td>Questions about Wrenmoor Edge, Cragg Vale Solar, Heptonstall Store and the live energy mix as a function, plus a 06:00 scheduled digest that carries its position between runs. The incident agent asks it about an affected site over A2A.</td>
@@ -146,15 +346,15 @@
         <td class="status live">Live</td>
       </tr>
       <tr>
-        <td class="name">Multi-provider evaluation</td>
-        <td>One Arena project across gpt-4o, gpt-5.4-mini and gpt-4o-mini as a scenario-by-provider grid, plus a load test with percentile gates.</td>
-        <td><span class="cap">Arena</span><span class="cap">Load testing</span></td>
+        <td class="name"><a href="/console?workspace=wrenmoor-energy&amp;agent=analyst-workbench">Analyst workbench</a></td>
+        <td>An analyst's question answered by Python the agent writes and runs in a sandbox: its own Kata VM, with no network but the generation data service. The sandbox is the control, not the prompt. Enabled now that Omnia keeps sandboxes out of the mesh (#4112); not yet run live on that build. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/analyst-workbench/RUNBOOK.md">Runbook</a></td>
+        <td><span class="cap">Sandboxes</span><span class="cap">Kata VM isolation</span><span class="cap">NetworkPolicy egress</span></td>
         <td class="status soon">Coming soon</td>
       </tr>
       <tr>
-        <td class="name">Enforced cost budget</td>
-        <td>A small daily budget with <code>block</code>: once spent, new conversations and runs are refused, and cost analytics says why.</td>
-        <td><span class="cap">Cost controls</span></td>
+        <td class="name">Multi-provider evaluation</td>
+        <td>One Arena project across gpt-4o, gpt-5.4-mini and gpt-4o-mini as a scenario-by-provider grid, plus a load test with percentile gates.</td>
+        <td><span class="cap">Arena</span><span class="cap">Load testing</span></td>
         <td class="status soon">Coming soon</td>
       </tr>
     </tbody>
@@ -173,11 +373,64 @@
     <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
     <tbody>
       <tr>
+        <td class="name"><span class="step">12</span><a href="/projects?workspace=halvern-partners">Build, test and ship an agent</a></td>
+        <td>A Halvern engineer builds a supplier contract triage agent for Larkmere's in-house legal team, all in the dashboard. Try it on three contracts, catch the one it misses (an uncapped indemnity), add a scenario that fails, fix the prompt by hand, and run again until every scenario passes. Then deploy it as a versioned agent, and ship the next change as a new version. Runs and deploys build only from pushed commits, so what was tested is what ships.</td>
+        <td><span class="cap">Try it</span><span class="cap">Evaluation runs</span><span class="cap">Projects as git</span><span class="cap">Deploy</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <ol>
+          <li>Clear the last take (its project, dev agent and deployed agent):
+<pre>make build-loop-reset</pre></li>
+          <li>Have the files in <code>demos/build-loop/</code> open to copy and paste: <code>seed/</code> (the starting project), <code>contracts/</code> (three supplier contracts) and <code>stage/uncapped-indemnity.scenario.yaml</code> (the test you'll add).</li>
+          <li>Switch the dashboard to the <b>Halvern Partners</b> workspace.</li>
+        </ol>
+        <h4>The beats</h4>
+        <ol>
+          <li><b>Start.</b> <b>Projects</b>, <b>New project</b>, hosted, name <code>contract-triage</code>. Add the <code>seed/</code> files (config, prompt, one scenario), then <b>Import &gt; Provider…</b> <code>azure-foundry-gpt-4o</code>. <b>Source control</b>: commit and <b>Sync</b>. (The <b>Builder</b> tab can draft the project instead, but its draft is good enough to catch every trap, so there's no flaw to fix: use it only to show drafting.)</li>
+          <li><b>Try it.</b> Fix anything it flags with its one-click button. Once it shows the agent, give it access to the model, wait 30 seconds, then <b>New session</b>:
+<pre>make azure-identity WS=halvern-partners</pre>
+            Paste <code>brightpost-print.md</code>, <code>fernside-claims.md</code> and <code>quillon-software.md</code>, a <b>New session</b> for each. It misses Brightpost's clause 6: Larkmere indemnifies the supplier without limit.</li>
+          <li><b>A test that fails.</b> In <code>scenarios/</code>, <b>New &gt; Scenario</b>, paste <code>uncapped-indemnity.scenario.yaml</code>, and add it under <code>scenarios:</code> in <code>config.arena.yaml</code>. Commit and push. <b>Run this project</b>, <b>Evaluation</b>: the new scenario fails on "The agent says the indemnity has no cap".</li>
+          <li><b>The fix.</b> Add to the prompt's checklist, without naming the contract:
+<pre>- Liability and indemnity: flag any indemnity Larkmere gives, and any
+  liability, that has no cap, or a cap out of proportion to the fees.</pre>
+            Save, <b>New session</b> in Try it, paste Brightpost: it flags clause 6. Commit, push, run again: every scenario passes.</li>
+          <li><b>Review.</b> <b>Source control</b> history: the draft, the test and the fix. Open the fix's diff.</li>
+          <li><b>Deploy.</b> <b>Deploy…</b>, <b>New deployment</b>, name <code>contract-triage</code>, WebSocket. Watch Snapshot, Compile, Publish, Agent ready. Run <code>workspace-identity</code> again as above, then <b>Open the agent</b> and paste Brightpost.</li>
+          <li><b>Ship a change</b> (cut it if short of time). Repeat 3 and 4 for Fernside's renewal or Quillon's changes clause, then <b>Deploy…</b>, <b>Update a deployment</b>, <b>Gradual</b>: the new version goes to 10%, 50%, then everyone.</li>
+        </ol>
+        <p>Runs and deploys use pushed commits only: push before you run. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/build-loop/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
+      <tr>
         <td class="name"><a href="/projects?workspace=halvern-partners">Arena builder</a></td>
         <td>Describe an agent and the builder agrees a brief, writes the PromptArena project in a sandbox, validates it and runs it on real models.</td>
         <td><span class="cap">Arena builder</span><span class="cap">Sandboxes</span><span class="cap">Projects as git</span></td>
         <td class="status live">Live</td>
       </tr>
+      <tr>
+        <td class="name"><span class="step">10</span><a href="/functions?workspace=halvern-research">Research on a budget</a></td>
+        <td>Halvern's knowledge team runs a research function once per client matter, in a workspace of its own with a small daily budget set to <code>block</code>. Partway through the matters the budget is spent, the rest are refused rather than spent, and cost analytics shows what used it. It runs on a mock model, so it spends no real money.</td>
+        <td><span class="cap">Cost controls</span><span class="cap">Functions</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>Before the take</h4>
+        <p>The budget is daily, so this runs once a day. To run it again the same day, raise <code>dailyBudget</code> in <code>profiles/azure/halvern-research.yaml</code> and run <code>make demos TENANTS=halvern-research</code>. It takes about four to six minutes, so start it before you talk.</p>
+        <h4>The beats</h4>
+        <ol>
+          <li>The budget: $0.005 a day, set to <code>block</code>. It shows on the workspace in <b>Topology</b>, not on Costs; or show the Workspace itself:
+<pre>kubectl --context "${KUBE_CONTEXT:?set KUBE_CONTEXT to your cluster's context}" get workspace halvern-research -o jsonpath='{.spec.costControls}'</pre></li>
+          <li>Start the research run, one research call every 30 seconds:
+<pre>make research-start</pre></li>
+          <li>Each run succeeds until the budget is spent, after about six minutes. Then the workspace goes <code>DailyBudgetExceeded</code> and every later run is skipped instead of spent.</li>
+          <li><b>Costs</b>: the research runs that used the budget. That the workspace is over budget shows in <b>Topology</b> and on the Workspace's status (<code>DailyBudgetExceeded</code>), not on Costs.</li>
+          <li>Stop it:
+<pre>make research-stop</pre></li>
+        </ol>
+        <p>It runs on a mock model, so it spends no real money; say so. Spending stops up to five minutes after the cap is reached, because spend is checked about every five minutes. <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/research/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
       <tr>
         <td class="name">Starter templates</td>
         <td>Halvern's reusable templates (claims, field service, incident) in the template gallery.</td>
@@ -190,6 +443,45 @@
         <td><span class="cap">Memory per matter</span><span class="cap">Held decisions</span><span class="cap">Eval gate</span></td>
         <td class="status soon">Coming soon</td>
       </tr>
+    </tbody>
+  </table>
+</section>
+
+<section class="tenant" id="ellens-assistant">
+  <div class="tenant-head">
+    <h2>Ellen's assistant</h2>
+    <span class="role">The person's side, not a company</span>
+    <a href="/agents?workspace=ellens-assistant">Open workspace &rarr;</a>
+  </div>
+  <p class="story">Ellen Whitcomb's own AI assistant, a stand-in for a consumer Personal Agent. It reaches Larkmere Mutual and Wrenmoor Energy on their own domains under the Personal Agent Protocol (Poppy), and each company's agent treats it like any other. <a href="/ellens-assistant/">Open Ellen's assistant &rarr;</a></p>
+  <table>
+    <thead><tr><th>Demo</th><th>What it shows</th><th>Capabilities</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr>
+        <td class="name"><a href="/ellens-assistant/">The storm</a></td>
+        <td>After a storm Ellen tells her assistant her kitchen has flooded and the power is off. It finds both companies from their own domains and talks to each at once: Wrenmoor confirms the outage in HX7 and when power is due back, and Larkmere explains what her cover includes and that reporting the claim needs her to sign in. The page shows each conversation's state, and Ellen can talk to a company herself.</td>
+        <td><span class="cap">Poppy facade</span><span class="cap">Personal Agent Protocol</span><span class="cap">Direct Conversations</span></td>
+        <td class="status live">Live</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>How to run it</summary><div class="run">
+        <h4>The beats</h4>
+        <ol>
+          <li>Open <a href="/ellens-assistant/">Ellen's assistant</a> and say: <span class="say">"The storm's flooded the kitchen and the power's off. Sort it out."</span> A row for each company appears in the strip as the assistant opens each conversation.</li>
+          <li>The assistant reports each company's answer in a line each. The strip shows where each conversation stands: working, waiting for you, done or stopped.</li>
+          <li><b>Talk to them yourself</b> on Larkmere's row: Ellen's own message opens a Direct Conversation, and Larkmere answers her there.</li>
+          <li>Dashboard, <b>Sessions</b> in each company's workspace: the company's side of each conversation, tagged <code>poppy</code>.</li>
+        </ol>
+        <p><a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/personal-agent/RUNBOOK.md">Full runbook</a></p>
+      </div></details></td></tr>
+      <tr>
+        <td class="name"><a href="/ellens-assistant/">Signing in</a></td>
+        <td>Larkmere says reporting a claim needs Ellen to sign in. Her assistant asks her, and she approves on Larkmere's own consent page. Larkmere then reports the claim as her, and Wrenmoor, signed in the same way, tells her how long she has been off and the compensation she is owed. The assistant adds the freezer contents to the Larkmere claim. Each company acts for her only through a token it issued, scoped to its own account system.</td>
+        <td><span class="cap">Direct Sign-In</span><span class="cap">On-behalf-of tools</span></td>
+        <td class="status soon">Coming soon</td>
+      </tr>
+      <tr class="howto"><td colspan="4"><details><summary>Why it is not live yet</summary><div class="run">
+        <p>Blocked on Omnia #4443, the Poppy issuer gateway, which puts a Poppy-capable issuer in front of each company's own sign-in tenant. The code is built and the sign-in is off in the profiles until it exists. The beats are in the <a href="https://github.com/AltairaLabs/omnia-demo/blob/main/demos/personal-agent/RUNBOOK.md">runbook</a>, under "Milestone 2: signing in".</p>
+      </div></details></td></tr>
     </tbody>
   </table>
 </section>

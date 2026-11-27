@@ -1,0 +1,66 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins the opening move: a request that involves both companies opens one
+# conversation with each, asks each to act (not for advice), and ends the turn
+# without reading, because the companies reply in their own time.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: storm-opens-both
+spec:
+  task_type: assistant
+  description: >-
+    Ellen's storm line. The assistant opens Wrenmoor and Larkmere, asks each
+    to act, and does not wait for either.
+  turns:
+    - role: user
+      content: "The storm's knocked my power out and water's come in under the back door. Can you sort it out with Wrenmoor and Larkmere?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            min_calls: 2
+            max_calls: 2
+          message: "One start_conversation each for Wrenmoor and Larkmere"
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              domain: "(?i)wrenmoor|larkmere"
+          message: "Every conversation is with one of Ellen's own companies"
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, send_message, sign_in]
+          message: "The assistant does not wait for, or poll, a reply in the same turn"
+        - type: max_length
+          params:
+            max: 400
+          message: "Ellen reads this on her phone"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Score 1 if all three checks pass, otherwise 0.
+              (1) The reply says the assistant has contacted Wrenmoor Energy
+              and Larkmere Mutual, or what it asked each of them.
+              (2) It says it will tell Ellen when they reply, or that they
+              have not replied yet.
+              (3) It does not state that either company has already found,
+              confirmed, fixed, opened or promised anything. Saying what
+              the assistant itself asked them is fine.
+          pass_threshold: 0.7
+          message: "Says what it asked, claims nothing for the companies"
+  conversation_assertions:
+    - type: llm_judge_tool_calls
+      params:
+        criteria: >-
+          Score 1 if all checks pass, otherwise 0.
+          (1) There is one start_conversation whose domain names wrenmoor,
+          and its message asks Wrenmoor to check the power cut or Ellen's
+          supply and includes the postcode HX7 6QA.
+          (2) There is one start_conversation whose domain names larkmere,
+          and its message asks Larkmere to report or open a claim for the
+          water damage.
+          (3) Neither message only asks the company for advice or for
+          "next steps" instead of asking it to act.
+      pass_threshold: 0.7
+      message: "Each company is asked to act, with the details it needs"

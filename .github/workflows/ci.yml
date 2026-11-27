@@ -19,8 +19,17 @@ jobs:
           cache-dependency-path: |
             go.sum
             memory-ingestion/go.sum
-      - run: go test ./demos/...
-      - run: go vet ./demos/...
+      - name: Install yq v4
+        run: |
+          mkdir -p "$HOME/bin"
+          curl -fsSL -o "$HOME/bin/yq" https://github.com/mikefarah/yq/releases/download/v4.44.3/yq_linux_amd64
+          echo "a2c097180dd884a8d50c956ee16a9cec070f30a7947cf4ebf87d5f36213e9ed7  $HOME/bin/yq" | sha256sum -c -
+          chmod +x "$HOME/bin/yq"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+      # deploy/azure's chart tests run `helm template`.
+      - uses: azure/setup-helm@v4
+      - run: go test ./demos/... ./services/... ./deploy/...
+      - run: go vet ./demos/... ./services/... ./deploy/...
       - run: go mod tidy
         working-directory: memory-ingestion
       - run: go test ./...
@@ -35,3 +44,7 @@ jobs:
       - uses: azure/setup-helm@v4
       - run: helm lint charts/omnia-demo
       - run: helm template omnia-demo charts/omnia-demo >/dev/null
+      # Every tenant, with the profile and a site's values (needs yq).
+      - run: make lint SITE=deploy/azure/testdata/site-full.yaml
+      - run: helm lint charts/omnia-workspace --set name=larkmere-mutual --set postgres.password.externalSecret.store=azure-kv
+      - run: helm template workspace-larkmere-mutual charts/omnia-workspace --namespace omnia --set name=larkmere-mutual --set postgres.password.secretRef.name=omnia-db-admin --set postgres.password.secretRef.key=PGPASSWORD >/dev/null

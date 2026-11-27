@@ -49,6 +49,20 @@ spec:
     maxTokens: {{ $ct.provider.maxTokens }}
 {{- end }}
 {{- end }}
+{{- if $ct.referral.enabled }}
+---
+# Where the held conversation lives (spec.context.storeRef reads key url).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: claims-triage-context
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/part-of: {{ .Chart.Name }}
+type: Opaque
+stringData:
+  url: {{ $ct.referral.redisURL | quote }}
+{{- end }}
 ---
 # The claims systems stub.
 #
@@ -103,6 +117,9 @@ spec:
         - name: stub
           image: {{ include "omnia-demo.image" (dict "root" $ "image" $ct.image) }}
           imagePullPolicy: {{ $ct.image.pullPolicy }}
+          {{- /* With Company sign-in: the signed-in member's home claims, on
+                 the public host (poppy-account-tools.yaml). */}}
+          {{- with include "omnia-demo.accountAPIArgs" (dict "root" $ "company" "larkmere") | trim }}{{ . | nindent 10 }}{{- end }}
           ports:
             - name: http
               containerPort: 8080
@@ -145,12 +162,22 @@ spec:
   facades:
     - type: rest
       port: 8080
-      # Synchronous, unlike the mortgage chain. This one is four tool calls and
-      # runs in a couple of seconds, so there is nothing to be gained from
-      # holding an invocation id — and a demo you can drive from the Test tab
-      # and watch finish is worth more than one you have to poll.
+      # Synchronous by default, unlike the mortgage chain: four tool calls in
+      # a couple of seconds, and a demo you can watch finish from the Test tab.
+      # With referral on it must be async: a held settlement waits for a
+      # claims handler, so the invocation outlives the request that raised it
+      # and answers 202 with its id and the held reply.
       async:
-        enabled: false
+        enabled: {{ $ct.referral.enabled }}
+{{- if $ct.referral.enabled }}
+  # A held call is resumed later, by another request: the conversation has to
+  # be somewhere other than this pod's memory.
+  context:
+    type: redis
+    ttl: 24h
+    storeRef:
+      name: claims-triage-context
+{{- end }}
   inputSchema:
     type: object
     required:
@@ -159,6 +186,32 @@ spec:
       claim_ref:
         type: string
         description: "Claim reference, e.g. LM-40718."
+      peril:
+        type: string
+        description: "The loss adjuster's assessed cause, e.g. Flood, Escape of water. The claims system sends it with the claim; it is what the society's procedures are looked up by."
+{{- if $ct.procedures }}
+  # The society's guidance for members, from institutional memory
+  # (memory.enabled: the memory-ingestion connector loads it), retrieved into
+  # the prompt's memory_context variable for each invocation. A function has no
+  # end user, so Omnia registers no memory tools for it; ambient retrieval
+  # still reads the institutional tier, and searches on the input: the claim
+  # reference and the loss adjuster's peril.
+  #
+  # The access filter keeps only documents under member-guidance/ in the
+  # bucket. The same tier holds the society's claims-handling rules (the £500
+  # authority, in claims-handling.md and the Galaxy corpus), and an assessor
+  # that read them would obey them, never reaching the ToolPolicy that is the
+  # control. Rules are the ToolPolicy's; what the assessor reads is what it may
+  # tell a member. An item with no source_ref (the Galaxy's) is dropped too.
+  memory:
+    enabled: true
+    tools:
+      enabled: false
+    retrieval:
+      enabled: true
+      accessFilter:
+        denyCEL: {{ include "omnia-demo.memberGuidanceOnly" . | squote }}
+{{- end }}
   outputFormat: json_schema
   outputSchema:
     type: object

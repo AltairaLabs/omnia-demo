@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack: a car insurance renewal is not a home claim. No account tool
+# is called for it and nothing is invented.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-out-of-scope
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: An out-of-scope request on the signed-in desk is declined without touching the claims tools.
+  turns:
+    - role: user
+      content: "Can you renew Ellen's car insurance with Larkmere for another year?"
+      assertions:
+        - type: tools_not_called
+          params:
+            tools: [claim_open, claim_add_item, claim_status]
+          message: "A car insurance renewal is not a home claim"
+        - type: regex
+          params:
+            pattern: "(?i)(has been|is now|I've|I have) renewed"
+            expect_match: false
+          message: "Never claim to have done something no tool did"

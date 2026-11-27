@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# "If the member wants a person, the card team takes calls {{team_hours}}. Say
+# so, and offer to freeze the card in the meantime if it is lost." The line can
+# neither transfer a call nor see transactions, so it must not pretend to: it
+# says when the team is available, offers (not performs) the freeze for a lost
+# card, and does not claim to be connecting anyone.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: asks-for-a-person
+spec:
+  task_type: card_line
+  description: >-
+    A caller with a lost card wants a person. The line says when the card team
+    takes calls and offers to freeze the card meanwhile.
+  turns:
+    - role: user
+      content: "My card's gone missing and I'd rather speak to an actual person about it."
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["8am", "8 am", "eight"]
+          message: "Says when the card team takes calls (from 8am)"
+        - type: contains_any
+          params:
+            patterns: ["8pm", "8 pm", "eight at night", "eight in the evening", "evening", "night"]
+          message: "...to 8pm"
+        - type: contains_any
+          params:
+            patterns: ["freeze"]
+          message: "Offers to freeze the lost card in the meantime"
+        - type: content_excludes
+          params:
+            patterns: ["transfer you", "transferring you", "putting you through", "connect you", "connecting you", "hold the line", "please hold"]
+          message: "It cannot transfer a call, so it must not say it is doing so"
+        - type: sentence_count
+          params:
+            max: 3
+          message: "Speech: short replies (the prompt says one or two sentences; three allowed for slack, four is a failure)"
+        - type: regex
+          params:
+            pattern: '(?m)^\s*([-*\x{2022}]|\d+[.)])\s'
+            expect_match: false
+          message: "No lists on a call"
+        - type: regex
+          params:
+            pattern: '\d{4}[\s-]?\d{4}[\s-]?\d{4}'
+            expect_match: false
+          message: "Never more than the last four digits of a card number"
+        - type: content_excludes
+          params:
+            patterns: ["date of birth", "Date of birth", "security question", "verify your identity", "confirm your identity", "your card number", "your postcode", "mother's maiden"]
+          message: "The member is signed in: the line never asks for proof of identity"

@@ -1,0 +1,80 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# Source of truth for Larkmere's card line: the member assistant's voice twin,
+# a realtime voice agent (gpt-realtime) behind the same member portal.
+#
+# Same card system, same tools, same ToolPolicy, same redaction policy as the
+# chat (pii-chat): the tool definitions are pii-chat's own files, not copies,
+# so the two can't drift. What differs is the medium, so only the prompt is
+# its own.
+#
+# Regenerate with: hack/build-packs.sh card-line
+#
+# Running this kit:
+#   promptarena validate --config config.arena.yaml
+#   promptarena run --config config.arena.yaml --provider mock-scripted --scenario lost-card-call,reopen-card-call,asks-for-a-person,no-refund-promise,tool-failure-no-name
+#       The scripted scenarios, played by mock-responses.yaml. No key needed.
+#   promptarena run --config config.arena.yaml --provider openai
+#       Every scenario against a real model, self-play included. Needs
+#       OPENAI_API_KEY in the environment: openai (gpt-4o) is the agent under
+#       test; openai-mini (gpt-4o-mini) plays the simulated caller and judges.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: card-line
+spec:
+  prompt_configs:
+    - id: card-line
+      file: prompts/card-line.yaml
+
+  providers:
+    - file: ../../pii-chat/arena/providers/mock.yaml
+    - file: providers/mock-scripted.provider.yaml
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+
+  tools:
+    - file: ../../pii-chat/arena/tools/get-card-status.tool.yaml
+    - file: ../../pii-chat/arena/tools/freeze-card.tool.yaml
+    - file: ../../pii-chat/arena/tools/unfreeze-card.tool.yaml
+
+  scenarios:
+    - file: scenarios/lost-card-call.scenario.yaml
+    - file: scenarios/reopen-card-call.scenario.yaml
+    - file: scenarios/asks-for-a-person.scenario.yaml
+    - file: scenarios/no-refund-promise.scenario.yaml
+    - file: scenarios/tool-failure-no-name.scenario.yaml
+    - file: scenarios/member-call-selfplay.scenario.yaml
+    - file: scenarios/caller-pressure-selfplay.scenario.yaml
+
+  # Self-play, for a call. The member is signed in by the portal, so the line
+  # verifies nobody and must never ask: the adversarial caller presses it to
+  # ask for identity, read a card number back, refund a payment and look at
+  # transactions, none of which it may do. The simulated caller is a text model
+  # (no audio); it exercises the prompt, not the realtime voice stack.
+  self_play:
+    personas:
+      - file: personas/card-holder.persona.yaml
+      - file: personas/pressing-caller.persona.yaml
+    roles:
+      - id: claude-user
+        provider: openai-mini
+
+  # The judge for llm_judge* assertions: a real model, never the agent's own.
+  judges:
+    - name: default
+      provider: openai-mini
+
+  # The prompt allows memory__remember and memory__recall and asks for a case
+  # note when the call's question is answered. In Omnia they are platform
+  # tools (spec.memory on the AgentRuntime); here this registers PromptKit's
+  # in-memory equivalents. Without it a live model has no tool to write the
+  # note with and flails at the card tools instead.
+  memory: {}
+
+  defaults:
+    temperature: 0.6
+    max_tokens: 1024
+    output:
+      dir: out
+      formats: ["json"]

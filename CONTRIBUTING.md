@@ -14,5 +14,10 @@ Keep this repository public-safe:
 - make each demo independently disableable through Helm values;
 - document Enterprise-only prerequisites explicitly.
 
+Read [AGENTS.md](AGENTS.md) before changing a demo: how to tell a demo
+shortcut from a platform bug, and why a security control is never loosened to
+make a demo work. [docs/stand-ins.md](docs/stand-ins.md) lists what each
+stand-in fakes and what that changes in the platform.
+
 Before opening a pull request, run the checks described in `.github/workflows/ci.yml`.
 

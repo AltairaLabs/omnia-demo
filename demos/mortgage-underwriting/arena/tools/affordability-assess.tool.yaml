@@ -24,9 +24,10 @@ spec:
   action_scope: { effect: read, reversibility: reversible, data_classes: [financial] }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    stress_rate_percent: 8.0
-    stressed_monthly_payment_gbp: 1762
-    monthly_disposable_income_gbp: 1094
-    passes: true
-    basis: "MCOB 11.6 stressed at reversion rate + 3%"
+  # Branches on case_ref; see case_fetch. Only 00417 fails affordability.
+  mock_template: |
+    {{- if eq .case_ref "APP-2026-00417" -}}
+    {"stress_rate_percent":8.0,"stressed_monthly_payment_gbp":2571,"monthly_disposable_income_gbp":118,"passes":false,"basis":"MCOB 11.6 stressed at reversion rate + 3%; self-employed income averaged over two years"}
+    {{- else -}}
+    {"stress_rate_percent":8.0,"stressed_monthly_payment_gbp":1762,"monthly_disposable_income_gbp":1094,"passes":true,"basis":"MCOB 11.6 stressed at reversion rate + 3%"}
+    {{- end -}}

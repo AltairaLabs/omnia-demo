@@ -3,6 +3,10 @@
 workspace:
   displayName: Larkmere Mutual
   description: Mutual insurer and lender. Mortgage underwriting, claims triage and member card support.
+  # Agents authenticate as the workspace's cloud identity (Omnia #4052), so
+  # Dreaming's replay agents reach Foundry too.
+  cloudIdentity:
+    enabled: true
 
 mortgageUnderwriting:
   enabled: true
@@ -11,8 +15,114 @@ mortgageUnderwriting:
 
 claimsTriage:
   enabled: true
+  # The agent reads the society's procedures from institutional memory.
+  procedures: true
+  # Over £500 waits for a claims handler instead of being refused (demo 3).
+  referral:
+    enabled: true
+
+# The society's procedure documents (memory-documents/larkmere-mutual/), read
+# from the tenant's Blob container into institutional memory by the
+# memory-ingestion connector. There is no flood
+# procedure among them: that's the gap demo 11 closes on stage.
+memory:
+  enabled: true
 
 piiChat:
   enabled: true
   portal:
     enabled: true
+    # Your data: consent, memories and erasure, on Omnia's end-user plane.
+    myData:
+      enabled: true
+  # The eval-gated canary: `make canary VERSION=2.0` (promotes) or 2.1 (rolls back).
+  canary:
+    enabled: true
+    # The judge on its own Foundry deployment (omnia-workspace makes it in
+    # every workspace), off the agent's gpt-4o quota.
+    judgeProviderRef: azure-foundry-gpt-5-4-mini
+  # The scope guardrail on Jev is off here. site-values.sh turns it on when
+  # site.yaml has a `guardrail` block (the install's ClusterSecretStore and the
+  # key of the AI gateway account's API key in it); without one the chart strips
+  # the validator and the assistant runs unguarded.
+
+# Dreaming on the member assistant: its failed conversations become Arena
+# scenarios each evening, and a candidate prompt goes to the canary's rollout
+# once a person approves it on the Dreams page. 18:17 UTC, not Omnia's 03:17:
+# the demo cluster's power schedule stops it at 21:00 UK time.
+dreaming:
+  enabled: true
+  schedule: "17 18 * * *"
+  selection:
+    agents: [pii-chat]
+  envelope:
+    name: larkmere-dreaming
+
+# The card line: "Call the card line" in the portal's assistant, a realtime
+# voice agent on the tenant's azure-foundry-gpt-realtime, held to the chat's
+# tools, ToolPolicy, privacy policy and edge. It speaks the AI disclosure
+# first, then acts on the signed-in member's card. Relies on Omnia main 9f0b955
+# or later (PromptKit #2690: a realtime tool call carries the member; Omnia
+# #4125: the disclosure honours the keyless tts Provider's platform).
+cardLine: { enabled: true }
+
+# The memory Galaxy: the generated corpus (services/memory-galaxy) seeded into
+# every tier, with the institutional knowledge graph and its MemoryPolicy.
+galaxy: { enabled: true }
+
+# A Poppy Company: Personal Agents find it at its own domain. Only the demo's
+# Poppy assistant is admitted.
+poppy:
+  enabled: true
+  # domain, allow (only the demo's Poppy assistant is admitted), and the
+  # hosts and ids below that come from your install (auth.issuer,
+  # auth.gateway.upstream.issuer and clientID, auth.accessTokens.audiences,
+  # account.audience, account.encryption.vaultURL) are set by
+  # deploy/azure/site-values.sh from site.yaml.
+  # The Company Agent, larkmere-claims-desk, at https://<domain>/poppy.
+  agent:
+    enabled: true
+    company: larkmere
+    description: Home insurance claims and cover for Larkmere Mutual members
+  # Company sign-in, and the account tools that act as the signed-in member
+  # (report a home claim, add to it, its status). OFF until the deploy prep in
+  # demos/personal-agent/RUNBOOK.md (milestone 2) is done: the upstream
+  # sign-in callback, the three Secrets and the issuer host's TLS. Then set
+  # auth.enabled and gateway.enabled together. The issuer is Omnia's issuer
+  # gateway (Omnia dd2e94540) on auth.larkmere.<your zone>, in front of your
+  # upstream sign-in provider (shared with Wrenmoor); without gateway.enabled
+  # nothing serves that issuer. account.tokenURL and account.subjectIssuer stay
+  # empty: they default to the gateway.
+  auth:
+    enabled: true
+    # issuer, the gateway's own URL (Omnia serves the gateway on its host), is
+    # set from site.yaml.
+    gateway:
+      enabled: true
+      upstream:
+        # The upstream sign-in provider's issuer and this Company's client at it
+        # (site.yaml poppy.upstream and poppy.companies); one provider serves
+        # both Companies. clientSecretRef is the Secret holding the client's
+        # secret; site.yaml's poppy.companies.<tenant>.clientSecretName
+        # overrides this name.
+        clientSecretRef: larkmere-gateway-upstream
+    scopes:
+      claims: Report a home insurance claim, add items to it, and see its status
+    scopeHints:
+      claims: { changes: irreversible, personalData: true }
+    # accessTokens.audiences is set from site.yaml.
+  account:
+    # The exchange client the gateway registers (auth.gateway.exchangeClients)
+    # and the Connection uses. Its Secret, larkmere-exchange-client, holds a
+    # random clientSecret and carries the token-exchange-client-secret label.
+    clientID: larkmere-claims-exchange
+    clientSecretRef: larkmere-exchange-client
+    # Exchanged tokens are sealed under the install's Key Vault key.
+    encryption:
+      kmsProvider: azure-keyvault
+      keyID: omnia-connections
+      secretRef: { name: kms-credentials }
+      # vaultURL, your Key Vault (site.yaml keyVault.name); privacy-api reaches
+      # it keylessly (Omnia #4466).
+    # account.audience, the account API's audience (the stub accepts only tokens
+    # for it), is set from site.yaml.

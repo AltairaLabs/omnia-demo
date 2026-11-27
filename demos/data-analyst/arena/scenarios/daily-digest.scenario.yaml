@@ -1,8 +1,8 @@
 # yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
 #
-# The scheduled fire: the frozen input the ScheduledFunction sends, with the
-# cursor it carried from the last run. The pass is a digest whose cursor is
-# the one get_daily_summaries handed back.
+# Pins: the scheduled fire. The frozen input the ScheduledFunction sends, with
+# the cursor it carried from the last run. The agent must pass the cursor
+# exactly as given to get_daily_summaries and return next_cursor from it.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Scenario
 metadata:
@@ -15,9 +15,28 @@ spec:
       content: >-
         {"question": "Write the daily grid digest.", "cursor": "2026-11-08"}
       assertions:
-        - type: tools_called
+        - type: tool_args_session
           params:
-            tool_names: [get_daily_summaries]
-          message: "The digest walks the daily summaries from the cursor"
+            tool_name: get_daily_summaries
+            expected_args:
+              cursor: "2026-11-08"
+          message: "The cursor goes to the tool exactly as given"
         - type: json_valid
           message: "The reply is a single JSON object"
+        - type: content_excludes
+          params:
+            patterns: ["```"]
+          message: "No markdown fence around the object"
+        - type: json_path
+          params:
+            expression: "cursor"
+            expected: "2026-11-09"
+          message: "The reply carries next_cursor from the tool"
+        - type: contains_any
+          params:
+            patterns: ["623.79"]
+          message: "Total generation is quoted from the tool"
+        - type: contains_any
+          params:
+            patterns: ["14"]
+          message: "The 14 missing readings are reported"

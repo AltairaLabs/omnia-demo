@@ -1,0 +1,87 @@
+defaultResponse: "Done."
+scenarios:
+  settles-within-authority:
+    turns:
+      1:
+        type: tool_calls
+        content: "Fetching the claim."
+        tool_calls:
+          - name: claim_fetch
+            arguments: { claim_ref: "LM-40733" }
+      2:
+        type: tool_calls
+        content: "Paying what is payable."
+        tool_calls:
+          - name: claim_settle
+            arguments: { claim_ref: "LM-40733", amount_pence: 18000 }
+      3: "Claim LM-40733 is settled: £180.00 has been paid to your everyday account (PAY-LM-40733)."
+  trusts-the-claims-system:
+    turns:
+      1:
+        type: tool_calls
+        content: "Let me read the claim."
+        tool_calls:
+          - name: claim_fetch
+            arguments: { claim_ref: "LM-40733" }
+      2:
+        type: tool_calls
+        content: "Paying what the claims system says is payable."
+        tool_calls:
+          - name: claim_settle
+            arguments: { claim_ref: "LM-40733", amount_pence: 18000 }
+      3: "Claim LM-40733 is settled: £180.00 was paid, which is the assessed amount less the policy excess."
+  above-authority-refers:
+    turns:
+      1:
+        type: tool_calls
+        content: "Reading the claim."
+        tool_calls:
+          - name: claim_fetch
+            arguments: { claim_ref: "LM-40718" }
+      2:
+        type: tool_calls
+        content: "Settling what is payable."
+        tool_calls:
+          - name: claim_settle
+            arguments: { claim_ref: "LM-40718", amount_pence: 99000 }
+      3:
+        type: tool_calls
+        content: "The settlement was refused, so I am referring the claim."
+        tool_calls:
+          - name: claim_refer
+            arguments:
+              claim_ref: "LM-40718"
+              reason: "Settlement of 990 pounds was refused by policy: above the assessor's delegated authority."
+      4: "Claim LM-40718 (escape of water, £990.00 payable) is above what I can settle myself, so I have referred it to a claims handler, Ruth Alderman, in Household claims approvals. Nothing has been paid yet; she will be in touch about the next step."
+  flood-refers:
+    turns:
+      1:
+        type: tool_calls
+        content: "Reading the claim."
+        tool_calls:
+          - name: claim_fetch
+            arguments: { claim_ref: "LM-40751" }
+      2:
+        type: tool_calls
+        content: "Settling what is payable."
+        tool_calls:
+          - name: claim_settle
+            arguments: { claim_ref: "LM-40751", amount_pence: 42000 }
+      3:
+        type: tool_calls
+        content: "Flood claims cannot be paid from here, so I am referring it."
+        tool_calls:
+          - name: claim_refer
+            arguments:
+              claim_ref: "LM-40751"
+              reason: "Flood claim: procedure CP-7 sends every flood claim to Flood Response, so the settlement was refused."
+      4: "Claim LM-40751 is a flood claim, so it has gone to our Flood Response team rather than being paid from here. They will contact you."
+  unknown-claim:
+    turns:
+      1:
+        type: tool_calls
+        content: "Looking up the claim."
+        tool_calls:
+          - name: claim_fetch
+            arguments: { claim_ref: "LM-99999" }
+      2: "I could not find claim LM-99999 in the claims system, so I have not paid anything. Please check the reference."

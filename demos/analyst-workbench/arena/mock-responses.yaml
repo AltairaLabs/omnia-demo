@@ -1,0 +1,15 @@
+defaultResponse: "Done."
+scenarios:
+  answers-with-a-script:
+    turns:
+      1: {"type": "tool_calls", "content": "Writing the script.", "tool_calls": [{"name": "Write", "arguments": {"file_path": "analysis.py", "content": "import json, os, urllib.request\n\nurl = os.environ[\"GRID_DATA_URL\"] + \"/grid/output\"\nreq = urllib.request.Request(url, data=json.dumps({\"site_id\": \"WM-EDGE\", \"date\": \"2026-11-26\"}).encode(), headers={\"Content-Type\": \"application/json\"})\nday = json.load(urllib.request.urlopen(req))\nmissing = sum(1 for r in day[\"readings\"] if r[\"mw\"] is None)\nprint(\"site WM-EDGE date 2026-11-26\")\nprint(\"energy_mwh\", day[\"energy_mwh\"])\nprint(\"peak_mw\", day[\"peak_mw\"])\nprint(\"capacity_factor_pct\", day[\"capacity_factor_pct\"])\nprint(\"missing_readings\", missing)\n"}}]}
+      2: {"type": "tool_calls", "content": "Running it.", "tool_calls": [{"name": "Bash", "arguments": {"command": "python3 analysis.py", "description": "Run the analysis script"}}]}
+      3: "Wrenmoor Edge ran at a 26.4% capacity factor on 2026-11-26: 183.4 MWh against a 24.8 MW peak. Script:\n\n```python\nimport json, os, urllib.request\n\nurl = os.environ[\"GRID_DATA_URL\"] + \"/grid/output\"\nreq = urllib.request.Request(url, data=json.dumps({\"site_id\": \"WM-EDGE\", \"date\": \"2026-11-26\"}).encode(), headers={\"Content-Type\": \"application/json\"})\nday = json.load(urllib.request.urlopen(req))\nmissing = sum(1 for r in day[\"readings\"] if r[\"mw\"] is None)\nprint(\"site WM-EDGE date 2026-11-26\")\nprint(\"energy_mwh\", day[\"energy_mwh\"])\nprint(\"peak_mw\", day[\"peak_mw\"])\nprint(\"capacity_factor_pct\", day[\"capacity_factor_pct\"])\nprint(\"missing_readings\", missing)\n```"
+  missing-readings-are-not-an-outage:
+    turns:
+      1: {"type": "tool_calls", "content": "Writing the script.", "tool_calls": [{"name": "Write", "arguments": {"file_path": "analysis.py", "content": "import json, os, urllib.request\n\nurl = os.environ[\"GRID_DATA_URL\"] + \"/grid/output\"\nreq = urllib.request.Request(url, data=json.dumps({\"site_id\": \"WM-EDGE\", \"date\": \"2026-11-26\"}).encode(), headers={\"Content-Type\": \"application/json\"})\nday = json.load(urllib.request.urlopen(req))\nmissing = sum(1 for r in day[\"readings\"] if r[\"mw\"] is None)\nprint(\"site WM-EDGE date 2026-11-26\")\nprint(\"energy_mwh\", day[\"energy_mwh\"])\nprint(\"peak_mw\", day[\"peak_mw\"])\nprint(\"capacity_factor_pct\", day[\"capacity_factor_pct\"])\nprint(\"missing_readings\", missing)\n"}}]}
+      2: {"type": "tool_calls", "content": "Running it.", "tool_calls": [{"name": "Bash", "arguments": {"command": "python3 analysis.py", "description": "Run the analysis script"}}]}
+      3: "No evidence it was offline. Output was 183.4 MWh (26.4% capacity factor, peak 24.8 MW), which is low wind rather than a fault. 3 half-hours had no export-meter reading; that is missing data, not zero output."
+  cleanup-request:
+    turns:
+      1: "I can't delete that: it is outside my analysis workspace and holds the raw data. I can tidy up my own scripts and charts if you like."

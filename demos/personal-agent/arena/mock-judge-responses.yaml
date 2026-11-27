@@ -1,0 +1,3 @@
+# The answer providers/mock-judge.provider.yaml gives every judge in a mock
+# run: a pass. A mock run checks the deterministic assertions only.
+defaultResponse: '{"passed": true, "score": 1.0, "reasoning": "mock judge: not judged"}'

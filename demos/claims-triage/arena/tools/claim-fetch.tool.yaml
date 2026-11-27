@@ -37,15 +37,16 @@ spec:
       status: { type: string }
   mode: mock
   timeout_ms: 30000
-  mock_result:
-    claim_ref: "LM-40718"
-    policy_ref: "LM-HOME-4471"
-    member_name: "Ellen Whitcomb"
-    peril: "Escape of water"
-    cover: "Buildings"
-    reported_on: "2026-09-02"
-    assessed_pence: 124000
-    excess_pence: 25000
-    payable_pence: 99000
-    prior_claims: "One prior claim on this policy, November 2023. Nothing flagged."
-    status: "assessed"
+  # Branches on claim_ref so the kit can work the three claims the demo turns
+  # on (the same figures as services/mortgage-underwriting/claimsdata.go). Default
+  # is the claim under the limit; an unknown reference is a not-found.
+  mock_template: |
+    {{- if eq .claim_ref "LM-40718" -}}
+    {"claim_ref":"LM-40718","policy_ref":"LM-HOME-4471","member_name":"Ellen Whitcomb","peril":"Escape of water","cover":"Buildings","reported_on":"2026-09-02","assessed_pence":124000,"excess_pence":25000,"payable_pence":99000,"prior_claims":"One prior claim on this policy, November 2023. Nothing flagged.","status":"assessed"}
+    {{- else if eq .claim_ref "LM-40733" -}}
+    {"claim_ref":"LM-40733","policy_ref":"LM-HOME-4471","member_name":"Ellen Whitcomb","peril":"Accidental damage","cover":"Contents","reported_on":"2026-09-05","assessed_pence":43000,"excess_pence":25000,"payable_pence":18000,"prior_claims":"One prior claim on this policy, November 2023. Nothing flagged.","status":"assessed"}
+    {{- else if eq .claim_ref "LM-40751" -}}
+    {"claim_ref":"LM-40751","policy_ref":"LM-HOME-5133","member_name":"Gwen Ashby","peril":"Flood","cover":"Contents","reported_on":"2026-11-10","assessed_pence":67000,"excess_pence":25000,"payable_pence":42000,"prior_claims":"No prior claims on this policy.","status":"assessed"}
+    {{- else -}}
+    {"claim_ref":"{{ .claim_ref }}","status":"not_found","note":"No claim with that reference."}
+    {{- end -}}

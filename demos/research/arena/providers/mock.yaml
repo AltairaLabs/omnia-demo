@@ -1,0 +1,13 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+spec:
+  id: mock
+  type: mock
+  model: mock-matter-research
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 600

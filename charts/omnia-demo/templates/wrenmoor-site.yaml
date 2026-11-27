@@ -3,7 +3,7 @@
 ---
 # Wrenmoor Energy's websites: the public site, the customer portal with the
 # Wren panel, and the Wrenmoor Hub intranet. The demo-sites binary
-# (demos/demo-sites) with --site wrenmoor-energy; every brand's site is
+# (services/demo-sites) with --site wrenmoor-energy; every brand's site is
 # embedded in the one image, so there is no ConfigMap and no volume.
 #
 # Serve it through the catalogue's proxy (catalogue.proxies) at
@@ -56,6 +56,10 @@ spec:
             - http://wren.{{ $ns }}:8080
             - --backend-url
             - http://wren-account.{{ $ns }}:8080
+            # Wrenmoor's customer identity provider: a signed token for the
+            # customer on each conversation (docs/stand-ins.md).
+            - --issuer-url
+            - {{ include "omnia-demo.issuerURL" (dict "service" "wrenmoor-site" "root" $) }}
 {{- end }}
           ports:
             - name: http

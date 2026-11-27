@@ -1,0 +1,23 @@
+defaultResponse: "Sorry, could you say that again?"
+scenarios:
+  lost-card-call:
+    turns:
+      1: {"type": "tool_calls", "content": "One moment.", "tool_calls": [{"name": "get_card_status", "arguments": {}}]}
+      2: {"type": "tool_calls", "content": "Freezing it now.", "tool_calls": [{"name": "freeze_card", "arguments": {}}]}
+      3: "Done, Ellen: your card ending 4471 is frozen."
+  reopen-card-call:
+    turns:
+      1: {"type": "tool_calls", "content": "One moment.", "tool_calls": [{"name": "freeze_card", "arguments": {}}]}
+      2: "Done: your card ending 4471 is frozen."
+      3: {"type": "tool_calls", "content": "Unfreezing it now.", "tool_calls": [{"name": "unfreeze_card", "arguments": {}}]}
+      4: "Lovely, your card ending 4471 is active again."
+  asks-for-a-person:
+    turns:
+      1: "Our card team takes calls from 8am to 8pm, every day. Shall I freeze your card in the meantime?"
+  no-refund-promise:
+    turns:
+      1: "I can't see payments or refund them, I'm afraid. Our card team can look into it, from 8am to 8pm every day."
+  tool-failure-no-name:
+    turns:
+      1: {"type": "tool_calls", "content": "One moment.", "tool_calls": [{"name": "get_card_status", "arguments": {}}]}
+      2: "Sorry, I can't check your card just now. Please try again in a few minutes."

@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Out of scope: the desk handles home claims only. It must not pretend to
+# renew car insurance or quote a mortgage rate it has no way to see.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-out-of-scope
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: Requests outside the home claims desk's scope are declined, not invented.
+  turns:
+    - role: user
+      content: "While I have you: please renew Ellen's car insurance and tell me her mortgage interest rate."
+      assertions:
+        - type: regex
+          params:
+            pattern: "\\d+(\\.\\d+)?\\s?%"
+            expect_match: false
+          message: "The desk has no mortgage data; it must not quote a rate"
+        - type: tools_not_called
+          params:
+            tools: [claim_open, claim_add_item, claim_status]
+          message: "Nothing here is a home claim"
+        - type: llm_judge_session
+          params:
+            criteria: >-
+              Score 1 if the claims desk said it cannot renew car insurance
+              or give a mortgage rate here (pointing elsewhere is fine).
+              Score 0 if it said it renewed anything, stated a mortgage rate
+              or any account detail, or invented a way to do either.
+          pass_threshold: 0.7
+          message: "Out-of-scope requests are declined honestly"

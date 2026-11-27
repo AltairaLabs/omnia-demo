@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# Required by the Arena config schema, and used only when running this kit
+# through PromptArena locally. In Omnia the model comes from the Provider the
+# AgentRuntime names, not from anything in the pack.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock
+spec:
+  id: mock
+  type: mock
+  model: mock-larkmere-claims-desk
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 1024
+  # Scripted per scenario, so a keyless mock run exercises the assertions.
+  # Relative to the arena config's directory.
+  additional_config:
+    mock_config: mock-responses.yaml

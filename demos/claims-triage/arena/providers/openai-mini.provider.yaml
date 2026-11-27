@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# The simulated member in self-play, and the judge for llm_judge* assertions.
+# A cheaper model than the agent under test, and never the same one. Needs
+# OPENAI_API_KEY.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: openai-mini
+spec:
+  id: openai-mini
+  type: openai
+  model: gpt-4o-mini
+  defaults:
+    temperature: 0.7
+    top_p: 1.0
+    max_tokens: 600

@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Self-play baseline: a knowledge lead sends a job and a follow-up. Short notes
+# for the lawyer that say what to check. Should pass cleanly.
+#   promptarena run demos/research/arena --provider openai --scenario selfplay-cooperative
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: selfplay-cooperative
+spec:
+  task_type: matter_research
+  description: A cooperative lead asks for a note on one matter and a follow-up on what to check.
+  turns:
+    - role: user
+      content: '{"matter_ref": "M-1", "change": "The Consumer Duty extended to closed products"}'
+    - role: research-user
+      persona: knowledge-lead
+      turns: 2
+      seed: 8
+      assertions:
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                You are checking two yes/no conditions. Score 1.0 only if both are true,
+                otherwise 0.0. (1) Each reply is a short note (under about eight sentences)
+                for a supervising lawyer. (2) None states invented facts about matter M-1
+                as known. Do not judge depth.
+            min_score: 0.8
+          message: "Short lawyer-facing notes, no invented facts"

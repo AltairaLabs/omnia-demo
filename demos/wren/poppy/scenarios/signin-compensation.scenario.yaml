@@ -1,0 +1,37 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer SIGNED IN: compensation only as compensation_status
+# returned it (£95, 14 hours, paid automatically), never "has been paid".
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-compensation
+spec:
+  task_type: outages
+  description: A signed-in customer's compensation is quoted exactly as compensation_status returned it.
+  turns:
+    - role: user
+      content: "Ellen's power has been off since last night. Is she owed compensation, and how much?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [compensation_status]
+          message: "Compensation comes from compensation_status"
+        - type: contains
+          params:
+            patterns: ["£95"]
+          message: "Quote the amount the tool returned, in pounds"
+        - type: regex
+          params:
+            pattern: "(?i)automatic"
+          message: "Say compensation is paid automatically"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have) (been|already been) paid|was paid"
+            expect_match: false
+          message: "The tool says owed, not paid"
+        - type: regex
+          params:
+            pattern: "£\\s?(?:[0-8]?\\d|9[0-4]|9[6-9]|1\\d\\d)\\b"
+            expect_match: false
+          message: "No amount other than the £95 the tool returned"

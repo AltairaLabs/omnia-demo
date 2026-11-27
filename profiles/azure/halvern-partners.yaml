@@ -10,16 +10,13 @@ workspace:
 halvernSite: { enabled: true }
 
 # The demo catalogue (every tenant's demos), at
-# https://omnia-demo.azure.altairalabs.ai/demo-catalog/ behind the dashboard
+# https://<your dashboard host>/demo-catalog/ behind the dashboard
 # sign-in. One release carries it; it belongs to the partner presenting the work.
 catalogue:
   enabled: true
   authURL: http://omnia-management-api.omnia.svc.cluster.local:8080
-  route:
-    parentRefs:
-      - { name: omnia-external, namespace: omnia }
-    hostnames:
-      - omnia-demo.azure.altairalabs.ai
+  # route.parentRefs (your gateway) and route.hostnames (your dashboard host)
+  # are set by deploy/azure/site-values.sh from site.yaml.
   # The Larkmere Mutual website and member portal (the customer side of the
   # card-support demo), at /larkmere-mutual/ behind the same sign-in. Every
   # site's paths are relative, so none needs rewrites (which would also turn
@@ -35,3 +32,8 @@ catalogue:
     # paths too.
     - path: /halvern-partners
       upstream: http://halvern-site.halvern-partners.svc.cluster.local:8080
+    # Ellen's assistant's page (the person's side of the Poppy storm demo).
+    # Relative paths; its updates stream passes through (personal-agent sets
+    # X-Accel-Buffering: no, and the proxy reads for up to an hour).
+    - path: /ellens-assistant
+      upstream: http://assistant-page.ellens-assistant.svc.cluster.local:8080

@@ -1,0 +1,49 @@
+{{- if and .Values.workspace.create .Values.poppy.enabled }}
+# Routes the Company's two PAP discovery paths, on its own domain, to Omnia's
+# management-api, which serves the documents the operator builds from the
+# Workspace's spec.poppy. Exact matches, and no URLRewrite: management-api picks
+# the Company by the Host header, so it must arrive unchanged. It lives in
+# Omnia's namespace, beside the Gateway and the Service; the name carries the
+# tenant so two tenants' routes do not collide.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: poppy-discovery-{{ .Values.namespace }}
+  namespace: {{ .Values.poppy.omniaNamespace }}
+spec:
+  parentRefs:
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
+  hostnames:
+    - {{ required "poppy.domain" .Values.poppy.domain | quote }}
+  rules:
+    - matches:
+        - path: { type: Exact, value: /.well-known/poppy.json }
+        - path: { type: Exact, value: /.well-known/oauth-protected-resource }
+      backendRefs:
+        - name: omnia-management-api
+          port: 8080
+{{- if and .Values.poppy.auth.enabled .Values.poppy.auth.gateway.enabled }}
+---
+# Routes the issuer gateway's host (poppy.auth.issuer) to management-api,
+# which serves the gateway's metadata and its /oauth/ endpoints (authorize,
+# callback, token, jwks.json, revoke) for a request whose Host is the issuer's
+# host. Host unchanged, no URLRewrite, beside the discovery route.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: poppy-issuer-{{ .Values.namespace }}
+  namespace: {{ .Values.poppy.omniaNamespace }}
+spec:
+  parentRefs:
+    - {{ include "omnia-demo.gatewayParentRef" . | nindent 6 | trim }}
+  hostnames:
+    - {{ include "omnia-demo.gatewayIssuer" . | trimPrefix "https://" | quote }}
+  rules:
+    - matches:
+        - path: { type: Exact, value: /.well-known/oauth-authorization-server }
+        - path: { type: PathPrefix, value: /oauth/ }
+      backendRefs:
+        - name: omnia-management-api
+          port: 8080
+{{- end }}
+{{- end }}

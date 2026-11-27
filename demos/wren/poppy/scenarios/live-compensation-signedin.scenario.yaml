@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The live take's compensation question, word for word, member signed in:
+# compensation_status answers it, in one reply, with no sign-in talk.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-compensation-signedin
+spec:
+  task_type: outages
+  description: Live phrasing, signed in - compensation for a named customer is read with compensation_status.
+  turns:
+    - role: user
+      content: "Can Ellen Whitcomb claim compensation for the power outage at HX7 6QA?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [compensation_status]
+          message: "Compensation is compensation_status"
+        - type: contains
+          params:
+            patterns: ["£95"]
+          message: "Quote the amount compensation_status returned"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "No call was refused, so no sign-in talk"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) postcode|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["let me do that", "let me check", "i'll check", "i will check", "one moment", "please hold", "how you'd like to proceed"]
+      message: "One reply per turn: no 'let me check' preamble sent beside a tool call, no options to choose"

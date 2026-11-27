@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins: a short summary for the supervising lawyer: what the change means for
+# the matter and what to check, in three or four sentences, and plain about
+# what it does not know. The input names only a matter reference, so the facts
+# of M-1 are unknown to the function and it must say so.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: one-matter
+spec:
+  task_type: matter_research
+  description: One matter, one change, a short summary.
+  turns:
+    - role: user
+      content: '{"matter_ref": "M-1", "change": "The Consumer Duty extended to closed products"}'
+      assertions:
+        - type: min_length
+          params:
+            min: 80
+          message: "The function returns a real summary"
+        - type: sentence_count
+          params:
+            max: 5
+          message: "Three or four sentences, not an essay"
+        - type: contains_any
+          params:
+            patterns: ["check", "confirm", "verify", "review", "ensure"]
+          message: "It says what the supervising lawyer should check"
+        - type: assertion
+          params:
+            eval_type: llm_judge_session
+            eval_params:
+              criteria: >-
+                You are checking three yes/no conditions about the reply. Score 1.0 only if
+                ALL are true, otherwise 0.0. (1) It says what the Consumer Duty extension
+                means for the matter. (2) It tells the supervising lawyer what to check.
+                (3) It says it does not know, or cannot judge, the facts of matter M-1, or
+                gives no invented facts about M-1. Do not judge style or depth.
+            min_score: 0.8
+          message: "Plain about what it does not know"

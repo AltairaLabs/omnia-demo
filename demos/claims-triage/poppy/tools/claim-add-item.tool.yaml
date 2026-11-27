@@ -1,0 +1,76 @@
+# The model's descriptor for claim_add_item. The ToolRegistry binding
+# (charts/omnia-demo/templates/poppy-account-tools.yaml) is kept in step.
+# Served by the claims-systems stub's POST /api/claims/add-item
+# (services/mortgage-underwriting/homeclaims.go), behind the on-behalf-of guard
+# (obo.go): only a claim the signed-in member reported is found.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: claim_add_item
+spec:
+  name: claim_add_item
+  description: >-
+    Add one damaged or lost item to one of the signed-in member's open home
+    claims: what it is, what it is worth in pence, and what damaged it.
+    Returns the claim with every item and the total claimed, in pence. A claim
+    the member did not report is not found. Refused until the member has
+    signed in.
+  input_schema:
+    type: object
+    properties:
+      claim_ref:
+        type: string
+        description: The claim reference, e.g. LM-41001
+      description:
+        type: string
+        description: The item, e.g. Oak dining table
+      value_pence:
+        type: integer
+        minimum: 1
+        description: >-
+          What the member said it is worth, in pence (pounds times 100). Never
+          estimate it: if no value was given, ask for it and do not call this
+          tool
+      cause:
+        type: string
+        description: What damaged it, as the member said
+    required: [claim_ref, description, value_pence]
+  output_schema:
+    type: object
+    properties:
+      claim_ref: { type: string }
+      policy_ref: { type: string }
+      member_name: { type: string }
+      peril: { type: string }
+      description: { type: string }
+      occurred_on: { type: string }
+      reported_on: { type: string }
+      status: { type: string }
+      items:
+        type: array
+        items:
+          type: object
+          properties:
+            description: { type: string }
+            value_pence: { type: integer }
+            cause: { type: string }
+      claimed_pence: { type: integer }
+      next_steps: { type: string }
+  # A write to Larkmere's own claims system, as the member: not external.
+  # Compensable: an item added is corrected by the claims handler, not undone.
+  action_scope: { effect: write, reversibility: compensable, data_classes: [pii] }
+  mode: mock
+  timeout_ms: 30000
+  mock_result:
+    claim_ref: LM-41001
+    policy_ref: LM-HOME-4471
+    member_name: Ellen Whitcomb
+    peril: Storm
+    description: Storm water came in under the back door and flooded the kitchen.
+    occurred_on: "2026-11-22"
+    reported_on: "2026-11-23"
+    status: reported
+    items:
+      - { description: Oak dining table, value_pence: 45000, cause: storm water }
+    claimed_pence: 45000
+    next_steps: Add each damaged or lost item with its value. A claims handler will review the claim once the list is complete.

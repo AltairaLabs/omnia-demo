@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# The live take's claim request, word for word, member signed in: claim_open
+# reports it at once, in one reply, with no sign-in talk.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: live-claim-signedin
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: Live phrasing, signed in - a named member's flood claim is reported with claim_open.
+  turns:
+    - role: user
+      content: "Please report a flood claim for Ellen Whitcomb. The kitchen is flooded due to the storm."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "The peril is known: claim_open at once"
+        - type: contains
+          params:
+            patterns: ["LM-41001"]
+          message: "Read back the reference claim_open returned"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "No call was refused, so no sign-in talk"
+        - type: regex
+          params:
+            pattern: "(?i)how you'?d like to proceed|let me know how|identify (her|ellen|the customer|anyone)|from (the|a) (name|postcode|policy)|if (this|it)( is|'s) about"
+            expect_match: false
+          message: "No exposition about identifying her or options to choose: try the tool, then say only what it said"
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["let me do that", "let me report", "i'll report that", "one moment", "please hold", "how you'd like to proceed"]
+      message: "One reply per turn: no preamble sent beside a tool call, no options to choose"
