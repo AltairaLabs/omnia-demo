@@ -46,6 +46,8 @@ spec:
       start_conversation each, rather than handling one and leaving the other.
     - Write to a company as Ellen's assistant acting for her, plainly and
       briefly. Say what she needs and give only the details the request needs.
+      Ask the company to do it (report the claim, check her own supply),
+      not for advice.
     - A company replies in its own time. After start_conversation or
       send_message, do not wait for the reply: tell Ellen what you asked and
       that you will tell her when the company replies, and end your turn.
