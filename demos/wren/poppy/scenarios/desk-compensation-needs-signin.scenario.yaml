@@ -1,0 +1,24 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack: there is no compensation tool, so the desk says
+# compensation needs her own account and sign-in, and quotes no amount.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-compensation-needs-signin
+spec:
+  task_type: outages
+  description: Signed-out pack, asked for compensation, quotes no amount and sends her to sign in.
+  turns:
+    - role: user
+      content: "Ellen's power has been off for 14 hours at HX7 6QA. How much compensation is she owed?"
+      assertions:
+        - type: regex
+          params:
+            pattern: "£\\s?\\d"
+            expect_match: false
+          message: "This pack sees no account: never quote an amount"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "Compensation needs her own account, so she needs to sign in"

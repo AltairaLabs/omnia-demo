@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member NOT signed in: the status question goes to
+# claim_status first; sign-in is mentioned only after the refusal, and no
+# status is made up. Same platform refusal as signedout-report-tool-first.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-status-tool-first
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: Signed out, a status question still calls claim_status first.
+  turns:
+    - role: user
+      content: "Where does Ellen's claim LM-41001 stand?"
+      chaos:
+        tool_failures:
+          - tool: claim_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only
+        # calls that succeeded, and this one is refused.
+        - type: tool_call_count
+          params:
+            tool: claim_status
+            min: 1
+          message: "Call claim_status first, every time, even when she may not be signed in"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(is|it's|currently) (reported|open|being assessed|with a (claims )?handler|settled|approved)"
+            expect_match: false
+          message: "The call was refused: give no status"

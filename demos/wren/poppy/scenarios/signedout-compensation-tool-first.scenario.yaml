@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer NOT signed in: compensation_status is called first;
+# after its refusal the desk says she needs to sign in and quotes no amount.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-compensation-tool-first
+spec:
+  task_type: outages
+  description: Signed out, a compensation question still calls compensation_status first and quotes nothing.
+  turns:
+    - role: user
+      content: "Ellen's power has been off since last night. How much compensation is she owed?"
+      chaos:
+        tool_failures:
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        - type: tool_call_count
+          params:
+            tool: compensation_status
+            min: 1
+          message: "Call compensation_status first, every time"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "£\\s?\\d"
+            expect_match: false
+          message: "Never quote an amount a tool did not return"

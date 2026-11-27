@@ -1,0 +1,52 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member NOT signed in. THE live-take regression: the desk said
+# "Ellen will need to sign in" without calling claim_open, and the platform
+# sends the sign-in request only when a tool call is refused. So claim_open
+# must be called on this first turn; only after its refusal may sign-in be
+# mentioned, and no claim is said to be reported.
+#
+# Not signed in is modelled as the platform does it: the call is refused
+# before it reaches the claims system. chaos replays Omnia's refusal text
+# (obocredential notEnrolled, wrapped by RefusedError) as the tool's error.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-report-tool-first
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: Signed out, the desk still calls claim_open first, then asks for sign-in.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's kitchen flooded in last night's storm; please report a claim."
+      chaos:
+        tool_failures:
+          - tool: claim_open
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only
+        # calls that succeeded, and this one is refused.
+        - type: tool_call_count
+          params:
+            tool: claim_open
+            min: 1
+          message: "REGRESSION: call claim_open first, every time; the sign-in request only comes from a refused call"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+        - type: regex
+          params:
+            pattern: "LM-\\d"
+            expect_match: false
+          message: "The call was refused: there is no claim reference"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have|is|'s) been (reported|logged|registered|submitted|opened|raised)|\\bI('ve| have) (reported|logged|registered|submitted|opened|raised|noted)"
+            expect_match: false
+          message: "Never say a claim was reported unless the tool confirmed it"

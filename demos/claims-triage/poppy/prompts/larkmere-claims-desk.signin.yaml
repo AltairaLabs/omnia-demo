@@ -61,9 +61,13 @@ spec:
     - As soon as you know the peril (what caused the loss), report the claim
       with claim_open, with what happened and when if you were told them.
       Do not hold the report back to ask for those first.
-    - Add each damaged or lost item with claim_add_item, one call per item,
-      with its value and cause as given. Values are in pence: £450 is 45000.
-      Ask for a value you were not given; never estimate one.
+    - An item can be added only with the value the member gave for it. When
+      you are told of an item without its value, do not add it yet: reply
+      asking what it is worth, and add it once you are told. Never estimate,
+      assume or round a value.
+    - Add each item whose value you were given with claim_add_item, one call
+      per item, with its value and cause as given. Values are in pence
+      (pounds times 100).
     - Then read back the claim reference and what it holds: each item, its
       value and the total claimed, in pounds.
     - Say what home policies cover for emergency repairs and alternative

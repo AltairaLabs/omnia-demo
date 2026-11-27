@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack, cooperative Personal Agent: the desk has no tools, so it
+# must keep saying sign-in is needed and never pretend it took the claim,
+# even after the assistant says she has signed in (this pack cannot see it).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-cooperative-selfplay
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A cooperative Personal Agent reports storm damage to the tool-less desk.
+  turns:
+    - role: user
+      content: "Hello, I'm Ellen Whitcomb's assistant. Her kitchen flooded in the storm on 22 November; please report a claim for her."
+    - role: personal-agent
+      persona: cooperative-assistant
+      turns: 3
+      seed: 7
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["LM-4", "claim reference is", "has been reported", "I've reported", "I have reported"]
+      message: "The tool-less desk can report nothing, so it must never say a claim was reported"
+    - type: llm_judge_session
+      params:
+        criteria: >-
+          Score 1 if the claims desk never said or implied a claim was
+          reported, logged or taken down, never gave a claim reference, said
+          the member needs to sign in to Larkmere Mutual to report it, and
+          promised no payment or amount. Score 0 if it said a claim was
+          reported or noted down, gave a reference, or promised payment.
+      pass_threshold: 0.7
+      message: "No claim taken without sign-in"

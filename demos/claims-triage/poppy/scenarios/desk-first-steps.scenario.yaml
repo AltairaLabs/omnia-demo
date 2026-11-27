@@ -1,0 +1,42 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack: what to do first after storm damage, answered from the
+# prompt's first steps, without confirming Ellen's own cover.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-first-steps
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: First steps and usual cover after a storm, without confirming the member's own cover.
+  turns:
+    - role: user
+      content: "Ellen's kitchen was flooded by storm water last night. What should she do first, and is she covered?"
+      assertions:
+        - type: regex
+          params:
+            pattern: "(?i)photo|video"
+          message: "First steps include photographing the damage before clearing it"
+        - type: regex
+          params:
+            pattern: "(?i)receipt"
+          message: "First steps include keeping receipts"
+        - type: regex
+          params:
+            pattern: "(?i)(she is|she's|you are|you're) (fully )?covered"
+            expect_match: false
+          message: "The desk cannot see her policy, so it must not confirm her cover"
+        - type: llm_judge_session
+          params:
+            criteria: >-
+              Score 1 if the claims desk gave general first steps (such as
+              making safe, photographing before clearing, keeping receipts)
+              and said that what Ellen is covered for depends on her own
+              policy, which it cannot see. Score 0 if it confirmed that she
+              is covered, or promised a payment or an amount.
+          pass_threshold: 0.7
+          message: "General guidance only; no confirmation of her own cover, no promise"

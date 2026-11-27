@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member SIGNED IN: an item with no value is not added with a
+# guessed one. The desk asks for the value instead of estimating.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-value-not-given
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: An item without a value prompts a question, never an estimate.
+  turns:
+    - role: user
+      content: "Please add Ellen's sofa to claim LM-41001; the storm water ruined it."
+      assertions:
+        - type: tools_not_called
+          params:
+            tools: [claim_add_item]
+          message: "No value was given: do not add the item with an estimate"
+        - type: regex
+          params:
+            pattern: "(?i)(value|worth|cost|how much|price)"
+          message: "Ask what the sofa is worth"

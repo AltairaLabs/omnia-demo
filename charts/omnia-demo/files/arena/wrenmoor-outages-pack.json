@@ -1,8 +1,8 @@
 {
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
   "compilation": {
-    "compiled_with": "packc-v2.7.0",
-    "created_at": "2026-11-23T14:42:43Z",
+    "compiled_with": "compiler-dev",
+    "created_at": "2026-11-27T12:42:40Z",
     "schema": "v1"
   },
   "description": "Pack containing 1 prompts",

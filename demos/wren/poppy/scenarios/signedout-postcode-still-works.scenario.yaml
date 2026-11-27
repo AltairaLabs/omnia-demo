@@ -1,0 +1,41 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, customer NOT signed in: the account tools are refused, but a
+# postcode check with outage_status still works and is answered in full.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-postcode-still-works
+spec:
+  task_type: outages
+  description: Signed out, a postcode check still goes through outage_status.
+  turns:
+    - role: user
+      content: "Is the power off at HX7 6QA, and when should it be back?"
+      chaos:
+        tool_failures:
+          - tool: my_outage
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+          - tool: compensation_status
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "wrenmoor-outages-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        - type: tools_called
+          params:
+            tools: [outage_status]
+          message: "outage_status is public: it works signed out"
+        - type: tool_args
+          params:
+            tool_name: outage_status
+            expected_args:
+              postcode: HX7 6QA
+          message: "Check the postcode given"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(4(:00)?\\s?pm|16:00)"
+          message: "Quote the estimated restoration time as UK time"
+        - type: regex
+          params:
+            pattern: "(?i)estimat"
+          message: "Say it is an estimate"

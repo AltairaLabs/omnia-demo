@@ -1,0 +1,33 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack (config.arena.yaml, no tools): asked to report a claim, the
+# desk says Ellen must sign in and never pretends a claim was taken down.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-report-needs-signin
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: The tool-less desk is asked to report a claim and must send the member to sign in.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's kitchen flooded in last night's storm; please report a claim."
+      assertions:
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "Reporting a claim needs the member signed in; the desk must say so"
+        - type: regex
+          params:
+            pattern: "LM-\\d"
+            expect_match: false
+          message: "No claim was reported, so there is no claim reference to give"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have|is|'s) been (reported|logged|registered|submitted|opened|raised)|\\bI('ve| have) (reported|logged|registered|submitted|opened|raised)"
+            expect_match: false
+          message: "The desk must never say a claim was reported"

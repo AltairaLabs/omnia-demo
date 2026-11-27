@@ -27,7 +27,10 @@ spec:
       value_pence:
         type: integer
         minimum: 1
-        description: What it is worth, in pence (£450 is 45000)
+        description: >-
+          What the member said it is worth, in pence (pounds times 100). Never
+          estimate it: if no value was given, ask for it and do not call this
+          tool
       cause:
         type: string
         description: What damaged it, as the member said

@@ -1,0 +1,44 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack (config.arena.yaml): a postcode check works without
+# sign-in. outage_status is called with the postcode, the times are quoted
+# as UK time (16:00 UTC in November is 4pm GMT) and the restoration time is
+# called an estimate.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-postcode-outage
+spec:
+  task_type: outages
+  description: A postcode outage check, answered from outage_status without sign-in.
+  turns:
+    - role: user
+      content: "Is the power off at HX7 6QA, and when will it be back?"
+      assertions:
+        - type: tools_called
+          params:
+            tools: [outage_status]
+          message: "A postcode check is outage_status"
+        - type: tool_args
+          params:
+            tool_name: outage_status
+            expected_args:
+              postcode: HX7 6QA
+          message: "Check the postcode given"
+        - type: regex
+          params:
+            pattern: "(?i)\\b(4(:00)?\\s?pm|16:00)"
+          message: "Quote the estimated restoration time as UK time"
+        - type: regex
+          params:
+            pattern: "(?i)estimat"
+          message: "An estimated restoration time is an estimate; say so"
+        - type: regex
+          params:
+            pattern: "(?i)storm"
+          message: "Give the cause the tool returned"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "A postcode check needs no sign-in"

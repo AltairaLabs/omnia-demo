@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGNED-OUT pack: outage_status has no outage for the district. The desk
+# says so and does not guess. The stub answers an error for a district with
+# no outage (outages.go); chaos replays that error.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: desk-no-outage-on-record
+spec:
+  task_type: outages
+  description: No outage on record for a postcode is reported as such, never guessed.
+  turns:
+    - role: user
+      content: "Is the power off at HX2 7LT?"
+      chaos:
+        tool_failures:
+          - tool: outage_status
+            mode: error
+            message: "no outage on record for HX2"
+      assertions:
+        - type: tool_call_count
+          params:
+            tool: outage_status
+            min: 1
+          message: "Check the postcode with outage_status"
+        - type: regex
+          params:
+            pattern: "(?i)no (outage|power cut)|not (aware of|have|show)|nothing on record"
+          message: "Say there is no outage on record"
+        - type: regex
+          params:
+            pattern: "(?i)\\b\\d{1,2}(:\\d{2})?\\s?(am|pm)\\b|\\b\\d{2}:\\d{2}\\b"
+            expect_match: false
+          message: "No time was returned, so give none"

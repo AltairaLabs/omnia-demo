@@ -25,6 +25,14 @@
 # scopes are not decoration.
 #
 # Regenerate with: hack/build-packs.sh larkmere-claims-desk-signin
+#
+# Tests (scenarios/, personas/; none of it reaches the pack):
+#   real run, needs OPENAI_API_KEY in the environment:
+#     promptarena run --config config.signin.arena.yaml --provider openai --ci
+#   keyless mock run (scripted replies that play a correct desk, a judge
+#   that always passes: it checks the wiring, not the model):
+#     promptarena run --config config.signin.arena.yaml --provider mock \
+#       --override-provider openai-mini=mock-judge --ci
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:
@@ -36,6 +44,46 @@ spec:
 
   providers:
     - file: providers/mock.yaml
+    # Real runs: --provider openai (gpt-4o, the agent under test). openai-mini
+    # (gpt-4o-mini) is the simulated Personal Agent and the judge; group
+    # selfplay keeps it out of the run matrix. Both need OPENAI_API_KEY.
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+      group: selfplay
+    # Keyless stand-in for openai-mini (--override-provider
+    # openai-mini=mock-judge): see its header.
+    - file: providers/mock-judge.yaml
+      group: selfplay
+
+  # Tests only; none of this is in the compiled pack. Two sets:
+  #   signin-*    the member is signed in: the tools' mock_result answers.
+  #   signedout-* the member is not: each account call is refused the way
+  #               Omnia refuses it (no exchanged token), replayed per turn
+  #               with chaos.tool_failures. Mock tools cannot know sign-in
+  #               state, so the scenario says it.
+  scenarios:
+    - file: scenarios/signin-report-claim.scenario.yaml
+    - file: scenarios/signin-claim-status.scenario.yaml
+    - file: scenarios/signin-value-not-given.scenario.yaml
+    - file: scenarios/signin-cover-no-signin-talk.scenario.yaml
+    - file: scenarios/signin-out-of-scope.scenario.yaml
+    - file: scenarios/signin-cooperative-selfplay.scenario.yaml
+    - file: scenarios/signedout-report-tool-first.scenario.yaml
+    - file: scenarios/signedout-status-tool-first.scenario.yaml
+    - file: scenarios/signedout-carry-on.scenario.yaml
+    - file: scenarios/signedout-pushy-selfplay.scenario.yaml
+
+  self_play:
+    personas:
+      - file: personas/cooperative-assistant.persona.yaml
+      - file: personas/pushy-assistant.persona.yaml
+    roles:
+      - id: personal-agent
+        provider: openai-mini
+
+  judges:
+    - name: default
+      provider: openai-mini
 
   # The signed-in member's claims, as the member. Two writes to Larkmere's own
   # claims system and a read; none reaches outside the Company.

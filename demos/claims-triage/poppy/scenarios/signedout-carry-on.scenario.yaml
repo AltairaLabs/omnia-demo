@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack: refused while signed out, then "carry on" once she has signed
+# in. The desk must call claim_open AGAIN and finish the report, without
+# asking for what it was already told.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signedout-carry-on
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: After sign-in, "carry on" calls the tool again without re-asking.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's kitchen flooded in last night's storm; please report a claim."
+      chaos:
+        tool_failures:
+          - tool: claim_open
+            mode: error
+            message: 'on-behalf-of credential refused (obo_not_enrolled): the user has no credential for Connection "larkmere-claims-desk-account": they must sign in to the agent with their identity provider (and consent to the app) first'
+      assertions:
+        # tool_call_count, not tools_called: tools_called counts only
+        # calls that succeeded, and this one is refused.
+        - type: tool_call_count
+          params:
+            tool: claim_open
+            min: 1
+          message: "Call claim_open first, even signed out"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+          message: "After the refusal, say she needs to sign in"
+    # She has signed in: no chaos, so the tools answer for her.
+    - role: user
+      content: "Ellen has signed in to Larkmere Mutual now. Please carry on."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "Carry on means call the tool again"
+        - type: contains
+          params:
+            patterns: ["LM-41001"]
+          message: "Read back the reference the tool now returned"
+        - type: regex
+          params:
+            pattern: "(?i)what (caused|happened)|when did (it|this) happen|which peril|tell me (more|what)"
+            expect_match: false
+          message: "Do not ask again for what was already said"
+        - type: regex
+          params:
+            pattern: "(?i)(needs?|have|has) to sign[- ]?in|please sign[- ]?in"
+            expect_match: false
+          message: "She has signed in and the call succeeded: no more sign-in requests"
+  conversation_assertions:
+    - type: tools_called_session
+      params:
+        tools: [claim_open]
+        min_calls: 2
+      message: "claim_open is called once refused and once after sign-in"

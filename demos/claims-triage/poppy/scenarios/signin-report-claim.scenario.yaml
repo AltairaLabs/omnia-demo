@@ -1,0 +1,73 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# SIGN-IN pack, member SIGNED IN (the account tools' mocks return her claim).
+# The live-take bug's happy path: the peril is known on the first message, so
+# claim_open is called at once, with no sign-in talk; items go on one call
+# each, in pence, and the read-back is in pounds.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signin-report-claim
+spec:
+  task_type: claims_desk
+  # No member-guidance documents are retrieved (none are loaded today), so
+  # the desk answers from its prompt alone.
+  variables:
+    memory_context: ""
+  description: A signed-in member's claim is reported on the first turn and an item added.
+  turns:
+    - role: user
+      content: "Ellen Whitcomb's kitchen flooded in last night's storm; please report a claim."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_open]
+          message: "The peril is known: claim_open must be called on this first turn"
+        - type: regex
+          params:
+            pattern: "(?i)storm|flood"
+          message: "The claim must be reported with the peril it was given"
+        - type: contains
+          params:
+            patterns: ["LM-41001"]
+          message: "Read back the claim reference the tool returned"
+        - type: regex
+          params:
+            pattern: "(?i)sign(s|ed|ing)?[- ]?in"
+            expect_match: false
+          message: "Nothing was refused, so there must be no sign-in talk"
+    - role: user
+      content: "Please add her oak dining table, worth £450, ruined by the storm water."
+      assertions:
+        - type: tools_called
+          params:
+            tools: [claim_add_item]
+          message: "The item goes on with claim_add_item"
+        - type: tool_args
+          params:
+            tool_name: claim_add_item
+            expected_args:
+              claim_ref: LM-41001
+              value_pence: 45000
+          message: "£450 is 45000 pence, on the claim the tool returned"
+        - type: contains
+          params:
+            patterns: ["£450"]
+          message: "Read back the value and total in pounds"
+  conversation_assertions:
+    - type: tool_call_sequence
+      params:
+        sequence: [claim_open, claim_add_item]
+      message: "Open the claim, then add to it"
+    - type: llm_judge_session
+      params:
+        criteria: >-
+          Score 1 if the claims desk reported the claim with claim_open as
+          soon as it knew the peril, added the table with claim_add_item,
+          read back the claim reference, the item, its value and the total in
+          pounds as the tool returned them, said a claims handler will be in
+          touch, and never promised the claim will be paid or how much.
+          Score 0 if it promised payment, stated anything the tools did not
+          return as done, or asked for sign-in.
+      pass_threshold: 0.7
+      message: "Claim reported and read back from the tool, no promise of payment"

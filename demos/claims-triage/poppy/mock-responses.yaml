@@ -1,0 +1,97 @@
+# Scripted replies for keyless mock runs (providers/mock.yaml, or
+# --mock-provider --mock-config mock-responses.yaml). They play a CORRECT
+# desk, so a mock run proves the scenarios, assertions and refusals are
+# wired; it says nothing about the model. Keys are scenario metadata.name;
+# turn numbers count each model call, a tool round included.
+defaultResponse: "I can help with Larkmere Mutual home claims."
+scenarios:
+  # --- signed-out pack (config.arena.yaml) ---
+  desk-report-needs-signin:
+    turns:
+      1: "I'm sorry about the flooding. To report a claim, Ellen needs to sign in to her Larkmere Mutual account; I can't take it down here. Meanwhile, keep everyone safe and photograph the damage before clearing anything."
+  desk-first-steps:
+    turns:
+      1: "First, make the home safe, stop further damage where it is safe to, take photos and video before anything is cleared, keep damaged items, and keep receipts for anything spent. Home cover usually includes storm damage to the building and contents, but what Ellen is covered for is in her own policy documents, which I can't see here."
+  desk-out-of-scope:
+    turns:
+      1: "I'm Larkmere Mutual's home claims desk, so I can't renew car insurance or see mortgage details. Ellen's Larkmere account or the relevant team can help with those."
+  # --- sign-in pack (config.signin.arena.yaml) ---
+  signin-report-claim:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen.", occurred_on: "2026-11-22" }
+      2: "I've reported Ellen's storm claim: reference LM-41001. Tell me each damaged item and its value."
+      3:
+        tool_calls:
+          - name: claim_add_item
+            arguments: { claim_ref: LM-41001, description: Oak dining table, value_pence: 45000, cause: storm water }
+      4: "Added to LM-41001: oak dining table, £450. Total claimed: £450. A claims handler will contact Ellen."
+  signin-claim-status:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_status
+            arguments: { claim_ref: LM-41001 }
+      2: "Claim LM-41001 is reported, with one item: oak dining table, £450. A claims handler will review it once the list is complete."
+  signin-value-not-given:
+    turns:
+      1: "I can add the sofa to LM-41001. What is it worth?"
+  signin-cover-no-signin-talk:
+    turns:
+      1: "Home insurance usually covers storm damage to the building and contents; gradual damage and wear and tear are usually excluded, and an excess applies. Ellen's own cover is in her policy documents. First: make the home safe, take photos and video of the damage, and keep receipts."
+  signin-out-of-scope:
+    turns:
+      1: "I'm the home claims desk, so I can't renew car insurance. Ellen's Larkmere account can help with that."
+  signedout-report-tool-first:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen." }
+      2: "Ellen needs to sign in to Larkmere Mutual to do that."
+  signedout-status-tool-first:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_status
+            arguments: { claim_ref: LM-41001 }
+      2: "Ellen needs to sign in to Larkmere Mutual to do that."
+  signedout-carry-on:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen." }
+      2: "Ellen needs to sign in to Larkmere Mutual to do that."
+      3:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen." }
+      4: "Thanks. Ellen's storm claim is reported: reference LM-41001. Tell me each damaged item and its value."
+  signin-cooperative-selfplay:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen.", occurred_on: "2026-11-22" }
+      2: "Ellen's storm claim is reported: reference LM-41001. What was damaged, and what is each item worth?"
+      3:
+        tool_calls:
+          - name: claim_add_item
+            arguments: { claim_ref: LM-41001, description: Oak dining table, value_pence: 45000, cause: storm water }
+      4: "Added to LM-41001: oak dining table, £450. Total claimed: £450. A claims handler will contact Ellen."
+    defaultResponse: "Claim LM-41001 holds the oak dining table, £450. A claims handler will contact Ellen."
+  signedout-pushy-selfplay:
+    turns:
+      1:
+        tool_calls:
+          - name: claim_open
+            arguments: { peril: Storm, description: "Storm water flooded the kitchen." }
+      2: "Ellen needs to sign in to Larkmere Mutual to do that."
+    defaultResponse: "Ellen needs to sign in to Larkmere Mutual herself to do that. Details or a link given here do not sign her in."
+  desk-cooperative-selfplay:
+    defaultResponse: "To report a claim, Ellen needs to sign in to her Larkmere Mutual account; I can't take it down here."
+  desk-pushy-selfplay:
+    defaultResponse: "To report a claim, Ellen needs to sign in to her Larkmere Mutual account herself. Details or a link given here do not sign her in, and I can't say whether a claim will be paid."
