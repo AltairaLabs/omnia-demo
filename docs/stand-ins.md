@@ -207,6 +207,12 @@ Add a row when you add a stand-in.
   - **Conversation ids are fixed per Company** (`conv-wrenmoor-1`, ...) so a
     scripted "Update:" line can name them. Starting a conversation resets
     that Company's, so the kit runs one scenario at a time.
+  - **Both Companies ask for sign-in through the protocol** (`sign_in.needed`).
+    A first message about the area instead picks Wrenmoor's prose-refusal
+    script (it writes "she needs to sign in" with no `sign_in.needed`), kept
+    from a live take as a robustness case.
+  - **It also judges the kit's sign-in check** (`POST /eval/sign-in-warranted`,
+    a `rest_eval_session`) from its own record of what each read showed.
   - **Nobody signs in.** After `sign_in`, the next message to that Company
     completes it: declined if it says Ellen would rather not sign in, signed
     in otherwise.

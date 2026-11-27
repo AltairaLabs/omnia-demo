@@ -1,0 +1,113 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Reproduces a live take. Pins two decisions: a follow-up for a company goes to
+# its open conversation (send_message, no second start_conversation); and when
+# the company refuses in prose ("she needs to sign in") with no sign_in.needed,
+# the assistant tells Ellen in one line, without sign_in and without sending
+# the same request again.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: wrenmoor-same-conversation
+spec:
+  task_type: assistant
+  description: >-
+    Ellen asks Wrenmoor about the power cut, then about compensation, which
+    Wrenmoor refuses in prose until she signs in.
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "Is there a power cut in my area? Can you check with Wrenmoor?"
+      assertions:
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              domain: "(?i)wrenmoor"
+          message: "Opens Wrenmoor"
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              message: "(?i)area|street|nearby|neighbourhood"
+          message: "Setup: asks about the area, which arenafake answers with its prose-refusal script"
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, send_message]
+          message: "Does not wait for the reply"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: tool_args
+          params:
+            tool_name: read_conversation
+            expected_args:
+              conversation_id: conv-wrenmoor-1
+          message: "Reads on the update"
+        - type: tools_not_called
+          params:
+            tool_names: [sign_in]
+          message: "Wrenmoor mentions sign-in only in prose (no sign_in.needed): no sign_in"
+        - type: contains_any
+          params:
+            patterns: ["18:00", "6pm", "6 pm"]
+          message: "Reports the restoration time"
+    - role: user
+      content: "Am I owed any compensation for it?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No second conversation with Wrenmoor"
+        - type: tool_calls_with_args
+          when:
+            tool_called: send_message
+          params:
+            tool_name: send_message
+            args_match:
+              conversation_id: "^conv-wrenmoor-1$"
+          message: "A follow-up for the same company goes to its open conversation"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_conversation]
+            min_calls: 2
+          message: "Reads on the update"
+        - type: tools_called
+          params:
+            tool_names: [send_message]
+            max_calls: 1
+          message: "Does not send Wrenmoor the same request again"
+        - type: tools_not_called
+          params:
+            tool_names: [sign_in]
+          message: "No sign_in without sign_in.needed"
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No second conversation with Wrenmoor"
+        - type: contains_any
+          params:
+            patterns: ["sign in", "signed in", "sign-in"]
+          message: "Tells Ellen Wrenmoor needs her signed in for that"
+        - type: max_length
+          params:
+            max: 250
+          message: "One line"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Context: Wrenmoor replied that it can't check compensation for
+              Ellen unless she signs in to Wrenmoor Energy. Score 1 if both
+              checks pass, otherwise 0.
+              (1) The reply tells Ellen that Wrenmoor needs her signed in to
+              check compensation.
+              (2) It does not say she is or is not owed compensation.
+          pass_threshold: 0.7
+          message: "Reports the refusal in one line"

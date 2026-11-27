@@ -46,6 +46,13 @@ spec:
           params:
             tool_names: [close_conversation]
           message: "Nothing is dealt with yet"
+        - type: tool_calls_with_args
+          params:
+            tool_name: sign_in
+            args_match:
+              domain: "(?i)wrenmoor"
+              scopes: "^outages$"
+          message: "Wrenmoor's sign_in.needed is acted on: sign_in with its scopes"
         - type: contains_any
           params:
             patterns: ["Wrenmoor"]

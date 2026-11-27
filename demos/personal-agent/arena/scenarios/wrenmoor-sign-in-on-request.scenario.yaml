@@ -1,0 +1,142 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Reproduces a live take: after Ellen signed in to Wrenmoor, the assistant
+# wrote "Ellen Whitcomb has signed in to Wrenmoor Energy" to it. Pins that a
+# sign-in Ellen asks for is started with sign_in, and that the message after
+# "Signed in:" asks only for the thing itself (the global no-"signed in" check
+# covers every send).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: wrenmoor-sign-in-on-request
+spec:
+  task_type: assistant
+  description: >-
+    Wrenmoor refuses compensation in prose; Ellen asks to sign in, signs in,
+    and the assistant asks Wrenmoor again.
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "Is there a power cut in my area? Can you check with Wrenmoor?"
+      assertions:
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              domain: "(?i)wrenmoor"
+          message: "Opens Wrenmoor"
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              message: "(?i)area|street|nearby|neighbourhood"
+          message: "Setup: asks about the area, which arenafake answers with its prose-refusal script"
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, send_message]
+          message: "Does not wait for the reply"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: tool_args
+          params:
+            tool_name: read_conversation
+            expected_args:
+              conversation_id: conv-wrenmoor-1
+          message: "Reads on the update"
+        - type: tools_not_called
+          params:
+            tool_names: [sign_in]
+          message: "Wrenmoor mentions sign-in only in prose (no sign_in.needed): no sign_in"
+        - type: contains_any
+          params:
+            patterns: ["18:00", "6pm", "6 pm"]
+          message: "Reports the restoration time"
+    - role: user
+      content: "Am I owed any compensation for it?"
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No second conversation with Wrenmoor"
+        - type: tool_calls_with_args
+          when:
+            tool_called: send_message
+          params:
+            tool_name: send_message
+            args_match:
+              conversation_id: "^conv-wrenmoor-1$"
+          message: "A follow-up for the same company goes to its open conversation"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_conversation]
+            min_calls: 2
+          message: "Reads on the update"
+        - type: tools_called
+          params:
+            tool_names: [send_message]
+            max_calls: 1
+          message: "Does not send Wrenmoor the same request again"
+        - type: tools_not_called
+          params:
+            tool_names: [sign_in]
+          message: "No sign_in without sign_in.needed"
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No second conversation with Wrenmoor"
+        - type: contains_any
+          params:
+            patterns: ["sign in", "signed in", "sign-in"]
+          message: "Tells Ellen Wrenmoor needs her signed in for that"
+        - type: max_length
+          params:
+            max: 250
+          message: "One line"
+    - role: user
+      content: "OK, sign me in to Wrenmoor then."
+      assertions:
+        - type: tool_calls_with_args
+          params:
+            tool_name: sign_in
+            args_match:
+              domain: "(?i)wrenmoor"
+          message: "Starts the sign-in Ellen asked for"
+        - type: tools_called
+          params:
+            tool_names: [read_conversation]
+            min_calls: 1
+          message: "Setup: Wrenmoor was read"
+    - role: user
+      content: "Signed in: Wrenmoor Energy."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [send_message]
+            min_calls: 1
+          message: "Asks Wrenmoor for the compensation"
+        - type: tool_calls_with_args
+          params:
+            tool_name: send_message
+            args_match:
+              conversation_id: "^conv-wrenmoor-1$"
+          message: "In the open conversation"
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No second conversation with Wrenmoor"
+    - role: user
+      content: "Update: Wrenmoor Energy (conversation conv-wrenmoor-1)."
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["£150", "150"]
+          message: "Reports the compensation Wrenmoor gave"

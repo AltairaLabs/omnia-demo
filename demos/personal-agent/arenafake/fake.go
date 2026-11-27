@@ -72,9 +72,21 @@ func companyFor(domain string) (company, bool) {
 // The company lines. Synthetic, and the facts the kit's assertions look for.
 const (
 	wrenAskPostcode = "Happy to check. What's the postcode of Ellen's home?"
-	wrenOutage      = "Yes, there's a power cut in HX7 after storm damage to the 11kV line at Mytholm at 05:40; " +
+	// Wrenmoor asks for sign-in through the protocol (sign_in.needed), as
+	// Larkmere does: the storm flow.
+	wrenOutage = "Yes, there's a power cut in HX7 after storm damage to the 11kV line at Mytholm at 05:40; " +
 		"about 1,900 homes are off. Engineers are on site and expect to restore supply by 18:00 today. " +
 		"To check Ellen's own supply and any compensation, I need her signed in to her Wrenmoor account."
+	wrenCompensation = "To check Ellen's compensation I need her signed in to her Wrenmoor account."
+	// The prose script, a robustness case from a live take: a question about
+	// the area gets the area outage, and anything on Ellen's own account is
+	// refused in prose, with no sign-in request through the protocol (no
+	// sign_in.needed). Picked when the first message asks about the area.
+	wrenAreaOutage = "The power is off in HX7 6QA after storm damage to the 11kV line at Mytholm. It went off " +
+		"at 05:40 and is expected back by 18:00 today; about 1,900 homes are affected. I can't check Ellen's " +
+		"own supply without her signing in to Wrenmoor Energy."
+	wrenNeedsSignIn = "I can't check compensation for Ellen unless she signs in to Wrenmoor Energy. If it's " +
+		"about the area, I can give the outage details for HX7 6QA. Let me know how you'd like to proceed."
 	wrenSignedIn = "Thanks. Ellen's supply at HX7 6QA is off as part of incident WM-4471 and should be back by " +
 		"18:00 today. If it is still off at 17:40, 12 hours after it went, she'll get £150 compensation, " +
 		"paid automatically to her account; she doesn't need to claim."
@@ -105,6 +117,7 @@ const (
 )
 
 var (
+	areaRE     = regexp.MustCompile(`(?i)\b(area|street|nearby|neighbourhood)\b`)
 	postcodeRE = regexp.MustCompile(`(?i)\bHX7\s*6QA\b`)
 	declineRE  = regexp.MustCompile(`(?i)rather not|not to sign|won't sign|will not sign|doesn't want to sign|does not want to sign|not sign in|not signing in|without signing|declined?`)
 	refuseRE   = regexp.MustCompile(`(?i)\b(not|don't|doesn't|won't|decline[sd]?|no)\b`)
@@ -136,13 +149,15 @@ type signIn struct {
 }
 
 type conv struct {
-	id       string
-	co       company
-	domain   string
-	stage    stage
-	closed   bool
-	messages []message
-	signIn   *signIn
+	prose       bool // Wrenmoor's prose-refusal script
+	neededShown bool // a read has shown sign_in.needed
+	id          string
+	co          company
+	domain      string
+	stage       stage
+	closed      bool
+	messages    []message
+	signIn      *signIn
 }
 
 func (c *conv) say(text string) {
@@ -211,6 +226,7 @@ func (f *fake) handler() http.Handler {
 			writeJSON(w, http.StatusOK, out)
 		})
 	}
+	mux.HandleFunc("POST /eval/sign-in-warranted", f.signInWarranted)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) })
 	return mux
 }
@@ -265,6 +281,15 @@ func firstReply(c *conv, text string) {
 		case strings.Contains(t, "last month"):
 			c.say(wrenLastMonth)
 			c.stage = stageDone
+		case areaRE.MatchString(text):
+			// The prose script: see wrenAreaOutage.
+			c.prose = true
+			c.stage = stageDone
+			if strings.Contains(t, "compensation") {
+				c.say(wrenNeedsSignIn)
+				return
+			}
+			c.say(wrenAreaOutage)
 		case postcodeRE.MatchString(text):
 			askSignIn(c, wrenOutage)
 		default:
@@ -348,6 +373,15 @@ func reply(c *conv, text string) {
 			return
 		}
 		askSignIn(c, wrenOutage)
+	case c.co.key == "wrenmoor" && strings.Contains(strings.ToLower(text), "compensation"):
+		switch {
+		case c.signIn != nil && c.signIn.Status == "signed_in":
+			c.say(wrenSignedIn)
+		case c.prose:
+			c.say(wrenNeedsSignIn)
+		default:
+			askSignIn(c, wrenCompensation)
+		}
 	case c.stage == stageSettlementOffer:
 		c.stage = stageDone
 		if accepts(text) {
@@ -385,6 +419,9 @@ func (f *fake) readConversation(req request) (any, *toolErr) {
 	}
 	if c.signIn != nil {
 		out["sign_in"] = c.signIn
+		if c.signIn.Needed {
+			c.neededShown = true
+		}
 	}
 	return out, nil
 }
@@ -424,4 +461,72 @@ func (f *fake) signIn(req request) (any, *toolErr) {
 		"company": co.name, "scopes": scopes, "status": "pending",
 		"note": fmt.Sprintf("A 'Sign in to %s' button is on Ellen's screen; she signs in on %s's own page.", co.name, co.name),
 	}, nil
+}
+
+// evalRequest is the part of PromptArena's rest_eval_session request this
+// check reads: the session's messages and tool calls.
+type evalRequest struct {
+	Messages []struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	} `json:"messages"`
+	ToolCalls []struct {
+		Name string         `json:"name"`
+		Args map[string]any `json:"args"`
+	} `json:"tool_calls"`
+}
+
+// askedRE is Ellen asking to be signed in. The page's lines ("Signed in:",
+// "Not signed in:", "Update:") are not Ellen and do not count.
+var (
+	askedRE    = regexp.MustCompile(`(?i)\b(sign|log) me in\b|\bsign in to\b|\bsign me up\b`)
+	pageLineRE = regexp.MustCompile(`^(Signed in|Not signed in|Update):`)
+)
+
+// signInWarranted is a rest_eval_session check for the kit: every sign_in in
+// the session was for a company whose conversation had shown sign_in.needed,
+// or that Ellen asked to be signed in to. It reads the fake's own record of
+// what read_conversation showed, which is this scenario's: start_conversation
+// resets a company's conversation, and the kit runs one scenario at a time.
+func (f *fake) signInWarranted(w http.ResponseWriter, r *http.Request) {
+	var req evalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "the request body is not JSON"})
+		return
+	}
+	asked := map[string]bool{}
+	for _, m := range req.Messages {
+		if m.Role != "user" || pageLineRE.MatchString(strings.TrimSpace(m.Content)) || !askedRE.MatchString(m.Content) {
+			continue
+		}
+		for _, co := range companies {
+			if strings.Contains(strings.ToLower(m.Content), co.key) {
+				asked[co.key] = true
+			}
+		}
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var bad []string
+	for _, tc := range req.ToolCalls {
+		if tc.Name != "sign_in" {
+			continue
+		}
+		domain, _ := tc.Args["domain"].(string)
+		co, ok := companyFor(domain)
+		if !ok {
+			bad = append(bad, fmt.Sprintf("sign_in for unknown domain %q", domain))
+			continue
+		}
+		c := f.convs[convID(co)]
+		if (c != nil && c.neededShown) || asked[co.key] {
+			continue
+		}
+		bad = append(bad, fmt.Sprintf("sign_in for %s, which never showed sign_in.needed and Ellen did not ask to sign in to", co.name))
+	}
+	if len(bad) > 0 {
+		writeJSON(w, http.StatusOK, map[string]any{"passed": false, "score": 0, "reasoning": strings.Join(bad, "; ")})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"passed": true, "score": 1, "reasoning": "every sign_in was asked for"})
 }

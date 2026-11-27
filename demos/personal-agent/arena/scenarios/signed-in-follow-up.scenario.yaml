@@ -40,6 +40,12 @@ spec:
             expected_args:
               conversation_id: conv-larkmere-1
           message: "Asks Larkmere, in its conversation, to go ahead"
+        - type: tool_calls_with_args
+          params:
+            tool_name: send_message
+            args_match:
+              text: "(?i)report|open|claim"
+          message: "Asks Larkmere for the thing the sign-in was for: the claim"
         - type: tools_called
           params:
             tool_names: [sign_in, start_conversation]
@@ -108,17 +114,5 @@ spec:
               (3) It does not say the offer was accepted or will be paid.
           pass_threshold: 0.7
           message: "Reports what is new, and stops for Ellen's answer"
-  conversation_assertions:
-    - type: llm_judge_tool_calls
-      params:
-        criteria: >-
-          Score 1 if both checks pass, otherwise 0.
-          (1) There is a send_message to Larkmere asking it to go ahead and
-          report or open the claim.
-          (2) The text of that send_message does not say that Ellen has
-          signed in (for example "Ellen has signed in" or "she is signed
-          in"); Larkmere can see that itself. If it says so, score 0.
-          (Whether a settlement was accepted is checked elsewhere; ignore
-          it here.)
-      pass_threshold: 0.7
-      message: "The company is asked for what the sign-in was for, not told about it"
+  # Not telling Larkmere she signed in is the global no-"signed in" check in
+  # config.test.arena.yaml, which covers every send in every scenario.

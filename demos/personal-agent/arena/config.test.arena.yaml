@@ -62,6 +62,31 @@ spec:
     - file: scenarios/selfplay-cooperative.scenario.yaml
     - file: scenarios/selfplay-impatient.scenario.yaml
     - file: scenarios/selfplay-adversarial.scenario.yaml
+    - file: scenarios/wrenmoor-same-conversation.scenario.yaml
+    - file: scenarios/wrenmoor-sign-in-on-request.scenario.yaml
+  # Every scenario: no message to a company says Ellen "signed in" (it can
+  # see that itself). The pattern matches only text that does not contain
+  # "signed in", in any case: RE2 has no negative lookahead, so it is the
+  # complement of /signed in/ written out as a regex.
+  globals:
+    conversation_assertions:
+      - type: tool_calls_with_args
+        when:
+          tool_called: send_message
+        params:
+          tool_name: send_message
+          args_match:
+            text: '(?is)^(?:(?:)(?:(?:[^s]|(?:s)(?:(?:s|(?:i)(?:(?:s|(?:g)(?:(?:s|(?:n)(?:(?:s|(?:e)(?:(?:s|(?:d)(?:(?:s|(?: )(?:(?:s|(?:i)(?:s)))))))))))))))*(?:(?:[^is]|(?:i)(?:(?:[^gs]|(?:g)(?:(?:[^ns]|(?:n)(?:(?:[^es]|(?:e)(?:(?:[^ds]|(?:d)(?:(?:[^ s]|(?: )(?:(?:[^is]|(?:i)(?:[^ns])))))))))))))))))*(?:(?:|(?:s)(?:(?:s|(?:i)(?:(?:s|(?:g)(?:(?:s|(?:n)(?:(?:s|(?:e)(?:(?:s|(?:d)(?:(?:s|(?: )(?:(?:s|(?:i)(?:s)))))))))))))))*(?:(?:|(?:i)(?:(?:|(?:g)(?:(?:|(?:n)(?:(?:|(?:e)(?:(?:|(?:d)(?:(?:|(?: )(?:(?:|(?:i)(?:))))))))))))))))))$'
+        message: "No send_message tells the company Ellen signed in"
+      # sign_in only for a company whose read_conversation showed
+      # sign_in.needed, or that Ellen asked to sign in to. arenafake judges
+      # it from its own record of what each read showed.
+      - type: rest_eval_session
+        params:
+          url: http://127.0.0.1:18640/eval/sign-in-warranted
+          include_tool_calls: true
+        message: "sign_in only when a company asked through the protocol, or Ellen asked"
+
   judges:
     - name: default
       provider: openai-mini
