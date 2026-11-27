@@ -27,11 +27,12 @@ import React, { useState, useEffect, useRef } from "react";
 //   SIGN IN. When a company wants Ellen signed in, its row says so. Once the
 //   assistant starts a sign-in (its sign_in tool), personal-agent publishes
 //   {"type":"signin","status":"pending","authorization_url":...} on
-//   api/updates and the row shows a "Sign in to <Company>" button. Only
+//   api/updates and the chat shows a "Sign in to <Company>" button. Only
 //   Ellen's click opens it, in a new tab: she signs in on the company's own
 //   page, which redirects to personal-agent's /signin/callback (never this
-//   site). How it ended comes back as another "signin" update, and the page
-//   tells the assistant in Ellen's words. No token, code or state ever
+//   site). How it ended comes back as another "signin" update: the button
+//   becomes a tick, and the page tells the assistant with a line it doesn't
+//   show. No token, code or state ever
 //   reaches this page; the URL carries only the state and code challenge.
 
 const OPENER = "The storm's flooded the kitchen and the power's off. Sort it out.";
@@ -84,9 +85,10 @@ function snapshotSignIns(list, seen, initial) {
   return out;
 }
 
-// Sign-in lines the page sends the assistant for Ellen.
-const signedInLine = (company) => "I've signed in to " + company + ".";
-const declinedLine = (company) => "I didn't sign in to " + company + ".";
+// Sign-in lines the page sends the assistant, not shown: the chat shows the
+// sign-in's outcome on its button instead.
+const signedInLine = (company) => "Signed in: " + company + ".";
+const declinedLine = (company) => "Not signed in: " + company + ".";
 
 // updateLine wakes the assistant for conversations that changed while it was
 // not reading them. It is the page speaking, not Ellen, so it is not shown.
@@ -438,33 +440,25 @@ function TalkYourself({ row, onClose }) {
   );
 }
 
-// SignInButton opens the company's own sign-in page in a new tab, on Ellen's
-// click only, and only over https. noopener: the company's page gets no
-// handle on this one.
-function SignInButton({ conv }) {
-  const href = httpsURL(conv.signin && conv.signin.url);
-  if (!href || conv.signin.status !== "pending") return null;
-  return (
-    <button className="ea-link ea-signin" onClick={() => { const u = httpsURL(href); if (u) window.open(u, "_blank", "noopener"); }}>
-      {"Sign in to " + conv.company}
-    </button>
-  );
-}
-
-// InlineSignIns puts each waiting sign-in in the chat itself, as one plain
-// button under the assistant's last message, so Ellen acts where she was
-// asked. The same rules as SignInButton: Ellen's click only, https only.
-// Once the sign-in ends, its update clears the button and the page tells the
-// assistant (signedInLine).
-function InlineSignIns({ list }) {
-  const waiting = list.filter((r) => r.conv.signin && r.conv.signin.status === "pending" && httpsURL(r.conv.signin.url));
-  return waiting.map((r) => (
-    <div className="ea-signin-inline" key={"signin-" + r.conv.id}>
-      <button className="ea-primary" onClick={() => { const u = httpsURL(r.conv.signin.url); if (u) window.open(u, "_blank", "noopener"); }}>
-        {"Sign in to " + r.conv.company}
-      </button>
-    </div>
-  ));
+// SignInCard is a sign-in in the chat, where the assistant asked for it: a
+// button while it waits, a tick once Ellen has signed in. Ellen's click only
+// opens the company's own page, in a new tab, only over https; noopener, so
+// that page gets no handle on this one.
+function SignInCard({ company, list }) {
+  const ss = list.map((r) => r.conv).filter((c) => c.company === company && c.signin).map((c) => c.signin);
+  const waiting = ss.find((x) => x.status === "pending" && httpsURL(x.url));
+  if (waiting) {
+    return (
+      <div className="ea-signin-inline">
+        <button className="ea-primary" onClick={() => { const u = httpsURL(waiting.url); if (u) window.open(u, "_blank", "noopener"); }}>
+          {"Sign in to " + company}
+        </button>
+      </div>
+    );
+  }
+  if (ss.some((x) => x.status === "signed_in")) return <div className="ea-signin-inline ea-signin-done">{"\u2713 Signed in to " + company}</div>;
+  if (ss.some((x) => x.status === "declined")) return <div className="ea-signin-inline ea-signin-off">{"Not signed in to " + company}</div>;
+  return null;
 }
 
 function Strip({ list, onTake }) {
@@ -483,7 +477,6 @@ function Strip({ list, onTake }) {
               {r.conv.signin && r.conv.signin.status === "signed_in" && <span className="ea-state signed">Signed in</span>}
             </div>
             <div className="ea-last" title={shown}>{shown}</div>
-            <SignInButton conv={r.conv} />
             <button className="ea-link ea-take" onClick={() => onTake(r.conv.id)}
               disabled={!r.direct && !!(r.conv.closed || r.conv.stopped)}>
               {r.direct ? "Your conversation" : "Talk to them yourself"}
@@ -504,8 +497,12 @@ function App() {
     const was = signInsRef.current[company];
     signInsRef.current[company] = status;
     if (was === status) return;
-    if (status === "signed_in") say(signedInLine(company));
-    else if (status === "declined") say(declinedLine(company));
+    // A sign-in begun shows its button in the chat, once: a new one for the
+    // company replaces an older one.
+    if (status === "pending") {
+      setThread((t) => [...t.filter((m) => !(m.from === "signin" && m.company === company)), { from: "signin", company }]);
+    } else if (status === "signed_in") say(signedInLine(company), true);
+    else if (status === "declined") say(declinedLine(company), true);
   };
   // A snapshot seeds the statuses: what had already ended before the page
   // loaded is not said again. After a reconnect, a sign-in that ended while
@@ -533,8 +530,7 @@ function App() {
   const [draft, setDraft] = useState("");
   const [busy, setBusyState] = useState(false);
   const busyRef = useRef(false);
-  // What waits for the running turn to end: { text } for Ellen's sign-in
-  // lines, { news: { id, company } } for conversations to wake it for.
+  // What waits for the running turn to end: { text, quiet } for lines, { news: { id, company } } for conversations to wake it for.
   const queueRef = useRef([]);
   const flushingRef = useRef(false);
   const setBusy = (b) => { busyRef.current = b; setBusyState(b); };
@@ -614,10 +610,11 @@ function App() {
     sock.send(JSON.stringify(m));
   }
 
-  // say sends a line for Ellen now, or after the turn that is running.
-  function say(text) {
-    if (busyRef.current || flushingRef.current) queueRef.current.push({ text });
-    else sendLine(text);
+  // say sends a line now, or after the turn that is running; quiet, it is
+  // not shown.
+  function say(text, quiet) {
+    if (busyRef.current || flushingRef.current) queueRef.current.push({ text, quiet });
+    else sendLine(text, quiet);
   }
 
   // news wakes the assistant for a changed conversation, once no turn runs.
@@ -634,7 +631,8 @@ function App() {
     const q = queueRef.current;
     if (q.length === 0) return;
     if (q[0].text) {
-      sendLine(q.shift().text);
+      const line = q.shift();
+      sendLine(line.text, line.quiet);
       return;
     }
     const waiting = q.filter((x) => x.news).map((x) => x.news);
@@ -684,10 +682,10 @@ function App() {
         </div>
         <Strip list={list} onTake={setOpen} />
         <div className="ea-chat" ref={scrollRef}>
-          {thread.map((m, i) => (
-            <div key={i} className={"ea-msg " + m.from}>{m.from === "note" ? m.text : emphasis(m.text)}</div>
+          {thread.map((m, i) => (m.from === "signin"
+            ? <SignInCard key={i} company={m.company} list={list} />
+            : <div key={i} className={"ea-msg " + m.from}>{m.from === "note" ? m.text : emphasis(m.text)}</div>
           ))}
-          <InlineSignIns list={list} />
           {busy && <div className="ea-typing">Working on it…</div>}
         </div>
         {thread.length === 1 && (

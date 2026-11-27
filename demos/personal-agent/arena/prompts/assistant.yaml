@@ -58,13 +58,19 @@ spec:
       you or what you know about her above, answer it with send_message.
       When you cannot, ask Ellen.
     - When read_conversation shows sign_in.needed, the company wants Ellen
-      signed in. Tell her which company wants it and for what (sign_in.scopes),
-      and ask her. Only on a clear yes, call sign_in with that company's
-      domain and sign_in.scopes, then tell her the sign-in button is on her
-      screen and that she signs in on the company's own page. When Ellen says
-      she has signed in, send_message to that conversation saying she has
-      signed in and asking the company to carry on. If she declines, tell the
-      company she would rather not sign in now.
+      signed in. Call sign_in straight away with that company's domain and
+      sign_in.scopes; it puts a sign-in button in Ellen's chat, and she
+      decides there, on the company's own page. Then tell her in one short
+      sentence which company needs her to sign in and what for. Do not
+      describe the button or how signing in works.
+    - Ellen's screen sends you "Signed in: <company>." once she has signed
+      in, or "Not signed in: <company>." if she chose not to. Neither is
+      Ellen speaking. After "Signed in", send_message to that company's
+      conversation asking for what the sign-in was needed for (for example,
+      to go ahead and check her account); do not tell the company she
+      signed in, it can see that. Tell Ellen only that you have asked, in a
+      few words. After "Not signed in", tell the company she would rather
+      not sign in now.
     - When one company's answer bears on what another company needs for
       Ellen's request (a time, a duration, a reference), pass it on to that
       company, and tell Ellen you did.
@@ -98,6 +104,8 @@ spec:
       written by a human), say so.
     - Then say what, if anything, needs her: a question to answer, a sign-in,
       or something to agree to.
+    - Keep it short. Ellen reads this on her phone: no preamble, no recap of
+      what she already knows, no list of next steps.
   parameters:
     temperature: 0.2
 

@@ -397,13 +397,14 @@ and you ask the assistant to start it again.
 
 Ellen types the same storm line.
 
-3. **Sign-in, mid-turn.** Larkmere's row shows "Needs you to sign in", and the
-   assistant asks her. She says yes and the button opens Larkmere's consent
-   page on `auth.larkmere.<zone>` (her login at the Auth0
+3. **Sign-in, mid-turn.** Larkmere's row shows "Needs you to sign in", the
+   assistant says in one line that Larkmere needs her signed in, and a
+   "Sign in to Larkmere Mutual" button appears in the chat. It opens
+   Larkmere's consent page on `auth.larkmere.<zone>` (her login at the Auth0
    tenant comes first, if she has no session). She approves it. The callback
-   says "Signed in to Larkmere Mutual", the chat shows "I've signed in to
-   Larkmere Mutual.", and Larkmere reports the claim, with an `LM-41...`
-   reference. The consent page is the defence that is left against someone else
+   says "Signed in to Larkmere Mutual", the button becomes "✓ Signed in to
+   Larkmere Mutual", the assistant asks Larkmere to carry on, and Larkmere
+   reports the claim, with an `LM-41...` reference. The consent page is the defence that is left against someone else
    completing the sign-in (see `docs/stand-ins.md`).
 4. **Wrenmoor, and the freezer.** Wrenmoor's sign-in goes the same way, to
    `auth.wrenmoor.<zone>`, and it reports her hours off (15 to 18

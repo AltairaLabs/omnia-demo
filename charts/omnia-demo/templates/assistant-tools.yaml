@@ -120,7 +120,7 @@ spec:
       timeout: 45s
       tool:
         name: sign_in
-        description: "Start a sign-in for Ellen at a company, so its agent can reach her account there. Call it only after Ellen has clearly said yes. It puts a sign-in button on her screen; she signs in on the company's own page, and you never see her password, any code or the sign-in link. Returns the company, the scopes asked for, the status and a note saying where the button is, or, when no conversation with the company is open, that one must be started first. Pass the scopes read_conversation showed (sign_in.scopes), space-separated; leave them out only when it showed none."
+        description: "Start a sign-in for Ellen at a company, so its agent can reach her account there. Call it when a company wants her signed in: it only puts a sign-in button in her chat, and she decides by using it or not; she signs in on the company's own page, and you never see her password, any code or the sign-in link. Returns the company, the scopes asked for, the status and a note saying where the button is, or, when no conversation with the company is open, that one must be started first. Pass the scopes read_conversation showed (sign_in.scopes), space-separated; leave them out only when it showed none."
         inputSchema:
           type: object
           properties:
