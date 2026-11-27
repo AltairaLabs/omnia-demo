@@ -1,0 +1,124 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins "Signed in: X.": send_message to X's conversation asking for what the
+# sign-in was for, without telling X she signed in, and a few words to Ellen.
+# Then the next Update: only what is new, and Larkmere's settlement offer goes
+# back to Ellen rather than being accepted.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: signed-in-follow-up
+spec:
+  task_type: assistant
+  description: >-
+    Larkmere needed a sign-in; Ellen signs in. The assistant asks Larkmere to
+    go ahead, then reports the claim reference and its £850 offer.
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "Water's come in under the back door in the storm. Can you report it to Larkmere?"
+      assertions:
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, send_message]
+          message: "Does not wait for the reply"
+    - role: user
+      content: "Update: Larkmere Mutual (conversation conv-larkmere-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [sign_in]
+          message: "Setup: the sign-in was started"
+    - role: user
+      content: "Signed in: Larkmere Mutual."
+      assertions:
+        - type: tool_args
+          params:
+            tool_name: send_message
+            expected_args:
+              conversation_id: conv-larkmere-1
+          message: "Asks Larkmere, in its conversation, to go ahead"
+        - type: tools_called
+          params:
+            tool_names: [sign_in, start_conversation]
+            max_calls: 1
+          message: "Neither a second sign-in nor a new conversation"
+        - type: tools_not_called
+          params:
+            tool_names: [close_conversation]
+          message: "The claim is not dealt with yet"
+        - type: regex
+          params:
+            pattern: "LM-"
+            expect_match: false
+          message: "No claim reference before Larkmere has given one"
+        - type: max_length
+          params:
+            max: 200
+          message: "Only that it has asked, in a few words"
+        - type: regex
+          params:
+            pattern: "(?i)(has|have|was|been) (now )?(been )?(opened|reported|filed|logged)|is (now )?(open|reported|filed|logged)"
+            expect_match: false
+          message: "Does not say Larkmere opened or reported the claim before it has said so"
+        - type: contains_any
+          params:
+            patterns: ["asked", "requested"]
+          message: "Says it has asked"
+    - role: user
+      content: "Update: Larkmere Mutual (conversation conv-larkmere-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_conversation]
+            min_calls: 2
+          message: "Reads again on the update"
+        - type: tools_called
+          params:
+            tool_names: [send_message]
+            max_calls: 1
+          message: "The settlement offer is Ellen's to answer: nothing more is sent"
+        - type: contains_any
+          params:
+            patterns: ["LM-41027"]
+          message: "Gives the reference Larkmere gave, exactly"
+        - type: contains_any
+          params:
+            patterns: ["£850", "850"]
+          message: "Gives the offer's amount"
+        - type: contains_any
+          params:
+            patterns: ["full and final", "in full", "full settlement", "final settlement", "assessor"]
+          message: "Gives the offer's terms, not just its amount"
+        - type: regex
+          params:
+            pattern: "\\?"
+          message: "Asks Ellen"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Context: Larkmere replied that it opened claim LM-41027 and
+              offers £850 in full and final settlement instead of sending an
+              assessor, and asked for Ellen's acceptance. Score 1 if all
+              checks pass, otherwise 0.
+              (1) The reply gives the reference LM-41027 and the £850 offer.
+              (2) It asks Ellen whether she wants to accept.
+              (3) It does not say the offer was accepted or will be paid.
+          pass_threshold: 0.7
+          message: "Reports what is new, and stops for Ellen's answer"
+  conversation_assertions:
+    - type: llm_judge_tool_calls
+      params:
+        criteria: >-
+          Score 1 if both checks pass, otherwise 0.
+          (1) There is a send_message to Larkmere asking it to go ahead and
+          report or open the claim.
+          (2) The text of that send_message does not say that Ellen has
+          signed in (for example "Ellen has signed in" or "she is signed
+          in"); Larkmere can see that itself. If it says so, score 0.
+          (Whether a settlement was accepted is checked elsewhere; ignore
+          it here.)
+      pass_threshold: 0.7
+      message: "The company is asked for what the sign-in was for, not told about it"

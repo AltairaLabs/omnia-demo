@@ -19,6 +19,10 @@
 # assistant-tools.yaml.
 #
 # Regenerate with: hack/build-packs.sh assistant
+#
+# Tests live in config.test.arena.yaml: the same prompt with these tools
+# bound to a stateful fake (demos/personal-agent/arenafake), so this config,
+# and the pack, stay free of test bindings.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: Arena
 metadata:

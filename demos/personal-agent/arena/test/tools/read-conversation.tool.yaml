@@ -1,0 +1,50 @@
+# TEST ONLY: the shipped tools/read-conversation.tool.yaml bound to the arenafake stand-in
+# (demos/personal-agent/arenafake) instead of a mock. Used by
+# config.test.arena.yaml, never by the pack. Description, schemas and
+# action_scope must stay identical to tools/read-conversation.tool.yaml; arenafake's
+# TestToolsMatchShipped fails when they drift. Regenerate after changing the
+# shipped tool, as that test's comment says.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: read_conversation
+spec:
+  name: read_conversation
+  description: >-
+    Read a conversation with a company so far: every message (role "user" is what was sent for Ellen, role "company" is the company's reply; author "agent" or "human" says whether a person at the company wrote it), whether the company is still working on a reply (working), whether a person at the company is taking it over (handoff "pending", else "none"), whether it is closed, and, if the assistant can no longer follow it, why (stopped, for example when the company asks for Ellen to sign in), and sign_in, present while the company wants Ellen signed in or a sign-in with it has begun or ended (needed; scopes, space-separated; status needed, pending, signed_in or declined). Changes nothing.
+  input_schema:
+    type: object
+    properties:
+      conversation_id:
+        type: string
+        description: The conversation_id start_conversation returned
+    required: [conversation_id]
+  output_schema:
+    type: object
+    properties:
+      company: {type: string}
+      working: {type: boolean}
+      handoff: {type: string, enum: [none, pending]}
+      closed: {type: boolean}
+      stopped: {type: string}
+      sign_in:
+        type: object
+        properties:
+          needed: {type: boolean}
+          scopes: {type: string}
+          status: {type: string, enum: [needed, pending, signed_in, declined]}
+      messages:
+        type: array
+        items:
+          type: object
+          properties:
+            role: {type: string}
+            author: {type: string}
+            text: {type: string}
+  action_scope: {effect: read, reversibility: reversible, data_classes: [pii]}
+  mode: live
+  timeout_ms: 10000
+  http:
+    url: http://127.0.0.1:18640/tools/read_conversation
+    method: POST
+    timeout_ms: 10000

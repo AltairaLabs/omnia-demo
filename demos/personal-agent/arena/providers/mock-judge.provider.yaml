@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# A keyless stand-in for the judges, for mock runs only:
+#   --override-provider openai-mini=mock-judge
+# Every judge passes, so a mock run checks only the deterministic assertions.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock-judge
+spec:
+  id: mock-judge
+  type: mock
+  model: mock-judge
+  additional_config:
+    mock_config: mock-judge-responses.yaml

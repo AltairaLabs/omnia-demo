@@ -190,6 +190,31 @@ Add a row when you add a stand-in.
     Redis and survive.) After a page reload a pending sign-in shows "ask your
     assistant to start the sign-in again".
 
+### The assistant's test companies (`demos/personal-agent/arenafake`)
+
+- **Fakes:** the personal-agent service and the Companies behind it, for the
+  assistant's PromptArena kit only (`arena/config.test.arena.yaml`). It
+  serves the same `/tools/*` routes on 127.0.0.1:18640, and Larkmere,
+  Wrenmoor and Halvern Partners are fixed scripts. It never ships: the pack
+  is built from `config.arena.yaml`, whose tools are mocks.
+- **Real system:** PAP discovery and conversations with the Companies' Poppy
+  agents, whose replies arrive later over a stream, and Direct Sign-In on the
+  Company's own page.
+- **Downstream:**
+  - **A Company replies as soon as it is written to.** The kit sends the
+    page's "Update:" lines itself, and pins "does not wait" with assertions,
+    not timing.
+  - **Conversation ids are fixed per Company** (`conv-wrenmoor-1`, ...) so a
+    scripted "Update:" line can name them. Starting a conversation resets
+    that Company's, so the kit runs one scenario at a time.
+  - **Nobody signs in.** After `sign_in`, the next message to that Company
+    completes it: declined if it says Ellen would rather not sign in, signed
+    in otherwise.
+  - **The script is picked by keywords** in the first message (planned work,
+    last month's power cut, a fence claim), and the prompt sees the literal
+    `@WRENMOOR_DOMAIN@` tokens as domains. A pass shows how the assistant
+    handles these replies, not that it works against the real Companies.
+
 ## Line-of-business systems
 
 ### Case, claims and account stubs (`demos/mortgage-underwriting`, one binary)

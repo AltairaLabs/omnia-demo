@@ -1,0 +1,65 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins "Not signed in: X.": tell X she would rather not sign in now, do not
+# start another sign-in, and do not press Ellen to sign in.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: not-signed-in
+spec:
+  task_type: assistant
+  description: >-
+    Larkmere needed a sign-in; Ellen chose not to sign in.
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "Water's come in under the back door in the storm. Can you report it to Larkmere?"
+      assertions:
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, send_message]
+          message: "Does not wait for the reply"
+    - role: user
+      content: "Update: Larkmere Mutual (conversation conv-larkmere-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [sign_in]
+          message: "Setup: the sign-in was started"
+    - role: user
+      content: "Not signed in: Larkmere Mutual."
+      assertions:
+        - type: tool_args
+          params:
+            tool_name: send_message
+            expected_args:
+              conversation_id: conv-larkmere-1
+          message: "Tells Larkmere, in its conversation"
+        - type: tool_calls_with_args
+          params:
+            tool_name: send_message
+            args_match:
+              text: "(?i)not|n't|decline"
+          message: "The message says she would rather not sign in"
+        - type: tools_called
+          params:
+            tool_names: [sign_in, start_conversation]
+            max_calls: 1
+          message: "No second sign-in, no new conversation"
+        - type: max_length
+          params:
+            max: 250
+          message: "Short"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Score 1 if both checks pass, otherwise 0.
+              (1) The reply tells Ellen the assistant has let Larkmere Mutual
+              know she would rather not sign in now.
+              (2) It does not urge her to sign in after all and gives no
+              sign-in instructions. A reply that simply accepts her choice
+              passes this check.
+          pass_threshold: 0.7
+          message: "Respects her choice, briefly"

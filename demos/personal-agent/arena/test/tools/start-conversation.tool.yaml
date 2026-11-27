@@ -1,0 +1,36 @@
+# TEST ONLY: the shipped tools/start-conversation.tool.yaml bound to the arenafake stand-in
+# (demos/personal-agent/arenafake) instead of a mock. Used by
+# config.test.arena.yaml, never by the pack. Description, schemas and
+# action_scope must stay identical to tools/start-conversation.tool.yaml; arenafake's
+# TestToolsMatchShipped fails when they drift. Regenerate after changing the
+# shipped tool, as that test's comment says.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: start_conversation
+spec:
+  name: start_conversation
+  description: >-
+    Open a conversation with a company's Poppy agent and send it the first message, for Ellen. The domain must be one Ellen has an account at or one find_company found. Returns the conversation_id and the company's name. The company replies in its own time: read its reply with read_conversation. If it says it couldn't reach the company, nothing was sent, and you may try once more.
+  input_schema:
+    type: object
+    properties:
+      domain:
+        type: string
+        description: The company's domain name, e.g. @LARKMERE_DOMAIN@
+      message:
+        type: string
+        description: The first message to the company, written as Ellen's assistant acting for her
+    required: [domain, message]
+  output_schema:
+    type: object
+    properties:
+      conversation_id: {type: string}
+      company: {type: string}
+  action_scope: {effect: external, reversibility: irreversible, data_classes: [pii]}
+  mode: live
+  timeout_ms: 45000
+  http:
+    url: http://127.0.0.1:18640/tools/start_conversation
+    method: POST
+    timeout_ms: 10000

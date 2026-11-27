@@ -1,0 +1,20 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# A keyless agent for config.test.arena.yaml: plays the behaviour each
+# scripted scenario expects (mock-responses.yaml, keyed by scenario name), so
+# a run checks the kit itself (arenafake, the tools, the deterministic
+# assertions) without a model. It proves nothing about the prompt.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: mock-scripted
+spec:
+  id: mock-scripted
+  type: mock
+  model: mock-assistant
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 1024
+  additional_config:
+    mock_config: mock-responses.yaml

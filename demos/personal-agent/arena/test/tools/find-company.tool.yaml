@@ -1,0 +1,42 @@
+# TEST ONLY: the shipped tools/find-company.tool.yaml bound to the arenafake stand-in
+# (demos/personal-agent/arenafake) instead of a mock. Used by
+# config.test.arena.yaml, never by the pack. Description, schemas and
+# action_scope must stay identical to tools/find-company.tool.yaml; arenafake's
+# TestToolsMatchShipped fails when they drift. Regenerate after changing the
+# shipped tool, as that test's comment says.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: find_company
+spec:
+  name: find_company
+  description: >-
+    Look up a company's Poppy agents by its domain (for example @LARKMERE_DOMAIN@). Returns the company's name, its domain and what each of its agents can talk about, with its access: "session" (no sign-in needed) or "signed_in" (the company needs Ellen signed in). When the domain has no Poppy agent it returns found false and a reason; that is an answer, not a failure to retry. When the company couldn't be reached right now, the reason says so ("couldn't reach ... right now"); that may pass, so try once more, and if it fails again tell Ellen.
+  input_schema:
+    type: object
+    properties:
+      domain:
+        type: string
+        description: The company's domain name, with no scheme or path, e.g. @WRENMOOR_DOMAIN@
+    required: [domain]
+  output_schema:
+    type: object
+    properties:
+      found: {type: boolean}
+      reason: {type: string}
+      name: {type: string}
+      domain: {type: string}
+      agents:
+        type: array
+        items:
+          type: object
+          properties:
+            description: {type: string}
+            access: {type: string, enum: [session, signed_in]}
+  action_scope: {effect: read, reversibility: reversible, data_classes: [public]}
+  mode: live
+  timeout_ms: 45000
+  http:
+    url: http://127.0.0.1:18640/tools/find_company
+    method: POST
+    timeout_ms: 10000

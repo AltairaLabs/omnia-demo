@@ -1,0 +1,36 @@
+# TEST ONLY: the shipped tools/send-message.tool.yaml bound to the arenafake stand-in
+# (demos/personal-agent/arenafake) instead of a mock. Used by
+# config.test.arena.yaml, never by the pack. Description, schemas and
+# action_scope must stay identical to tools/send-message.tool.yaml; arenafake's
+# TestToolsMatchShipped fails when they drift. Regenerate after changing the
+# shipped tool, as that test's comment says.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Tool
+metadata:
+  name: send_message
+spec:
+  name: send_message
+  description: >-
+    Send another message in an open conversation with a company, for Ellen. Not for a conversation Ellen has taken over herself (that one is hers), nor a closed one. The company replies in its own time: read its reply with read_conversation.
+  input_schema:
+    type: object
+    properties:
+      conversation_id:
+        type: string
+        description: The conversation_id start_conversation returned
+      text:
+        type: string
+        description: The message to the company
+    required: [conversation_id, text]
+  output_schema:
+    type: object
+    properties:
+      conversation_id: {type: string}
+      sent: {type: boolean}
+  action_scope: {effect: external, reversibility: irreversible, data_classes: [pii]}
+  mode: live
+  timeout_ms: 45000
+  http:
+    url: http://127.0.0.1:18640/tools/send_message
+    method: POST
+    timeout_ms: 10000

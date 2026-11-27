@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# A real model for local test runs of config.test.arena.yaml: the agent under
+# test (--provider openai). Needs OPENAI_API_KEY. Local only: in Omnia the
+# agent's model is the Provider the AgentRuntime names.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: openai
+spec:
+  id: openai
+  type: openai
+  model: gpt-4o
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 1024

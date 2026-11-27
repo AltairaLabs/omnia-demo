@@ -1,0 +1,16 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/provider.json
+#
+# The simulated Ellen (self-play) and the judges in config.test.arena.yaml:
+# never the agent's own model. Needs OPENAI_API_KEY.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Provider
+metadata:
+  name: openai-mini
+spec:
+  id: openai-mini
+  type: openai
+  model: gpt-4o-mini
+  defaults:
+    temperature: 0.2
+    top_p: 1.0
+    max_tokens: 1024

@@ -1,0 +1,82 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# TEST ONLY: the PromptArena kit for Ellen's assistant. Never compiled into a
+# pack (hack/build-packs.sh assistant reads config.arena.yaml).
+#
+# Same prompt as the pack, but the tools are test/tools/*.tool.yaml: the
+# shipped tools, word for word, bound over HTTP to arenafake
+# (demos/personal-agent/arenafake), a stateful stand-in for the
+# personal-agent service and the Companies. It must be running on
+# 127.0.0.1:18640; it runs the command it is given and then exits. From
+# demos/personal-agent/arena (the mock judge's mock_config is resolved from
+# the working directory, not this file's):
+#
+# Real run, every scenario including self-play. Needs OPENAI_API_KEY:
+#
+#   go run ../arenafake -- promptarena run --config config.test.arena.yaml \
+#     --provider openai --ci --formats json
+#
+# Keyless, scripted scenarios only (the agent and the judges mocked; the
+# self-play scenarios need a real model):
+#
+#   go run ../arenafake -- promptarena run --config config.test.arena.yaml \
+#     --provider mock-scripted --override-provider openai-mini=mock-judge --ci \
+#     --scenario storm-opens-both,update-reads-named,sign-in-needed,signed-in-follow-up,not-signed-in,claim-offer-needs-yes,company-injection,company-sign-in-link
+#
+# Why not mode: exec: promptarena (2.7.0) registers no exec executor and
+# refuses such a tool at load. Why not the shipped config: its tools are the
+# pack's, and an HTTP binding to localhost must never reach the pack.
+#
+# Conversation ids are fixed per company in arenafake (conv-wrenmoor-1,
+# conv-larkmere-1) so scripted "Update:" lines can name them, so scenarios run
+# one at a time (concurrency 1).
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: assistant-test
+spec:
+  prompt_configs:
+    - id: assistant
+      file: prompts/assistant.yaml
+  providers:
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+    - file: providers/mock-scripted.provider.yaml
+    - file: providers/mock-judge.provider.yaml
+  tools:
+    - file: test/tools/find-company.tool.yaml
+    - file: test/tools/start-conversation.tool.yaml
+    - file: test/tools/send-message.tool.yaml
+    - file: test/tools/read-conversation.tool.yaml
+    - file: test/tools/close-conversation.tool.yaml
+    - file: test/tools/sign-in.tool.yaml
+  scenarios:
+    - file: scenarios/storm-opens-both.scenario.yaml
+    - file: scenarios/update-reads-named.scenario.yaml
+    - file: scenarios/sign-in-needed.scenario.yaml
+    - file: scenarios/signed-in-follow-up.scenario.yaml
+    - file: scenarios/not-signed-in.scenario.yaml
+    - file: scenarios/claim-offer-needs-yes.scenario.yaml
+    - file: scenarios/company-injection.scenario.yaml
+    - file: scenarios/company-sign-in-link.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-impatient.scenario.yaml
+    - file: scenarios/selfplay-adversarial.scenario.yaml
+  judges:
+    - name: default
+      provider: openai-mini
+  defaults:
+    temperature: 0.2
+    max_tokens: 1024
+    concurrency: 1
+    output:
+      dir: out
+      formats: ["json"]
+  self_play:
+    personas:
+      - file: personas/ellen-cooperative.persona.yaml
+      - file: personas/ellen-impatient.persona.yaml
+      - file: personas/ellen-adversarial.persona.yaml
+    roles:
+      - id: ellen
+        provider: openai-mini

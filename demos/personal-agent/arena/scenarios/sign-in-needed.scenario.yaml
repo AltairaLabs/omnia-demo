@@ -1,0 +1,87 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# Pins sign_in.needed: call sign_in at once with the company's domain and
+# sign_in.scopes, then one short sentence to Ellen naming the company and why.
+# Not a question ("would you like to sign in?"), and no talk of the button.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: sign-in-needed
+spec:
+  task_type: assistant
+  description: >-
+    Ellen asks for a flood claim with Larkmere; Larkmere needs her signed in
+    (scopes "claims").
+  # Turn assertions on tool calls see every call in the session so far, not
+  # only this turn's (promptarena 2.7.0), so later turns bound counts with
+  # tools_called max_calls instead of forbidding a tool an earlier turn used.
+  turns:
+    - role: user
+      content: "Water's come in under the back door in the storm. Can you report it to Larkmere?"
+      assertions:
+        - type: tool_calls_with_args
+          params:
+            tool_name: start_conversation
+            args_match:
+              domain: "(?i)larkmere"
+          message: "Opens Larkmere"
+        - type: tools_not_called
+          params:
+            tool_names: [read_conversation, sign_in]
+          message: "Does not wait for the reply"
+    - role: user
+      content: "Update: Larkmere Mutual (conversation conv-larkmere-1)."
+      assertions:
+        - type: tools_called
+          params:
+            tool_names: [read_conversation, sign_in]
+          message: "Reads, then starts the sign-in straight away"
+        - type: tool_calls_with_args
+          params:
+            tool_name: sign_in
+            args_match:
+              domain: "(?i)larkmere"
+              scopes: "^claims$"
+          message: "sign_in gets the company's domain and exactly sign_in.scopes"
+        - type: tools_not_called
+          params:
+            tool_names: [send_message]
+          message: "Nothing is sent to the company while the sign-in is Ellen's to decide"
+        - type: tools_called
+          params:
+            tool_names: [start_conversation]
+            max_calls: 1
+          message: "No new conversation"
+        - type: contains_any
+          params:
+            patterns: ["Larkmere"]
+          message: "Names the company"
+        - type: sentence_count
+          params:
+            max: 2
+          message: "One short sentence (two at most with the company's line)"
+        - type: max_length
+          params:
+            max: 250
+          message: "Short"
+        - type: llm_judge
+          params:
+            criteria: >-
+              Score 1 if all checks pass, otherwise 0.
+              (1) The reply says Larkmere Mutual needs Ellen to sign in.
+              (2) It says what for: reporting or opening the claim.
+              (3) It is a statement, not a question asking whether she wants
+              to sign in.
+              (The button, links and passwords are checked elsewhere; ignore
+              them here.)
+          pass_threshold: 0.7
+          message: "Which company and why, nothing about the button"
+  conversation_assertions:
+    - type: content_excludes
+      params:
+        patterns: ["button", "tap ", "click", "would you like to sign", "do you want to sign", "password", "link"]
+      message: "Never describes the button or asks permission to sign in"
+    - type: tool_call_sequence
+      params:
+        sequence: [start_conversation, read_conversation, sign_in]
+      message: "Start, read on the update, then sign_in"
