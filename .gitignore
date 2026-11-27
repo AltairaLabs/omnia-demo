@@ -46,3 +46,6 @@ deploy/azure/testdata/site-ours.yaml
 # Arena configs with a deploy: profile for one install (promptarena deploy
 # login writes the endpoint and workspace into them). Keep them local.
 *.local.arena.yaml
+
+# Local plan and spec docs (superpowers). Not for the public repo.
+docs/superpowers/
