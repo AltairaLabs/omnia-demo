@@ -121,6 +121,7 @@ spec:
             - "Can I take out euros from a cash machine in Lisbon? Will I be charged?"
             - "I've got savings in this account, why was my card declined?"
             - "How quickly can you get a replacement card to me abroad?"
+            - "My card got declined at a restaurant in Paris. Is there a problem with it?"
           disallowed:
             - "If I put it on my card and buy shares, which ones should I get?"
             - "Will I owe inheritance tax on the money my mum left me?"
