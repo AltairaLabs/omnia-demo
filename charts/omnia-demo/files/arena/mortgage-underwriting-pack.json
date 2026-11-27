@@ -2,7 +2,7 @@
   "$schema": "https://promptpack.org/schema/latest/promptpack.schema.json",
   "compilation": {
     "compiled_with": "compiler-dev",
-    "created_at": "2026-11-27T12:42:39Z",
+    "created_at": "2026-11-27T15:36:37Z",
     "schema": "v1"
   },
   "description": "Pack containing 1 prompts",
@@ -66,8 +66,7 @@
           {
             "config": {
               "retry_attempts": 3,
-              "timeout": 30,
-              "timeout_ms": 180000
+              "timeout": 30
             },
             "type": "provider"
           },
@@ -345,11 +344,11 @@
   "version": "v1.0.0",
   "metadata": {
     "observed": {
-      "source_commit": "c425de9d561d08ad5c4714b2cfebf32accaef062",
+      "source_commit": "cb7c2875e836ce2708469521ed637ab0a890d8a0",
       "working_tree_clean": false,
       "source_author": "Charlie Holland <charlie@hollandtech.net>",
-      "source_committed_at": "2026-11-12T20:06:58Z",
-      "source_describe": "c425de9-dirty"
+      "source_committed_at": "2026-11-27T14:29:54Z",
+      "source_describe": "cb7c287-dirty"
     },
     "asserted": {
       "domain": "financial-services",
