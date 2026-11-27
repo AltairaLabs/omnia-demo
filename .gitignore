@@ -42,3 +42,7 @@ deploy/azure/site.yaml
 # A test-only site file holding a deployment's real values, for the render
 # comparison in deploy/azure (TestRenderedTenantsUnchanged). Never commit it.
 deploy/azure/testdata/site-ours.yaml
+
+# Arena configs with a deploy: profile for one install (promptarena deploy
+# login writes the endpoint and workspace into them). Keep them local.
+*.local.arena.yaml

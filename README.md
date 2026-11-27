@@ -12,6 +12,8 @@ documents its prerequisites and can be enabled or disabled through values.
   the demo cast's agents: Larkmere Mutual (mortgage underwriting, claims
   triage, card support) and Wrenmoor Energy (on-call incident agent, grid data
   analyst, field-service copilot).
+- [`docs/testing-agents.md`](docs/testing-agents.md) — the PromptArena kits
+  that measure every demo agent, and turning a bad live session into a scenario.
 - [`memory-ingestion/`](memory-ingestion/) — a public Azure Blob source
   connector that sends documents to Omnia institutional memory.
 - [`memory-documents/`](memory-documents/) — each company's synthetic documents,
