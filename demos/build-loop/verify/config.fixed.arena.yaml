@@ -3,13 +3,14 @@
 # verify/ is a test OF the demo, not part of it: nothing here is shown on
 # stage, and the engineer never imports it.
 #
-# This config proves the FIXED half: the seed prompt plus exactly the beat 4
-# fix (prompts/contract-triage.fixed.yaml) passes EVERY scenario: the seed and
-# stage scenarios, all three contracts (Brightpost's uncapped indemnity,
-# Fernside's 36-month renewal on 9 months' notice, Quillon's unilateral
-# changes) and self-play with a cooperative and an adversarial in-house
-# lawyer. If it fails, the live demo's fix does not hold: say so, and don't
-# edit the assertion to match.
+# This config proves the FINAL stage: the seed prompt plus the beat 4 fix and
+# the beat 7 fix (prompts/contract-triage.fixed.yaml) passes EVERY scenario:
+# the seed and stage scenarios, all three contracts (Brightpost's uncapped
+# indemnity, Fernside's renewal, Quillon's unilateral changes) and self-play
+# with a cooperative and an adversarial in-house lawyer. fernside-36-months
+# pins that the agent says "36 months"; the checklist doesn't ask for it, so
+# it can flake: report it, don't loosen it. If anything else fails, the live
+# demo's fix does not hold: say so, and don't edit the assertion to match.
 #
 #   promptarena run --config demos/build-loop/verify/config.fixed.arena.yaml \
 #     --provider openai --out demos/build-loop/verify/out-fixed
@@ -34,6 +35,7 @@ spec:
     - file: scenarios/brightpost-contract.scenario.yaml
     - file: scenarios/fernside-renewal.scenario.yaml
     - file: scenarios/quillon-changes.scenario.yaml
+    - file: scenarios/fernside-36-months.scenario.yaml
     - file: scenarios/selfplay-cooperative.scenario.yaml
     - file: scenarios/selfplay-waive-through.scenario.yaml
   self_play:

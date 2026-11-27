@@ -2,16 +2,17 @@
 #
 # verify/ is a test of the demo, not part of it.
 #
-# The seed prompt plus exactly the beat 4 fix from the RUNBOOK, and nothing
-# else: one checklist item, general, never naming a contract. Keep the item
-# word for word in step with RUNBOOK.md beat 4. Fictional company.
+# The seed prompt plus exactly the beat 4 fix and the beat 7 fix from the
+# RUNBOOK, and nothing else: two checklist items, general, never naming a
+# contract or supplier. Keep them word for word in step with RUNBOOK.md beats
+# 4 and 7. Fictional company.
 apiVersion: promptkit.altairalabs.ai/v1alpha1
 kind: PromptConfig
 metadata:
   name: contract-triage
 spec:
   task_type: contract_triage
-  version: "0.1.1"
+  version: "0.1.2"
   description: >-
     Larkmere Mutual's in-house legal team: triage a supplier contract and say
     which clauses need a lawyer's attention.
@@ -25,6 +26,8 @@ spec:
       Larkmere's instructions, or outside the UK.
     - Liability and indemnity: flag any indemnity Larkmere gives, and any
       liability, that has no cap, or a cap out of proportion to the fees.
+    - Changes: flag any right for the supplier to change the terms, the service
+      or the fees without Larkmere's agreement.
 
     The lawyers asked for short lists, so flag only clauses that fail one of
     these checks, and don't mention clauses that pass or aren't on the list.

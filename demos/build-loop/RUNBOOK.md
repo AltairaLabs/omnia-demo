@@ -165,7 +165,16 @@ Brightpost: it flags the indemnity.
 ### 7. Ship a change (cut first if short of time)
 
 Repeat 3 and 4 for the next miss (Fernside's renewal, or Quillon's
-variation clause). Then **Deploy…**, **Update a deployment**,
+variation clause).
+For Quillon's variation clause, the checklist item is again general and never
+names the contract or the supplier:
+
+```
+- Changes: flag any right for the supplier to change the terms, the service
+  or the fees without Larkmere's agreement.
+```
+
+Add it under the liability item. Then **Deploy…**, **Update a deployment**,
 `contract-triage`, **Gradual**. **Deployments** lists both versions. Demo 9
 is what happens next: the canary judged on live conversations.
 

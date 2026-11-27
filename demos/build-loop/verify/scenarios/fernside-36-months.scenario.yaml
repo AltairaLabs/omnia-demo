@@ -1,0 +1,38 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/scenario.json
+#
+# verify/ only. Fernside again, strict: the trap is a 36-month auto-renewal on 9
+# months' notice, so the agent must say 36 months. Pinned unloosened; the
+# checklist only covers the notice period, so it may never pass.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Scenario
+metadata:
+  name: fernside-36-months
+spec:
+  task_type: contract_triage
+  description: Full Fernside contract; 36-month auto-renewal on 9 months' notice.
+  turns:
+    - role: user
+      content: |
+        Please triage this.
+
+        OUTSOURCING AGREEMENT: FIRST NOTIFICATION OF LOSS
+
+        Between Larkmere Mutual (the "Society") and Fernside Claims Services (the "Supplier").
+        Fictional: all names, figures and terms are invented for a demonstration.
+
+        1. Services. The Supplier will take first notification of loss calls for household claims, 24 hours a day.
+        2. Fees. A monthly fee of £18,500, invoiced in advance and payable within 30 days.
+        3. Term and renewal. This agreement runs for 12 months and renews automatically for further periods of 36 months unless either party gives at least 9 months' written notice before the end of the current period.
+        4. Termination for breach. Either party may end this agreement at once if the other commits a material breach and fails to remedy it within 30 days.
+        5. Data protection. The Supplier will process member personal data only on the Society's documented instructions.
+        6. Liability. Each party's total liability is limited to the fees paid in the 12 months before the claim.
+        7. Governing law. This agreement is governed by the law of England and Wales.
+      assertions:
+        - type: contains_any
+          params:
+            patterns: ["36", "thirty-six"]
+          message: "The agent flags the 36-month auto-renewal"
+        - type: contains_any
+          params:
+            patterns: ["9 months", "nine months", "9-month", "nine-month"]
+          message: "The agent flags the 9 months' notice"

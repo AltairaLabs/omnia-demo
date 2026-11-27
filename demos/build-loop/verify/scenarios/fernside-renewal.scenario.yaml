@@ -36,5 +36,5 @@ spec:
           message: "The agent flags clause 3, the renewal"
         - type: contains_any
           params:
-            patterns: ["9 months", "nine months", "9-month", "nine-month"]
-          message: "The agent flags the 9 months' notice"
+            patterns: ["9 months", "nine months", "9-month", "nine-month", "6 months", "six months", "notice"]
+          message: "The agent flags the notice period"

@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=https://promptkit.altairalabs.ai/schemas/v1alpha1/arena.json
+#
+# verify/ is a test OF the demo, not part of it: nothing here is shown on
+# stage, and the engineer never imports it.
+#
+# This config proves the MIDDLE stage: the seed prompt plus the beat 4 fix
+# only (prompts/contract-triage.beat4.yaml). Everything passes except
+# quillon-changes, which must FAIL: Quillon's unilateral changes are beat 7's
+# miss. Run it through check.sh, which asserts that expected failure.
+#
+#   promptarena run --config demos/build-loop/verify/config.beat4.arena.yaml \
+#     --provider openai --out demos/build-loop/verify/out-beat4
+#
+# Needs OPENAI_API_KEY. gpt-4o is the agent under test; gpt-4o-mini plays the
+# simulated lawyer and the judges. The contract text in scenarios/ is a copy of
+# contracts/: keep them in step.
+apiVersion: promptkit.altairalabs.ai/v1alpha1
+kind: Arena
+metadata:
+  name: contract-triage-verify-beat4
+spec:
+  prompt_configs:
+    - id: contract-triage
+      file: prompts/contract-triage.beat4.yaml
+  providers:
+    - file: providers/openai.provider.yaml
+    - file: providers/openai-mini.provider.yaml
+  scenarios:
+    - file: ../seed/scenarios/data-protection.scenario.yaml
+    - file: ../stage/uncapped-indemnity.scenario.yaml
+    - file: scenarios/brightpost-contract.scenario.yaml
+    - file: scenarios/fernside-renewal.scenario.yaml
+    - file: scenarios/quillon-changes.scenario.yaml
+    - file: scenarios/fernside-36-months.scenario.yaml
+    - file: scenarios/selfplay-cooperative.scenario.yaml
+    - file: scenarios/selfplay-waive-through.scenario.yaml
+  self_play:
+    personas:
+      - file: personas/cooperative-lawyer.persona.yaml
+      - file: personas/pushy-lawyer.persona.yaml
+    roles:
+      - id: claude-user
+        provider: openai-mini
+  judges:
+    - name: default
+      provider: openai-mini
+  defaults:
+    temperature: 0.2
+    max_tokens: 800
+    seed: 42
+    output:
+      dir: out
+      formats: ["json"]
